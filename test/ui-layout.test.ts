@@ -75,3 +75,52 @@ describe("match rule summary", () => {
     expect(html).not.toContain("match: {");
   });
 });
+
+describe("header", () => {
+  it("marks the current section", async () => {
+    const { request } = await setup(fixtures());
+    const current = async (path: string) =>
+      /<a href="[^"]*" class="(?:nav-help )?current" aria-current="page">([^<]+)<\/a>/.exec(await (await request(path)).text())?.[1];
+    expect(await current("/_mimic")).toBe("Services");
+    expect(await current("/_mimic/services/users/edit")).toBe("Services");
+    expect(await current("/_mimic/import")).toBe("Services");
+    expect(await current("/_mimic/profiles/new")).toBe("Profiles");
+    expect(await current("/_mimic/history")).toBe("History");
+    expect(await current("/_mimic/settings")).toBe("Settings");
+    expect(await current("/_mimic/help/scenarios")).toBe("Help");
+  });
+});
+
+describe("controls", () => {
+  it("filters are segmented controls, and the profile picker is one group", async () => {
+    const tagged = fixtures();
+    tagged[0]!.tags = ["team-a"];
+    const { request } = await setup(tagged, undefined, [{ id: "p", name: "P", description: "", services: { users: { mode: "static" } } }]);
+    const services = await (await request("/_mimic")).text();
+    expect(services).toContain('<nav class="segmented" aria-label="Show services by tag">');
+    expect(services).toMatch(/<span class="group"><select id="profile-switch"[\s\S]*?<button type="submit">Apply<\/button><\/span>/);
+    expect(services).toContain('class="button ghost" href="/_mimic/profiles">Manage</a>');
+    const history = await (await request("/_mimic/history?validation=fail")).text();
+    expect(history).toMatch(/<nav class="segmented" aria-label="Filter history">[\s\S]*?class="current" aria-current="true" href="\/_mimic\/history\?validation=fail">Schema failures/);
+    expect(await (await request("/_mimic/services/new")).text()).toContain('class="button ghost" href="/_mimic">Cancel</a>');
+  });
+});
+
+describe("page shell", () => {
+  it("doesn't escape the stylesheet", async () => {
+    const { request } = await setup(fixtures());
+    const html = await (await request("/_mimic")).text();
+    const css = /<style>([\s\S]*?)<\/style>/.exec(html)![1]!;
+    expect(css).toContain(".segmented > a");
+    expect(css).toContain('url("data:image/svg+xml');
+    expect(css).not.toMatch(/&gt;|&quot;|&#39;/);
+  });
+
+  it("has its own icon, so browsers don't request /favicon.ico from the mocks", async () => {
+    const { request } = await setup(fixtures());
+    expect(await (await request("/_mimic")).text()).toContain('<link rel="icon" type="image/svg+xml" href="/_mimic/assets/favicon.svg"/>');
+    const icon = await request("/_mimic/assets/favicon.svg");
+    expect(icon.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await icon.text()).toMatch(/^<svg/);
+  });
+});

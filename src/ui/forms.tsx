@@ -101,7 +101,9 @@ const Actions = ({ submit, cancel }: { submit: string; cancel: string }) => (
     <button type="submit" class="primary">
       {submit}
     </button>
-    <a href={cancel}>Cancel</a>
+    <a class="button ghost" href={cancel}>
+      Cancel
+    </a>
   </div>
 );
 

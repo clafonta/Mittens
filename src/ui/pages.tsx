@@ -69,7 +69,7 @@ function LiveSwitcher({ service, modified, view }: { service: Service; modified:
           <span class="pill s4" title="Differs from the YAML definition. Resets on restart.">
             changed
           </span>
-          <button type="button" class="small" hx-post={`${BASE}/ui/services/${service.id}/reset`} hx-target={target} hx-swap="outerHTML">
+          <button type="button" hx-post={`${BASE}/ui/services/${service.id}/reset`} hx-target={target} hx-swap="outerHTML">
             Reset
           </button>
         </>
@@ -160,10 +160,11 @@ function ProfileSwitcher({ profiles }: { profiles: ProfileInfo[] }) {
   if (profiles.length === 0) return null;
   const active = profiles.filter((p) => p.active);
   return (
-    <form method="post" action={`${BASE}/profiles/apply`} class="switcher">
-      <label for="profile-switch">
+    <form method="post" action={`${BASE}/profiles/apply`} class="toolbar">
+      <label for="profile-switch" class="toolbar-label">
         Profile <HelpLink to="live-state#profiles" label="Help: profiles" />
       </label>
+      <span class="group">
       <select id="profile-switch" name="id">
         {active.length === 0 && <option value="">— custom —</option>}
         {profiles.map(({ profile, active, problems }) => (
@@ -173,9 +174,12 @@ function ProfileSwitcher({ profiles }: { profiles: ProfileInfo[] }) {
           </option>
         ))}
       </select>
-      <input type="hidden" name="return" value={BASE} />
       <button type="submit">Apply</button>
-      <a href={`${BASE}/profiles`}>Manage</a>
+      </span>
+      <input type="hidden" name="return" value={BASE} />
+      <a class="button ghost" href={`${BASE}/profiles`}>
+        Manage
+      </a>
     </form>
   );
 }
@@ -236,22 +240,24 @@ function TagBar({ tags, viewTag, activeTags }: { tags: string[]; viewTag?: strin
   const servingThis = viewTag !== undefined && activeTags.length === 1 && activeTags[0] === viewTag;
   return (
     <div class="tagbar">
-      <span class="muted">
+      <span class="toolbar-label">
         Tags <HelpLink to="services#tags" label="Help: tags" />
       </span>
-      <a class={`pill tag${viewTag === undefined ? " current" : ""}`} href={BASE}>
-        all
-      </a>
-      {tags.map((t) => (
-        <a class={`pill tag${t === viewTag ? " current" : ""}`} href={tagHref(t)}>
-          {t}
+      <nav class="segmented" aria-label="Show services by tag">
+        <a class={viewTag === undefined ? "current" : undefined} aria-current={viewTag === undefined ? "true" : undefined} href={BASE}>
+          all
         </a>
-      ))}
+        {tags.map((t) => (
+          <a class={t === viewTag ? "current" : undefined} aria-current={t === viewTag ? "true" : undefined} href={tagHref(t)}>
+            {t}
+          </a>
+        ))}
+      </nav>
       {viewTag !== undefined && !servingThis && (
         <form method="post" action={`${BASE}/state/tags`} class="inline">
           <input type="hidden" name="tags" value={viewTag} />
           <input type="hidden" name="return" value={tagHref(viewTag)} />
-          <button type="submit" class="small" title="Services without this tag stop answering requests until you serve all again.">
+          <button type="submit" title="Services without this tag stop answering requests until you serve all again.">
             Only serve “{viewTag}”
           </button>
         </form>
@@ -460,7 +466,7 @@ function HookPanel({ serviceId, hook }: { serviceId: string; hook: HookInfo }) {
       </span>
       {hook.file && (
         <form method="post" action={`${BASE}/services/${serviceId}/hook/reset`} class="inline">
-          <button type="submit" class="small" title="Empty ctx.state for this service">
+          <button type="submit" title="Empty ctx.state for this service">
             Clear hook state
           </button>
         </form>
@@ -609,7 +615,7 @@ const exportHref = (format: "har" | "json", filter: { service?: string; validati
 
 /** Download links for the current history view. */
 export const ExportLinks = (filter: { service?: string; validation?: string }) => (
-  <span class="switcher">
+  <span class="toolbar">
     <a class="button" href={exportHref("har", filter)} download>
       Export HAR
     </a>
@@ -627,13 +633,15 @@ export function HistoryPage({ validation, persistedTo, limit }: { validation?: "
         <h1>
           History <HelpLink to="recording#history" label="Help: history" />
         </h1>
-        <span class="switcher">
-          <a class={`pill tag${validation ? "" : " current"}`} href={`${BASE}/history`}>
-            all
-          </a>
-          <a class={`pill tag${validation === "fail" ? " current" : ""}`} href={`${BASE}/history?validation=fail`}>
-            schema failures
-          </a>
+        <span class="toolbar">
+          <nav class="segmented" aria-label="Filter history">
+            <a class={validation ? undefined : "current"} aria-current={validation ? undefined : "true"} href={`${BASE}/history`}>
+              All
+            </a>
+            <a class={validation === "fail" ? "current" : undefined} aria-current={validation === "fail" ? "true" : undefined} href={`${BASE}/history?validation=fail`}>
+              Schema failures
+            </a>
+          </nav>
           <HelpLink to="schemas#where-results-show-up" label="Help: schema checks" />
         </span>
         <ExportLinks validation={validation} />
@@ -831,17 +839,19 @@ export function ProfilesPage({ profiles }: { profiles: ProfileInfo[] }) {
                     </div>
                   ))}
                 </td>
-                <td class="nowrap">
-                  <form method="post" action={`${BASE}/profiles/${profile.id}/apply`} class="inline">
-                    <input type="hidden" name="return" value={`${BASE}/profiles`} />
-                    <button type="submit" class="primary" disabled={problems.length > 0}>
-                      Apply
-                    </button>
-                  </form>{" "}
-                  <a class="button" href={`${BASE}/profiles/${profile.id}/edit`}>
-                    Edit
-                  </a>{" "}
-                  <DeleteButton action={`${BASE}/profiles/${profile.id}/delete`} what={`profile '${profile.name}'`} />
+                <td>
+                  <div class="toolbar end">
+                    <form method="post" action={`${BASE}/profiles/${profile.id}/apply`} class="inline">
+                      <input type="hidden" name="return" value={`${BASE}/profiles`} />
+                      <button type="submit" class="primary" disabled={problems.length > 0}>
+                        Apply
+                      </button>
+                    </form>
+                    <a class="button" href={`${BASE}/profiles/${profile.id}/edit`}>
+                      Edit
+                    </a>
+                    <DeleteButton action={`${BASE}/profiles/${profile.id}/delete`} what={`profile '${profile.name}'`} />
+                  </div>
                 </td>
               </tr>
             ))}
@@ -927,7 +937,9 @@ export function ImportPage(props: { values: Record<string, string>; error?: stri
             <button type="submit" name="action" value="import" class="primary">
               Import
             </button>
-            <a href={BASE}>Cancel</a>
+            <a class="button ghost" href={BASE}>
+              Cancel
+            </a>
           </div>
         </form>
       )}

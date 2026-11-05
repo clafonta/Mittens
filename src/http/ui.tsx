@@ -53,6 +53,8 @@ import { BASE } from "./paths.js";
 
 const htmxSource = readFileSync(createRequire(import.meta.url).resolve("htmx.org/dist/htmx.min.js"), "utf8");
 
+const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#4f46e5"/><path d="M8 23V9h3.2l4.8 7.2L20.8 9H24v14h-3V14.4l-5 7.3-5-7.3V23z" fill="#fff"/></svg>`;
+
 /** Redirect target after a POST, carrying a one-off status message. */
 const withFlash = (path: string, flash: string) => `${path}${path.includes("?") ? "&" : "?"}flash=${encodeURIComponent(flash)}`;
 
@@ -66,7 +68,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
 
   const page = (c: Context, title: string, body: Child, status: 200 | 404 | 422 = 200) =>
     c.html(
-      <Layout title={title} readOnly={store.readOnly} flash={c.req.query("flash")} reloadError={store.reloadError}>
+      <Layout title={title} readOnly={store.readOnly} flash={c.req.query("flash")} reloadError={store.reloadError} path={c.req.path}>
         {body}
       </Layout>,
       status,
@@ -141,6 +143,13 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     return page(c, `${title} · Help`, <SearchPage help={help} query={query} results={help.search(query, 50)} />);
   });
   ui.get("/help/:slug", (c) => helpPage(c, c.req.param("slug")));
+
+  // With an icon of its own, the browser doesn't ask for /favicon.ico, which would land in History as mock traffic.
+  ui.get("/assets/favicon.svg", (c) => {
+    c.header("content-type", "image/svg+xml");
+    c.header("cache-control", "public, max-age=86400");
+    return c.body(FAVICON);
+  });
 
   ui.get("/assets/htmx.min.js", (c) => {
     c.header("content-type", "text/javascript; charset=utf-8");

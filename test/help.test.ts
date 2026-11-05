@@ -134,7 +134,7 @@ describe("help pages", () => {
 
   it("the header links to help", async () => {
     const { request } = await setup([]);
-    expect(await (await request("/_mimic/settings")).text()).toContain('class="nav-help" href="/_mimic/help"');
+    expect(await (await request("/_mimic/settings")).text()).toContain('href="/_mimic/help" class="nav-help"');
   });
 });
 

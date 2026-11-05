@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { FileRepo } from "./core/repo.js";
-import type { Service } from "./core/schema.js";
+import type { Profile, Service } from "./core/schema.js";
 
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -62,6 +62,22 @@ export const EXAMPLE_SERVICES: Service[] = [
   },
 ];
 
+/** Example profiles written by `mimic init`. */
+export const EXAMPLE_PROFILES: Profile[] = [
+  {
+    id: "happy-path",
+    name: "Happy path",
+    description: "Users API answers by request; httpbin goes to the real service.",
+    services: { users: { mode: "dynamic", scenario: "found" }, httpbin: { mode: "proxy" } },
+  },
+  {
+    id: "outage",
+    name: "Outage",
+    description: "Every users lookup fails with a 500.",
+    services: { users: { mode: "static", scenario: "server-error" } },
+  },
+];
+
 export async function init(dir: string): Promise<{ created: boolean; dir: string }> {
   const root = path.resolve(dir);
   if (existsSync(path.join(root, "services"))) return { created: false, dir: root };
@@ -70,5 +86,6 @@ export async function init(dir: string): Promise<{ created: boolean; dir: string
     await repo.saveService(service);
     for (const sc of service.scenarios) await repo.saveScenario(service.id, sc);
   }
+  for (const profile of EXAMPLE_PROFILES) await repo.saveProfile(profile);
   return { created: true, dir: root };
 }

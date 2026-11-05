@@ -3,16 +3,20 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
-import { type Scenario, ScenarioFile, type Service, ServiceFile, Slug } from "./schema.js";
+import { type Profile, ProfileFile, type Scenario, ScenarioFile, type Service, ServiceFile, Slug } from "./schema.js";
 
 /**
- * Persists services as a git-friendly directory tree:
+ * Persists definitions as a git-friendly directory tree:
  *
  *   <root>/services/<service-id>/service.yaml
  *   <root>/services/<service-id>/scenarios/<scenario-id>.yaml
+ *   <root>/profiles/<profile-id>.yaml
  */
 export interface Repo {
   loadAll(): Promise<Service[]>;
+  loadProfiles(): Promise<Profile[]>;
+  saveProfile(profile: Profile): Promise<void>;
+  deleteProfile(profileId: string): Promise<void>;
   saveService(service: Service): Promise<void>;
   deleteService(serviceId: string): Promise<void>;
   saveScenario(serviceId: string, scenario: Scenario): Promise<void>;
@@ -39,6 +43,9 @@ export class FileRepo implements Repo {
   }
   private serviceDir(id: string) {
     return path.join(this.servicesDir(), Slug.parse(id));
+  }
+  private profilePath(id: string) {
+    return path.join(this.root, "profiles", `${Slug.parse(id)}.yaml`);
   }
   private scenarioPath(serviceId: string, scenarioId: string) {
     return path.join(this.serviceDir(serviceId), "scenarios", `${Slug.parse(scenarioId)}.yaml`);
@@ -72,6 +79,29 @@ export class FileRepo implements Repo {
     return scenarios;
   }
 
+  async loadProfiles(): Promise<Profile[]> {
+    const dir = path.join(this.root, "profiles");
+    if (!existsSync(dir)) return [];
+    const profiles: Profile[] = [];
+    for (const file of (await readdir(dir)).filter((f) => f.endsWith(".yaml")).sort()) {
+      const id = file.slice(0, -".yaml".length);
+      if (!Slug.safeParse(id).success) continue;
+      profiles.push({ ...(await parseFile(path.join(dir, file), ProfileFile)), id });
+    }
+    return profiles;
+  }
+
+  async saveProfile(profile: Profile): Promise<void> {
+    const { id, ...def } = profile;
+    const file = this.profilePath(id);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, dump(ProfileFile.parse(def)));
+  }
+
+  async deleteProfile(profileId: string): Promise<void> {
+    await rm(this.profilePath(profileId), { force: true });
+  }
+
   async saveService(service: Service): Promise<void> {
     const { id, scenarios: _scenarios, ...def } = service;
     const dir = this.serviceDir(id);
@@ -97,10 +127,18 @@ export class FileRepo implements Repo {
 
 /** Repo that keeps nothing on disk; used in tests. */
 export class MemoryRepo implements Repo {
-  constructor(private readonly seed: Service[] = []) {}
+  constructor(
+    private readonly seed: Service[] = [],
+    private readonly profiles: Profile[] = [],
+  ) {}
   async loadAll() {
     return structuredClone(this.seed);
   }
+  async loadProfiles() {
+    return structuredClone(this.profiles);
+  }
+  async saveProfile() {}
+  async deleteProfile() {}
   async saveService() {}
   async deleteService() {}
   async saveScenario() {}

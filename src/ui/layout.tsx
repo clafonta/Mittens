@@ -21,9 +21,29 @@ select, button { font:inherit; padding:.2rem .4rem; border:1px solid var(--line)
 .grid { display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; } @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
 .empty { padding:2rem; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:8px; }
 .banner { padding:.5rem .75rem; border:1px solid var(--warn); color:var(--warn); border-radius:6px; margin-bottom:1rem; }
+.flash { padding:.5rem .75rem; border:1px solid var(--ok); color:var(--ok); border-radius:6px; margin-bottom:1rem; }
+.error-banner { border-color:var(--bad); color:var(--bad); }
+.title-row { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin:0 0 1rem; } .title-row h1, .title-row h2, .title-row h3 { margin:0; margin-right:auto; }
+h2 + .title-row, .title-row h2 { margin-top:2rem; }
+.scenario { border-top:1px solid var(--line); padding-top:.75rem; margin-top:.75rem; } .scenario .title-row { margin-bottom:.25rem; }
+.button, button { display:inline-block; font:inherit; padding:.3rem .7rem; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; text-decoration:none; cursor:pointer; line-height:1.4; }
+.button:hover, button:hover { border-color:var(--muted); } button:disabled { opacity:.5; cursor:not-allowed; }
+.primary { background:var(--accent); border-color:var(--accent); color:#fff; } .primary:hover { filter:brightness(1.1); border-color:var(--accent); }
+.danger { color:var(--bad); } .danger:hover { border-color:var(--bad); }
+form.inline { display:inline; } .nowrap { white-space:nowrap; }
+.switcher { display:flex; align-items:center; gap:.4rem; } .switcher label { color:var(--muted); }
+.form { max-width:820px; } .field { margin-bottom:.9rem; flex:1; min-width:0; }
+.field label { display:block; font-weight:500; margin-bottom:.2rem; }
+.row, .row3 { display:flex; gap:1rem; } .row3 > * { flex:1; } @media (max-width: 700px) { .row, .row3 { flex-direction:column; gap:0; } }
+input[type=text], input[type=number], input:not([type]), textarea, .field select { width:100%; font:inherit; padding:.4rem .5rem; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; }
+input[readonly] { color:var(--muted); } textarea.mono { font:12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.field.invalid input, .field.invalid textarea { border-color:var(--bad); }
+.error { color:var(--bad); font-size:.85rem; margin-top:.2rem; } .hint { color:var(--muted); font-size:.85rem; margin-top:.2rem; }
+fieldset { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem; margin:0 0 1rem; } legend { padding:0 .3rem; font-weight:500; }
+.actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; }
 `;
 
-export function Layout(props: { title: string; readOnly: boolean; children: Child }) {
+export function Layout(props: { title: string; readOnly: boolean; flash?: string; children: Child }) {
   return (
     <html lang="en">
       <head>
@@ -37,11 +57,17 @@ export function Layout(props: { title: string; readOnly: boolean; children: Chil
         <header>
           <strong>Mimic</strong>
           <a href={BASE}>Services</a>
+          <a href={`${BASE}/profiles`}>Profiles</a>
           <a href={`${BASE}/history`}>History</a>
           <a href={`${BASE}/api/services`}>API</a>
         </header>
         <main>
           {props.readOnly && <div class="banner">Read-only mode: changes are kept in memory and not saved to disk.</div>}
+          {props.flash && (
+            <div class="flash" role="status">
+              {props.flash}
+            </div>
+          )}
           {props.children}
         </main>
       </body>

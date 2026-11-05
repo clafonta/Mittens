@@ -23,12 +23,13 @@ Requires Node.js 22+. Installed globally (`npm i -g @laboriouslabs/mimic`), the 
 
 - **Service** — a route (`path` + `method`) and how to answer it.
 - **Scenario** — a canned response: status, headers, body, optional delay and `match` rule.
+- **Profile** — a named preset ("happy path", "outage") that sets the mode and/or default scenario of several services in one step. Apply one from the dashboard, the API, or at startup with `--profile`.
 - **Mode** (per service):
   - `static` — always return `defaultScenario`.
   - `dynamic` — return the scenario whose `match` rule best fits the request; otherwise fall back to `defaultScenario`, then `errorScenario`.
   - `proxy` — forward to `upstream` and record the exchange; on failure, return `errorScenario` (or a 502).
 
-Everything under `/_mimic` is Mimic's own dashboard and API; every other path is mock traffic. Responses carry `x-mimic-service`, `x-mimic-scenario` and `x-mimic-source` headers so you can tell what answered.
+Services, scenarios and profiles can all be created and edited in the dashboard, or by editing the YAML directly. Everything under `/_mimic` is Mimic's own dashboard and API; every other path is mock traffic. Responses carry `x-mimic-service`, `x-mimic-scenario` and `x-mimic-source` headers so you can tell what answered.
 
 ## Definitions on disk
 
@@ -42,6 +43,8 @@ mimic/
       scenarios/
         found.yaml
         not-found.yaml
+  profiles/
+    outage.yaml
 ```
 
 ```yaml
@@ -73,7 +76,17 @@ match:                    # dynamic mode: every listed criterion must match; mos
 delayMs: 250              # overrides the service delay
 ```
 
-Directory and file names are the IDs (lowercase, digits, dashes).
+```yaml
+# profiles/outage.yaml
+name: Outage
+description: Every users lookup fails with a 500.
+services:                 # services not listed are left alone
+  users:
+    mode: static          # optional
+    scenario: server-error   # optional; becomes the default scenario
+```
+
+Directory and file names are the IDs (lowercase, digits, dashes). `new` and `apply` are reserved.
 
 ## CLI
 
@@ -85,6 +98,7 @@ mimic init [--dir <path>]
       --host <addr>  default 127.0.0.1 (MIMIC_HOST)
   -d, --dir <path>   default ./mimic (MIMIC_DIR)
       --read-only    never write changes to disk
+      --profile <id> apply a profile on start (MIMIC_PROFILE)
       --open         open the dashboard in a browser
 ```
 
@@ -98,11 +112,15 @@ All under `/_mimic/api`, JSON in and out:
 | POST | `/services` | create a service |
 | GET / PATCH / DELETE | `/services/:id` | read / update fields / delete |
 | PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
+| GET | `/profiles` | list, each with `active` and `problems` |
+| POST | `/profiles` | create (`?from=current` fills `services` from the current state) |
+| GET / PUT / DELETE | `/profiles/:id` | read / replace / delete |
+| POST | `/profiles/:id/apply` | apply all-or-nothing; returns the changed service IDs |
 | GET / DELETE | `/history` | list (`?service=id`) / clear |
 | GET | `/history/:id` | one request/response |
 | GET | `/health` | liveness |
 
-Handy in test setup, e.g. `PATCH /_mimic/api/services/users {"mode":"static","defaultScenario":"server-error"}`.
+Handy in test setup, e.g. `POST /_mimic/api/profiles/outage/apply`, or `PATCH /_mimic/api/services/users {"mode":"static","defaultScenario":"server-error"}`.
 
 ## Development
 

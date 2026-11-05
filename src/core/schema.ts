@@ -58,7 +58,7 @@ export const ServiceFile = z
     name: z.string().min(1),
     description: z.string().default(""),
     /** Path template, e.g. /api/users/{id}. A trailing /* matches any suffix. */
-    path: z.string().startsWith("/"),
+    path: z.string().startsWith("/", "Must start with /"),
     method: HttpMethod.default("ANY"),
     mode: ServiceMode.default("static"),
     defaultScenario: Slug.optional(),
@@ -77,3 +77,30 @@ export const Service = ServiceFile.extend({
   scenarios: z.array(Scenario).default([]),
 });
 export type Service = z.infer<typeof Service>;
+
+/** What a profile sets on one service. Omitted fields are left unchanged. */
+export const ProfileEntry = z
+  .object({
+    mode: ServiceMode.optional(),
+    /** Becomes the service's defaultScenario. */
+    scenario: Slug.optional(),
+  })
+  .strict();
+export type ProfileEntry = z.infer<typeof ProfileEntry>;
+
+/**
+ * A named preset (Mockey's "service plan"): applying it sets mode and/or
+ * default scenario on each listed service in one step. Unlisted services are
+ * not touched.
+ */
+export const ProfileFile = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().default(""),
+    services: z.record(Slug, ProfileEntry).default({}),
+  })
+  .strict();
+export type ProfileFile = z.infer<typeof ProfileFile>;
+
+export const Profile = ProfileFile.extend({ id: Slug });
+export type Profile = z.infer<typeof Profile>;

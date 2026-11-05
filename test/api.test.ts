@@ -34,6 +34,12 @@ describe("management API", () => {
     expect((await request("/_mimic/api/services/zzz")).status).toBe(404);
   });
 
+  it("reserves ids that collide with dashboard routes", async () => {
+    const { request } = await setup([]);
+    expect((await request("/_mimic/api/services", body({ id: "new", name: "N", path: "/n" }))).status).toBe(409);
+    expect((await request("/_mimic/api/profiles", body({ id: "apply", name: "A" }))).status).toBe(409);
+  });
+
   it("requires an upstream for proxy mode", async () => {
     const { request } = await setup([{ id: "a", path: "/a" }]);
     expect((await request("/_mimic/api/services/a", { ...body({ mode: "proxy" }), method: "PATCH" })).status).toBe(409);

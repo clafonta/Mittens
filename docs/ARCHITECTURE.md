@@ -28,15 +28,22 @@ src/
   cli.ts            arg parsing, `init`, server start
   init.ts           example definitions
   core/
-    schema.ts       Zod schemas + types (Service, Scenario, MatchRule)
+    schema.ts       Zod schemas + types (Service, Scenario, MatchRule, Profile)
     path.ts         path templates → regex, specificity ranking
     repo.ts         Repo interface; FileRepo (YAML tree), MemoryRepo (tests)
-    store.ts        in-memory definitions, validation, write-through to Repo
+    store.ts        in-memory definitions + profiles, validation, write-through to Repo
     engine.ts       resolve request → scenario/proxy response; delay; record
     history.ts      bounded in-memory request log (event emitter)
   http/
-    app.tsx         Hono app: /_mimic/api (JSON), /_mimic (HTML), * (mocks)
-  ui/               JSX layout and pages
+    app.ts          composes the three sub-apps below
+    api.ts          /_mimic/api — JSON management API
+    ui.tsx          /_mimic — dashboard pages and form handlers
+    mock.ts         * — mock traffic (CORS, x-mimic-* headers)
+  ui/
+    layout.tsx      page shell and styles
+    pages.tsx       list/detail pages
+    forms.tsx       service, scenario and profile forms
+    form-data.ts    form values <-> domain objects, Zod issues -> field errors
 test/               vitest suites
 ```
 
@@ -62,8 +69,8 @@ test/               vitest suites
 | Error scenario / universal error | Per-service `errorScenario` | **0**; global default in 1 |
 | REST API (partial) | Full JSON API | **0** |
 | `-p`, `-l`, `-t` (transient), `-H` | `--port`, `--dir`, `--read-only`, `--open` (opt-in) | **0** |
-| Service/scenario editing in UI | Create/edit/delete forms | 1 |
-| Service plans | **Profiles**: named sets of mode + scenario per service, switchable in one call | 1 |
+| Service/scenario editing in UI | Create/edit/delete forms | **1 (done)** |
+| Service plans | **Profiles**: named sets of mode + scenario per service, switchable in one call; `--profile` on start | **1 (done)** |
 | Tags + `-F` filter | `--tag` filter, tag filters in UI | 1 |
 | History → save as scenario | "Save as scenario" from a recorded proxy response | 1 |
 | Redo request (`/doitagain`) | Replay from history | 1 |
@@ -79,6 +86,10 @@ test/               vitest suites
 ## Roadmap
 
 - **Phase 0 — foundation (done):** schemas, file store, engine with three modes, history, JSON API, dashboard with mode/default switching, CLI (`start`, `init`), tests.
-- **Phase 1 — daily-driver UI:** CRUD forms for services and scenarios, profiles, tags, record-to-scenario, replay, file-watch reload, global error scenario.
+- **Phase 1 — daily-driver UI:** ~~CRUD forms for services and scenarios~~, ~~profiles~~ (done); remaining: tags, record-to-scenario, replay, file-watch reload, global error scenario.
+
+### UI conventions
+
+Forms are plain HTML `POST`s (they work without JavaScript). On success the handler redirects (303) with a `?flash=` message; on failure it re-renders the form with the submitted values and per-field errors (422). Zod issue paths and `StoreError.field` map errors onto field names. htmx is used only for in-place updates (the mode/default switcher row, history polling).
 - **Phase 2 — proxy fidelity:** outbound proxy env vars, path rewrites, faithful header forwarding (`fetch` adds a few defaults such as `sec-fetch-mode`; switch to `undici.request` if that matters), streaming for large bodies, optional history persistence (`node:sqlite`), HAR export, schema validation.
 - **Phase 3 — extensibility:** response templating, user JS hooks, OpenAPI import to bootstrap services, publish to npm with CI (lint, test, release).

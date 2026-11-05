@@ -1,0 +1,6 @@
+name: Outage
+description: Every users lookup fails with a 500.
+services:
+  users:
+    mode: static
+    scenario: server-error

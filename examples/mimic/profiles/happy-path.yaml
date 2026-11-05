@@ -1,0 +1,8 @@
+name: Happy path
+description: Users API answers by request; httpbin goes to the real service.
+services:
+  users:
+    mode: dynamic
+    scenario: found
+  httpbin:
+    mode: proxy

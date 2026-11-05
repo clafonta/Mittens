@@ -20,6 +20,8 @@ export interface HelpTopic {
   slug: string;
   title: string;
   html: string;
+  /** The source, for tools that want plain text (e.g. the MCP read_help tool). */
+  markdown: string;
   headings: HelpHeading[];
   /** Plain-text sections, split at h2/h3, for search. */
   sections: HelpSection[];
@@ -99,7 +101,7 @@ function render(markdown: string, slug: string, base: string): HelpTopic {
   });
   const html = marked.parse(markdown, { async: false });
   const title = headings.find((h) => h.depth === 1)?.text ?? slug;
-  return { slug, title, html, headings, sections: sectionsOf(markdown, headings) };
+  return { slug, title, html, markdown, headings, sections: sectionsOf(markdown, headings) };
 }
 
 /** Markdown → plain text, near enough for searching and snippets. */

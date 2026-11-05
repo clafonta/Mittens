@@ -9,6 +9,7 @@ Mimic is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).
 - **Record real traffic** in proxy mode and save responses as scenarios; replay any request; export history as HAR.
 - **Request matching** on method, path params, query, headers and body, including regexes and JSONPath.
 - **Response templates** (`{{params.id}}`, `{{body.name | json}}`) and **JavaScript/TypeScript hooks** for stateful or unusual cases.
+- **Works with your AI assistant:** Claude Code, Codex, GitHub Copilot, Cursor and other MCP clients can create mocks, flip services into failure modes and explain responses for you.
 - **OpenAPI import** builds services, example responses and schemas in one command; every response can be **checked against a JSON Schema**.
 - **Works on a locked-down laptop:** one `npx` command, no database or Docker, honours corporate `HTTP(S)_PROXY` settings.
 
@@ -32,6 +33,7 @@ Requires Node.js 22.19+. Installed globally (`npm i -g @clafonta/mimic`), the co
 Mimic's help is built in: open **Help** in the dashboard ([/_mimic/help](http://localhost:4000/_mimic/help)), or follow the **?** next to any setting. The same pages are in [`docs/help`](docs/help/README.md):
 
 - [Getting started](docs/help/getting-started.md): run Mimic, point your app at it, make your first service
+- [AI assistants](docs/help/assistants.md): let Claude, Codex, Copilot or Cursor set Mimic up for you
 - [Services and modes](docs/help/services.md): routes, methods, static / dynamic / proxy, delays, tags
 - [Scenarios and matching](docs/help/scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks
 - [Live state and profiles](docs/help/live-state.md): what changes the files and what doesn't; switching many services at once

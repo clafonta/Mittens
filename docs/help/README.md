@@ -15,16 +15,17 @@ Mimic is a mock server and recording proxy that runs on your machine. Point your
 In Mimic, the search box above the topic list finds any section; press `/` to jump to it.
 
 1. [Getting started](getting-started.md): run Mimic, point your app at it, make your first service
-2. [Services and modes](services.md): routes, methods, static / dynamic / proxy, delays, tags
-3. [Scenarios and matching](scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks
-4. [Live state and profiles](live-state.md): what changes the files and what doesn't; switching many services at once
-5. [Recording, history and replay](recording.md): capture real traffic, save it as scenarios, replay, export HAR
-6. [Proxying to real services](proxying.md): upstreams, path rewrites, corporate proxies
-7. [Response templates](templates.md): fill responses in from the request
-8. [Hooks](hooks.md): JavaScript or TypeScript for stateful and unusual cases
-9. [Response schemas](schemas.md): check every response against a JSON Schema
-10. [Importing OpenAPI](openapi.md): build services from a spec
-11. [Files on disk](files.md): the definitions folder, YAML reference, reloading, git tips
-12. [Command line](cli.md): commands, options and environment variables
-13. [HTTP API](api.md): control Mimic from scripts and tests
-14. [Troubleshooting](troubleshooting.md): "why did I get this response?" and other puzzles
+2. [AI assistants](assistants.md): let Claude, Codex, Copilot or Cursor set Mimic up for you
+3. [Services and modes](services.md): routes, methods, static / dynamic / proxy, delays, tags
+4. [Scenarios and matching](scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks
+5. [Live state and profiles](live-state.md): what changes the files and what doesn't; switching many services at once
+6. [Recording, history and replay](recording.md): capture real traffic, save it as scenarios, replay, export HAR
+7. [Proxying to real services](proxying.md): upstreams, path rewrites, corporate proxies
+8. [Response templates](templates.md): fill responses in from the request
+9. [Hooks](hooks.md): JavaScript or TypeScript for stateful and unusual cases
+10. [Response schemas](schemas.md): check every response against a JSON Schema
+11. [Importing OpenAPI](openapi.md): build services from a spec
+12. [Files on disk](files.md): the definitions folder, YAML reference, reloading, git tips
+13. [Command line](cli.md): commands, options and environment variables
+14. [HTTP API](api.md): control Mimic from scripts and tests
+15. [Troubleshooting](troubleshooting.md): "why did I get this response?" and other puzzles

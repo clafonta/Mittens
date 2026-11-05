@@ -26,6 +26,8 @@ const HELP = `mimic ${pkg.version} — local HTTP mock server and recording prox
 Usage:
   mimic [start] [options]   Start the server
   mimic init [--dir <path>] Create example definitions
+  mimic mcp [--url <url>]   Connect an AI assistant that launches local commands
+                           (stdio) to the running Mimic; see the Assistants page
   mimic import <spec>       Create services from an OpenAPI 3 file or URL
       --dry-run            Show what would be created; write nothing
       --mode <mode>        Starting mode: static (default), dynamic or proxy
@@ -93,6 +95,7 @@ async function main() {
       "dry-run": { type: "boolean", default: false },
       mode: { type: "string" },
       prefix: { type: "string" },
+      url: { type: "string" },
     },
   });
 
@@ -109,6 +112,11 @@ async function main() {
     return;
   }
   if (command === "import") return importSpec(positionals[1], dir, values);
+  if (command === "mcp") {
+    const port = values.port ?? process.env.MIMIC_PORT ?? "4000";
+    const { runBridge } = await import("./mcp/bridge.js");
+    return runBridge(values.url ?? `http://127.0.0.1:${port}/_mimic/mcp`);
+  }
   if (command !== "start") fail(`unknown command '${command}'. Run 'mimic --help'.`);
 
   const port = Number(values.port ?? process.env.MIMIC_PORT ?? 4000);

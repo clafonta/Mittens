@@ -7,6 +7,7 @@ import { type Engine, renderScenario } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import type { Hooks } from "../core/hooks.js";
 import type { Rates } from "../core/rates.js";
+import type { McpActivity } from "../mcp/activity.js";
 import { scenarioFromHistory } from "../core/record.js";
 import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
 import { upstreamUrl } from "../core/rewrite.js";
@@ -32,6 +33,10 @@ import { loadHelp, withOrigin } from "../help.js";
 import { ProfileForm, refValue, ScenarioForm, ServiceForm, SettingsForm } from "../ui/forms.js";
 import { HelpPage, SearchDropdown, SearchPage } from "../ui/help.js";
 import { HomePage } from "../ui/home.js";
+import { AssistantActivity, AssistantsPage } from "../ui/assistants.js";
+import { MCP_PATH } from "../mcp/http.js";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
@@ -66,7 +71,7 @@ const safeReturn = (v: string | undefined, fallback: string) =>
   v && (v === BASE || v.startsWith(`${BASE}/`) || v.startsWith(`${BASE}?`)) && !v.startsWith("//") ? v : fallback;
 
 /** HTML dashboard, mounted at /_mimic. */
-export function createUi(store: Store, history: History, engine: Engine, hooks: Hooks, rates: Rates) {
+export function createUi(store: Store, history: History, engine: Engine, hooks: Hooks, rates: Rates, activity: McpActivity) {
   const rateOf = (id: string) => rates.series(id);
   const ui = new Hono();
 
@@ -559,6 +564,19 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
       />,
     );
   });
+  // ------------------------------------------------------- AI assistants
+
+  // Installed from npm, assistants can launch the bridge with npx; from a checkout, with this copy's dist/cli.js.
+  const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+  const stdioCommand = packageRoot.includes(`${path.sep}node_modules${path.sep}`)
+    ? { command: "npx", args: ["-y", "@clafonta/mimic"] }
+    : { command: "node", args: [path.join(packageRoot, "dist", "cli.js")] };
+
+  ui.get("/assistants", (c) =>
+    page(c, "AI assistants", <AssistantsPage data={{ endpoint: `${new URL(c.req.url).origin}${BASE}${MCP_PATH}`, stdioCommand, activity }} />),
+  );
+  ui.get("/ui/assistants/activity", (c) => c.html(<AssistantActivity activity={activity} />));
+
   ui.get("/ui/live-banner", (c) =>
     c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), SERVICES)} />),
   );

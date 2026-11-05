@@ -116,7 +116,7 @@ describe("help pages", () => {
     const started = await (await request("/_mimic/help/getting-started")).text();
     expect(started).toContain("curl http://localhost/api/users/42");
     expect(started).not.toContain("localhost:4000");
-    expect(started).toMatch(/class="pager"[\s\S]*Overview[\s\S]*Services and modes/);
+    expect(started).toMatch(/class="pager"[\s\S]*Overview[\s\S]*AI assistants/);
   });
 
   it("links out to other sites in a new tab", async () => {

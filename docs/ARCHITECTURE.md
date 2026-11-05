@@ -45,6 +45,11 @@ src/
     validate.ts     responseSchema checks (Ajv, 2020-12 / draft-07)
     rewrite.ts      stripPrefix / rewrite → upstream URL
     rates.ts        requests per service in 30 s buckets, for sparklines
+  mcp/
+    server.ts       MCP tools and server instructions for AI assistants
+    http.ts         /_mimic/mcp endpoint and its local-only guard
+    bridge.ts       `mimic mcp`: stdio ↔ HTTP relay for command-launching assistants
+    activity.ts     which assistant connected, and its recent tool calls
     upstream.ts     HTTP(S)_PROXY support for proxy-mode calls (undici)
     openapi.ts      OpenAPI 3 → import plan → services
     history.ts      bounded in-memory request log (event emitter)
@@ -90,6 +95,12 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 `watch.ts` watches the definitions directory recursively and, after a short debounce, calls `Store.reload()`. Reloads never overlap; events during a reload queue one more. `reload()` loads everything first and swaps only if every file is valid, so a half-finished edit never takes down a running mock: the last good definitions keep serving and `store.reloadError` is shown in the dashboard. Live overrides survive a reload unless they no longer make sense (service or scenario gone, proxy without upstream).
 
 Mimic's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
+
+### AI assistants (MCP)
+
+`/_mimic/mcp` is a Model Context Protocol endpoint (Streamable HTTP, via the official SDK's web-standard transport). It is stateless: each POST gets a fresh `McpServer` whose ~20 tools (`mcp/server.ts`) call the same Store, Engine and History the dashboard uses, so an assistant's changes apply to the running mocks and show up in the dashboard immediately. Tool results are JSON text; errors come back as tool errors with readable messages. Server instructions explain the model (definitions vs live state) and steer assistants to experiment with live state and verify with `send_request`. Tools carry MCP annotations (read-only, destructive) so clients can ask before deleting.
+
+The endpoint only answers local clients (`mcp/http.ts`): requests from other origins are refused, and the Host must be `localhost` or an IP literal, which defeats DNS rebinding. `mimic mcp` (`mcp/bridge.ts`) relays stdio to that endpoint for assistants that only launch commands. `McpActivity` records the connecting client (from `initialize`) and every tool call for the dashboard's Assistants page.
 
 ### Home page and live events
 
@@ -165,6 +176,7 @@ Hooks are on by default: they're the user's own code, like a test suite, and the
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
 - **Phase 2 — proxy fidelity & export (done):** corporate proxy, path rewrites, history export, schema validation, regex/JSONPath matching, history persistence.
   - Still open from this area: faithful header forwarding (`fetch` adds defaults such as `sec-fetch-mode`; `undici.request` would avoid them) and streaming large bodies instead of buffering.
+- **Phase 4 — AI assistants:** ~~MCP endpoint, stdio bridge, Assistants page~~ (done); next: an `AGENTS.md` written by `mimic init` for agents that edit the YAML directly, and verifying the setup with each assistant.
 - **Phase 3 — extensibility (done):** response templating, OpenAPI import, user JS hooks, and a local release gate (`prepublishOnly` runs typecheck, tests, build and a packaged-install smoke test). First publish still to do (see RELEASING.md). Not done: CI, since there is no hosted repository (only macOS has been tested), and a linter (e.g. Biome) — today `tsc --strict` is the only static check.
   - Import follow-ups: filtering by OpenAPI tag or path at import time (a full GitHub API import is 1,259 services and ~40 MB of YAML, because shared schemas are inlined per service), and re-importing to update services that came from a spec.
 

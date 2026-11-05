@@ -97,6 +97,17 @@ export const request: RequestHook = (req) => (req.query.smoke ? { body: { smoke:
   if (hooked.headers.get("x-mimic-source") !== "hook" || hookedBody !== '{"smoke":"7"}') fail(`hook response: ${hookedBody}`);
   const helpPage = await (await fetch(`${origin}/_mimic/help/getting-started`)).text();
   if (!helpPage.includes(`curl ${origin}/api/users/42`)) fail("help pages missing, or examples don't show the live address");
+  step("MCP endpoint for AI assistants");
+  const rpc = (id, method, params) =>
+    fetch(`${origin}/_mimic/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+    }).then((r) => r.json());
+  const init = await rpc(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "smoke", version: "0" } });
+  if (init.result?.serverInfo?.name !== "mimic") fail(`MCP initialize: ${JSON.stringify(init)}`);
+  const overview = await rpc(2, "tools/call", { name: "get_overview", arguments: {} });
+  if (!overview.result?.content?.[0]?.text?.includes('"id": "users"')) fail(`MCP get_overview: ${JSON.stringify(overview).slice(0, 300)}`);
   const home = await (await fetch(`${origin}/_mimic`)).text();
   if (!home.includes("<title>Home · Mimic</title>")) fail("home page didn't render");
   const dashboard = await (await fetch(`${origin}/_mimic/services`)).text();

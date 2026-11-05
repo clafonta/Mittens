@@ -135,6 +135,17 @@ a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-co
 .legend span { display:inline-flex; align-items:center; gap:.35rem; } .legend #flow-status { margin-left:auto; }
 .legend i.dot { width:9px; height:9px; border-radius:50%; display:inline-block; } .legend i.dot.req { background:var(--accent); } .legend i.dot.s2 { background:var(--ok); } .legend i.dot.s4 { background:var(--warn); } .legend i.dot.s5 { background:var(--bad); }
 .legend i.line.dashed { width:18px; border-top:1.5px dashed var(--line-strong); display:inline-block; }
+/* ---- AI assistants */
+.assistants { max-width:860px; } .assistants .lead { font-size:1rem; line-height:1.55; color:var(--fg); margin:0 0 1.25rem; }
+.panel.endpoint code { font-size:13px; }
+.assistant-status { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin:0 0 .75rem; }
+table.activity td { vertical-align:middle; } table.activity code.args { font-size:11.5px; word-break:break-all; }
+details.setup { border:1px solid var(--line); border-radius:8px; background:var(--surface); margin:0 0 .5rem; }
+details.setup summary { cursor:pointer; padding:.7rem 1rem; list-style-position:inside; } details.setup[open] summary { border-bottom:1px solid var(--line); }
+details.setup > :not(summary) { margin-left:1rem; margin-right:1rem; } details.setup > :last-child { margin-bottom:1rem; }
+details.setup ol { padding-left:1.2rem; } details.setup li { margin:.6rem 0; } details.setup pre { margin:.4rem 0; }
+pre.copyable { position:relative; padding-right:4.5rem; white-space:pre-wrap; word-break:break-all; } pre.copyable .copy { position:absolute; top:.4rem; right:.4rem; }
+ul.prompts { list-style:none; padding:0; margin:0 0 1rem; } ul.prompts li { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.55rem .75rem; border:1px solid var(--line); border-radius:8px; background:var(--surface); margin:0 0 .4rem; }
 .form { max-width:820px; } .field { margin-bottom:.9rem; flex:1; min-width:0; }
 .field label { display:block; font-weight:500; margin-bottom:.2rem; }
 .row, .row3 { display:flex; gap:1rem; } .row3 > * { flex:1; } @media (max-width: 700px) { .row, .row3 { flex-direction:column; gap:0; } }
@@ -180,6 +191,7 @@ const NAV: { label: string; href: string; prefixes: string[]; className?: string
   { label: "Profiles", href: `${BASE}/profiles`, prefixes: ["/profiles"] },
   { label: "History", href: `${BASE}/history`, prefixes: ["/history"] },
   { label: "Settings", href: `${BASE}/settings`, prefixes: ["/settings"] },
+  { label: "Assistants", href: `${BASE}/assistants`, prefixes: ["/assistants"] },
   { label: "Help", href: `${BASE}/help`, prefixes: ["/help"], className: "nav-help" },
 ];
 

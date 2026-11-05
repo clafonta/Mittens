@@ -1,7 +1,19 @@
 {
-  "name": "@laboriouslabs/mimic",
+  "name": "@clafonta/mimic",
   "version": "0.1.0",
   "description": "Local-first HTTP mock server and recording proxy for developers.",
+  "keywords": [
+    "mock",
+    "mock-server",
+    "api-mock",
+    "http",
+    "proxy",
+    "recording",
+    "openapi",
+    "json-schema",
+    "har",
+    "testing"
+  ],
   "license": "MIT",
   "author": "Laborious Labs (https://laboriouslabs.com)",
   "type": "module",
@@ -34,7 +46,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run smoke",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {

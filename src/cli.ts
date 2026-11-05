@@ -105,7 +105,7 @@ async function main() {
   if (command === "init") {
     const { created } = await init(dir);
     console.log(created ? `Created example definitions in ${dir}` : `${dir} already has services; left untouched.`);
-    console.log(`Start with: npx @laboriouslabs/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
+    console.log(`Start with: npx @clafonta/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
     return;
   }
   if (command === "import") return importSpec(positionals[1], dir, values);
@@ -199,7 +199,7 @@ async function main() {
       const extra = restored.skipped ? `, skipped ${restored.skipped} unreadable line${restored.skipped === 1 ? "" : "s"}` : "";
       console.log(`  History:     ${historyFile.file} (restored ${restored.restored}${extra})`);
     }
-    if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
+    if (count === 0) console.log(`  No services yet — try 'npx @clafonta/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });
   server.on("error", (err: NodeJS.ErrnoException) =>

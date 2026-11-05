@@ -222,7 +222,7 @@ export function ServicesPage(props: {
         </div>
       ) : services.length === 0 ? (
         <div class="empty">
-          No services yet. <a href={`${BASE}/services/new`}>Create one</a>, run <code>npx @laboriouslabs/mimic init</code> for
+          No services yet. <a href={`${BASE}/services/new`}>Create one</a>, run <code>npx @clafonta/mimic init</code> for
           an example, or add YAML files under <code>services/</code>.
         </div>
       ) : (
@@ -799,7 +799,7 @@ export function ImportPage(props: { values: Record<string, string>; error?: stri
       <h1>Import OpenAPI</h1>
       <p class="muted">
         Creates a service per operation, with a scenario per response (or per named example) and the response schemas for
-        validation. Existing services are never overwritten. Also available as <code>npx @laboriouslabs/mimic import spec.yaml</code>.
+        validation. Existing services are never overwritten. Also available as <code>npx @clafonta/mimic import spec.yaml</code>.
       </p>
       {error && <div class="banner error-banner">{error}</div>}
       {summary && <ImportSummaryView summary={summary} imported={!!imported} />}

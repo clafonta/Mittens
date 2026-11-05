@@ -18,8 +18,12 @@ function fail(message) {
   console.error(`smoke: FAILED: ${message}`);
   process.exit(1);
 }
+// When run from `npm publish --dry-run`, npm passes dry-run down through the
+// environment, which would make our own `npm pack` write nothing.
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toLowerCase() !== "npm_config_dry_run"));
+
 function run(cmd, args, cwd) {
-  const r = spawnSync(cmd, args, { cwd, encoding: "utf8", shell: win });
+  const r = spawnSync(cmd, args, { cwd, env, encoding: "utf8", shell: win });
   if (r.status !== 0) fail(`${cmd} ${args.join(" ")} exited ${r.status}\n${r.stdout}\n${r.stderr}`);
   return r.stdout;
 }
@@ -59,13 +63,13 @@ try {
   step("TypeScript hook using the published types");
   writeFileSync(
     path.join(app, "defs", "services", "users", "hook.ts"),
-    `import type { RequestHook } from "@laboriouslabs/mimic";
+    `import type { RequestHook } from "@clafonta/mimic";
 export const request: RequestHook = (req) => (req.query.smoke ? { body: { smoke: req.params.id } } : undefined);
 `,
   );
 
   step("start the server");
-  server = spawn(bin, ["--dir", "defs", "--port", "0"], { cwd: app, shell: win, stdio: ["ignore", "pipe", "pipe"] });
+  server = spawn(bin, ["--dir", "defs", "--port", "0"], { cwd: app, env, shell: win, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   server.stdout.on("data", (d) => (output += d));
   server.stderr.on("data", (d) => (output += d));

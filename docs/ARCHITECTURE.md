@@ -2,7 +2,7 @@
 
 ## Goals
 
-- **Local-first.** `npx @laboriouslabs/mimic` and go. No database server, no cloud, no build step for users.
+- **Local-first.** `npx @clafonta/mimic` and go. No database server, no cloud, no build step for users.
 - **Definitions are code.** Human-readable YAML in the repo, one file per service/scenario, clean diffs.
 - **One process, one port.** Mock traffic, dashboard and API are served together.
 - **Scriptable from tests.** Everything the UI does is available over a JSON API.
@@ -28,17 +28,28 @@ This is a clean break from Mockey: no XML import, new file format, new URL layou
 
 ```
 src/
-  cli.ts            arg parsing, `init`, server start
+  cli.ts            arg parsing, `init`, `import`, server start
   init.ts           example definitions
+  index.ts          public types (hook API) exported by the package
+  version.ts        package version
   core/
-    schema.ts       Zod schemas + types (Service, Scenario, MatchRule, Profile)
+    schema.ts       Zod schemas + types (Service, Scenario, MatchRule, Profile, Settings)
     path.ts         path templates → regex, specificity ranking
     repo.ts         Repo interface; FileRepo (YAML tree, atomic writes), MemoryRepo (tests)
-    store.ts        definitions + profiles (write-through to Repo) and in-memory live state
-    engine.ts       resolve request → scenario/proxy response; delay; record
+    store.ts        definitions, profiles, settings (write-through to Repo); live state; tag filter
+    engine.ts       resolve request → hook / scenario / proxy response; templates; validate; delay; record
+    match.ts        dynamic-mode scoring: exact, regex and JSONPath criteria
+    template.ts     {{ }} response templates: parse (on save) and render
+    hooks.ts        load and run services/<id>/hook.*; hook types
+    validate.ts     responseSchema checks (Ajv, 2020-12 / draft-07)
+    rewrite.ts      stripPrefix / rewrite → upstream URL
+    upstream.ts     HTTP(S)_PROXY support for proxy-mode calls (undici)
+    openapi.ts      OpenAPI 3 → import plan → services
     history.ts      bounded in-memory request log (event emitter)
+    history-file.ts optional JSON Lines persistence for history
+    har.ts          history → HAR 1.2
     record.ts       history entry -> scenario draft (headers, body, suggested match)
-    watch.ts        debounced fs.watch -> Store.reload()
+    watch.ts        debounced fs.watch -> Store.reload() and hook reload
   http/
     app.ts          composes the three sub-apps below
     api.ts          /_mimic/api — JSON management API
@@ -47,9 +58,10 @@ src/
   ui/
     layout.tsx      page shell and styles
     pages.tsx       list/detail pages
-    forms.tsx       service, scenario and profile forms
+    forms.tsx       service, scenario, profile and settings forms
     form-data.ts    form values <-> domain objects, Zod issues -> field errors
-test/               vitest suites
+test/               vitest suites (+ fixtures/petstore.yaml)
+scripts/smoke.mjs   pack, install the tarball in a scratch project, run the installed CLI
 ```
 
 ### Definitions vs live state
@@ -131,7 +143,7 @@ Hooks are on by default: they're the user's own code, like a test suite, and the
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
 - **Phase 2 — proxy fidelity & export (done):** corporate proxy, path rewrites, history export, schema validation, regex/JSONPath matching, history persistence.
   - Still open from this area: faithful header forwarding (`fetch` adds defaults such as `sec-fetch-mode`; `undici.request` would avoid them) and streaming large bodies instead of buffering.
-- **Phase 3 — extensibility (done):** response templating, OpenAPI import, user JS hooks, CI and a tag-triggered npm release workflow. First publish still to do (see RELEASING.md); a linter (e.g. Biome) could join CI later — today `tsc --strict` is the only static check.
+- **Phase 3 — extensibility (done):** response templating, OpenAPI import, user JS hooks, and a local release gate (`prepublishOnly` runs typecheck, tests, build and a packaged-install smoke test). First publish still to do (see RELEASING.md). Not done: CI, since there is no hosted repository (only macOS has been tested), and a linter (e.g. Biome) — today `tsc --strict` is the only static check.
   - Import follow-ups: filtering by OpenAPI tag or path at import time (a full GitHub API import is 1,259 services and ~40 MB of YAML, because shared schemas are inlined per service), and re-importing to update services that came from a spec.
 
 ### UI conventions

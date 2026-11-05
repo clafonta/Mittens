@@ -1,31 +1,34 @@
 # Releasing
 
-Releases are published to npm by `.github/workflows/release.yml` when a tag like `v0.2.0` is pushed. The workflow checks that the tag matches `package.json`, builds, runs the packaged-install smoke test, and runs `npm publish` (whose `prepublishOnly` runs typecheck, tests and a fresh build again).
+Mimic is published to npm as `@clafonta/mimic`, from a local checkout. There is no CI, so `npm publish` does the checking: its `prepublishOnly` script runs typecheck, tests, a fresh build, and the smoke test (`scripts/smoke.mjs`), which packs the tarball, installs it into a scratch project and runs the installed CLI. If any of these fail, nothing is published.
 
 ## One-time setup
 
-1. Create the GitHub repository, push `main`, and add a `repository` field to `package.json`, e.g.
-
-   ```json
-   "repository": { "type": "git", "url": "git+https://github.com/<owner>/<repo>.git" }
-   ```
-
-   npm uses it to link the package to its source, and trusted publishing requires it to match the repository the workflow runs in.
-
-2. Give the workflow permission to publish, either:
-
-   - **Trusted publishing (recommended, no secrets):** on npmjs.com, open the package settings (after a first manual publish, or when creating the package) → *Trusted publisher* → GitHub Actions, with the repository and workflow file `release.yml`, environment `npm`. The workflow already requests the `id-token: write` permission this needs.
-   - **Token:** create a granular npm access token with publish rights to `@laboriouslabs/mimic` and save it as the `NPM_TOKEN` repository secret.
-
-3. Optionally, add required reviewers to the `npm` environment in the GitHub repository settings, so each release needs an approval.
-
-The very first publish of a new package may need to be done by hand: `npm login`, then `npm publish --access public` from a clean checkout of `main`.
+```sh
+npm login        # as clafonta
+npm whoami       # should print clafonta
+```
 
 ## Each release
 
+From a clean `main`:
+
 ```sh
-npm version minor        # or patch / major: bumps package.json, commits, tags vX.Y.Z
-git push --follow-tags   # the tag triggers the release workflow
+npm version patch          # or minor / major: bumps package.json, commits, and tags vX.Y.Z
+npm publish                # access is public via publishConfig; runs the checks above first
 ```
 
-Check the run in the repository's Actions tab, then `npx @laboriouslabs/mimic@latest --version`.
+If your npm account uses two-factor authentication for publishing, npm asks for a one-time code.
+
+Then check it:
+
+```sh
+npx @clafonta/mimic@latest --version
+```
+
+`npm version` creates a local git tag; there's no remote to push it to, but it marks what was released.
+
+## Notes
+
+- Only macOS has been tested. Linux should behave the same; Windows is the most likely to have surprises (paths, file watching). The smoke test is the quickest way to check another machine: `npm ci && npm run build && npm run smoke`.
+- To try a release without publishing: `npm run build && npm run smoke`, or `npm publish --dry-run` (which also runs `prepublishOnly`).

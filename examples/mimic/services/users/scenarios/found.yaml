@@ -1,0 +1,11 @@
+name: User found
+status: 200
+headers:
+  content-type: application/json
+body: |
+  {
+    "id": "42",
+    "name": "Ada Lovelace",
+    "email": "ada@example.com"
+  }
+tags: []

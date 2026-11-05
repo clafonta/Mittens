@@ -1,0 +1,10 @@
+name: Users API
+description: Look up a user by id. Dynamic mode picks a scenario from the path param.
+path: /api/users/{id}
+method: GET
+mode: dynamic
+defaultScenario: found
+errorScenario: server-error
+delayMs: 0
+tags:
+  - example

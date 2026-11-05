@@ -1,0 +1,12 @@
+name: Server error
+status: 500
+headers:
+  content-type: application/json
+body: |
+  {
+    "error": "internal_error"
+  }
+match:
+  params:
+    id: "500"
+tags: []

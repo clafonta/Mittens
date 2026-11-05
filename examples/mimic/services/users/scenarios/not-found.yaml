@@ -1,0 +1,12 @@
+name: User not found
+status: 404
+headers:
+  content-type: application/json
+body: |
+  {
+    "error": "user_not_found"
+  }
+match:
+  params:
+    id: "404"
+tags: []

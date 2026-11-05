@@ -1,0 +1,9 @@
+name: httpbin (proxy)
+description: Proxies /anything/* to https://httpbin.org/anything/* so you can inspect real traffic in History.
+path: /anything/*
+method: ANY
+mode: proxy
+upstream: https://httpbin.org
+delayMs: 0
+tags:
+  - example

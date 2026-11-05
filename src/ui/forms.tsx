@@ -148,8 +148,27 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
         values={values}
         errors={errors}
         placeholder="https://api.example.com"
-        hint="Required for proxy mode. The request path and query are appended."
+        hint="Required for proxy mode. The request path (after the rewrites below) and query are appended; the URL may include a base path."
       />
+      <fieldset>
+        <legend>Path rewrites (proxy mode)</legend>
+        <Text name="stripPrefix" label="Strip prefix" values={values} errors={errors} placeholder="/mock-api" hint="Removed from the start of the path before it is sent upstream." />
+        <TextArea
+          name="rewrite"
+          label="Rewrite rules"
+          values={values}
+          errors={errors}
+          rows={3}
+          mono
+          placeholder={"^/users/(\\d+)$ -> /people/$1"}
+          hint={
+            <>
+              One <code>{"regex -> replacement"}</code> per line, applied in order after the prefix is stripped. Use <code>$1</code> for
+              capture groups.
+            </>
+          }
+        />
+      </fieldset>
       {editing && (
         <div class="row">
           <Select name="defaultScenario" label="Starting default scenario" values={values} errors={errors} options={scenarioOptions} />

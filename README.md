@@ -17,7 +17,7 @@ curl localhost:4000/api/users/404   # 404, matched by path param
 curl localhost:4000/anything/hi     # proxied to httpbin.org
 ```
 
-Requires Node.js 22+. Installed globally (`npm i -g @laboriouslabs/mimic`), the command is just `mimic`.
+Requires Node.js 22.19+. Installed globally (`npm i -g @laboriouslabs/mimic`), the command is just `mimic`.
 
 ## Concepts
 
@@ -59,7 +59,11 @@ method: GET               # or ANY
 mode: dynamic             # starting mode: static | dynamic | proxy
 defaultScenario: found    # starting default scenario
 errorScenario: server-error
-upstream: https://api.example.com   # required for proxy mode
+upstream: https://api.example.com   # required for proxy mode; may include a base path
+stripPrefix: /mock        # proxy mode: removed from the path before calling upstream
+rewrite:                  # proxy mode: regex replaces on the path, in order, after stripPrefix
+  - from: ^/users/(\d+)$
+    to: /people/$1
 delayMs: 0
 ```
 
@@ -107,6 +111,14 @@ Put a service in `proxy` mode, exercise your app, then open a request in **Histo
 
 Recorded bodies are kept up to 256 KB; larger responses are marked as truncated and can't be saved as scenarios.
 
+## Behind a corporate proxy
+
+Proxy-mode calls honour the usual `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` variables (lowercase forms too), so if your shell is set up for the company proxy, Mimic is as well. Credentials in the URL (`http://user:pass@proxy.corp:8080`) are sent to the proxy and masked in the startup output. Use `--upstream-proxy <url>` to pick a proxy explicitly (NO_PROXY still applies) or `--no-upstream-proxy` to ignore the variables. Requests *to* Mimic are unaffected; this only concerns the calls Mimic makes upstream.
+
+If the proxy re-signs TLS with a company certificate, point Node at it: `NODE_EXTRA_CA_CERTS=/path/to/corp-ca.pem npx @laboriouslabs/mimic`. When an upstream call fails, the History entry says why (e.g. `Proxy Authentication Required (407)`, `ECONNREFUSED`).
+
+To see where a request would go after `stripPrefix` and `rewrite`, use **Try a path** on the service page, or `GET /_mimic/api/services/:id/upstream?path=/mock/users/7`.
+
 ## Replaying requests
 
 Open any request in **History** and click **Replay** to send it again — same method, path, query, headers and body — through whatever the services are doing *now*. Handy after switching a mode or editing a scenario: the new entry says whether the response matches the original and, if not, what changed (status, body, which scenario answered). Scripts can use `POST /_mimic/api/history/:id/replay`.
@@ -125,6 +137,8 @@ mimic init [--dir <path>]
       --profile <id> apply a profile on start, live only (MIMIC_PROFILE)
   -t, --tag <tags>   only serve services with one of these tags; comma-separated
                      or repeated, live only (MIMIC_TAGS)
+      --upstream-proxy <url>  send proxy-mode calls through this proxy
+      --no-upstream-proxy     ignore HTTP(S)_PROXY for proxy-mode calls
       --open         open the dashboard in a browser
 ```
 
@@ -139,6 +153,7 @@ All under `/_mimic/api`, JSON in and out:
 | POST | `/services` | create a service |
 | GET / PATCH / DELETE | `/services/:id` | read (live view) / edit the definition / delete |
 | PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
+| GET | `/services/:id/upstream?path=` | the upstream URL proxy mode would call for a path, after rewrites |
 | GET | `/state` | live mode and default per service, with `modified` and `starting` values |
 | PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) |
 | DELETE | `/state/services/:id`, `/state` | reset one / all services to their starting state |

@@ -76,7 +76,45 @@ export function zodToFormErrors(err: z.ZodError, fields: string[]): FormErrors {
 
 // ------------------------------------------------------------------ services
 
-export const SERVICE_FIELDS = ["id", "name", "description", "path", "method", "mode", "upstream", "delayMs", "tags", "defaultScenario", "errorScenario"];
+export const SERVICE_FIELDS = [
+  "id",
+  "name",
+  "description",
+  "path",
+  "method",
+  "mode",
+  "upstream",
+  "stripPrefix",
+  "rewrite",
+  "delayMs",
+  "tags",
+  "defaultScenario",
+  "errorScenario",
+];
+
+const ARROW = " -> ";
+
+/** Parses `from -> to` lines into rewrite rules. Blank lines are ignored. */
+function rewriteRules(values: FormValues, errors: FormErrors) {
+  const rules: { from: string; to: string }[] = [];
+  for (const [i, line] of (values.rewrite ?? "").split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    const idx = line.indexOf(ARROW);
+    const from = idx < 0 ? "" : line.slice(0, idx).trim();
+    if (!from) {
+      errors.rewrite = `Line ${i + 1}: expected "pattern -> replacement"`;
+      return undefined;
+    }
+    try {
+      new RegExp(from);
+    } catch {
+      errors.rewrite = `Line ${i + 1}: "${from}" is not a valid regular expression`;
+      return undefined;
+    }
+    rules.push({ from, to: line.slice(idx + ARROW.length).trim() });
+  }
+  return rules.length ? rules : undefined;
+}
 
 export function serviceFromForm(values: FormValues) {
   const errors: FormErrors = {};
@@ -88,6 +126,8 @@ export function serviceFromForm(values: FormValues) {
     method: opt(values.method) ?? "ANY",
     mode: opt(values.mode) ?? "static",
     upstream: opt(values.upstream),
+    stripPrefix: opt(values.stripPrefix),
+    rewrite: rewriteRules(values, errors),
     delayMs: int(values, "delayMs", errors) ?? 0,
     tags: tags(values.tags),
     defaultScenario: opt(values.defaultScenario),
@@ -105,6 +145,8 @@ export function serviceToValues(s: Service): FormValues {
     method: s.method,
     mode: s.mode,
     upstream: s.upstream ?? "",
+    stripPrefix: s.stripPrefix ?? "",
+    rewrite: (s.rewrite ?? []).map((r) => `${r.from}${ARROW}${r.to}`).join("\n"),
     delayMs: String(s.delayMs),
     tags: s.tags.join(", "),
     defaultScenario: s.defaultScenario ?? "",

@@ -7,6 +7,7 @@ import { serve } from "@hono/node-server";
 import { History } from "./core/history.js";
 import { FileRepo, LoadError } from "./core/repo.js";
 import { Store } from "./core/store.js";
+import { describeProxy, proxiedFetch, proxyFromEnv, type UpstreamProxy, usesProxy } from "./core/upstream.js";
 import { watchDefinitions } from "./core/watch.js";
 import { createApp } from "./http/app.js";
 import { BASE } from "./http/paths.js";
@@ -29,6 +30,11 @@ Options:
   -t, --tag <tags>     Only serve services tagged with one of these (comma-separated
                        or repeated; env MIMIC_TAGS). Changeable from the dashboard.
       --no-watch       Don't reload definitions when files change
+      --upstream-proxy <url>
+                       Send proxy-mode calls through this HTTP proxy. By default
+                       HTTP_PROXY / HTTPS_PROXY / NO_PROXY are honoured.
+      --no-upstream-proxy
+                       Ignore proxy variables; call upstreams directly
       --open           Open the dashboard in a browser on start
   -h, --help           Show this help
   -v, --version        Show the version
@@ -57,6 +63,8 @@ async function main() {
       tag: { type: "string", short: "t", multiple: true },
       open: { type: "boolean", default: false },
       "no-watch": { type: "boolean", default: false },
+      "upstream-proxy": { type: "string" },
+      "no-upstream-proxy": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       version: { type: "boolean", short: "v", default: false },
     },
@@ -104,7 +112,21 @@ async function main() {
   const watching = !values["no-watch"] && existsSync(dir);
   const watcher = watching ? watchDefinitions(dir, store) : undefined;
 
-  const app = createApp({ store, history: new History() });
+  let upstreamProxy: UpstreamProxy = {};
+  if (values["upstream-proxy"] && values["no-upstream-proxy"]) fail("use either --upstream-proxy or --no-upstream-proxy, not both");
+  if (values["upstream-proxy"]) {
+    try {
+      new URL(values["upstream-proxy"]);
+    } catch {
+      fail(`invalid --upstream-proxy URL '${values["upstream-proxy"]}'`);
+    }
+    // Keep NO_PROXY from the environment so internal hosts still go direct.
+    upstreamProxy = { httpProxy: values["upstream-proxy"], httpsProxy: values["upstream-proxy"], noProxy: proxyFromEnv().noProxy };
+  } else if (!values["no-upstream-proxy"]) {
+    upstreamProxy = proxyFromEnv();
+  }
+
+  const app = createApp({ store, history: new History(), fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     const origin = `http://${host.includes(":") ? `[${host}]` : host}:${info.port}`;
     const count = store.listServices().length;
@@ -121,6 +143,7 @@ async function main() {
       if (unknownTags.length) console.log(`  Warning:     no service or scenario is tagged ${unknownTags.join(", ")}`);
     }
     console.log(`  Watching:    ${watching ? "on (edits to YAML reload automatically)" : "off"}`);
+    if (usesProxy(upstreamProxy)) console.log(`  Upstreams:   via ${describeProxy(upstreamProxy)}`);
     if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });

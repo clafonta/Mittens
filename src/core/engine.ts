@@ -1,4 +1,5 @@
 import type { History, HistoryEntry, Source } from "./history.js";
+import { upstreamUrl } from "./rewrite.js";
 import type { MatchRule, Scenario, Service } from "./schema.js";
 import type { Store } from "./store.js";
 
@@ -164,8 +165,8 @@ export class Engine {
   }
 
   private async proxy(service: Service, req: MockRequest): Promise<Resolution> {
-    if (!service.upstream) return problem(500, `Service '${service.id}' has no upstream`, "error", service);
-    const target = new URL(service.upstream.replace(/\/$/, "") + req.url.pathname + req.url.search);
+    const target = upstreamUrl(service, req.url);
+    if (!target) return problem(500, `Service '${service.id}' has no upstream`, "error", service);
     const headers = new Headers(req.headers);
     for (const h of HOP_BY_HOP) headers.delete(h);
     headers.delete("content-length");
@@ -195,7 +196,7 @@ export class Engine {
         delayMs: service.delayMs,
       };
     } catch (err) {
-      const message = `Proxy to ${target} failed: ${err instanceof Error ? err.message : String(err)}`;
+      const message = `Proxy to ${target} failed: ${describeError(err)}`;
       const sc = findScenario(service, service.errorScenario);
       return sc ? fromScenario(service, sc, "fallback", message) : problem(502, message, "error", service);
     }
@@ -230,4 +231,15 @@ function preview(bytes: Uint8Array): { body: string; truncated: boolean } {
     body: dec.decode(bytes.subarray(0, HISTORY_BODY_LIMIT)) + `\n… [truncated, ${bytes.byteLength} bytes total]`,
     truncated: true,
   };
+}
+
+/** fetch() wraps the useful detail (ECONNREFUSED, proxy 407, TLS errors) in `cause`. */
+function describeError(err: unknown): string {
+  const parts: string[] = [];
+  for (let e: unknown = err; e && parts.length < 4; e = (e as { cause?: unknown }).cause) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg && !parts.includes(msg)) parts.push(msg);
+    if (!(e instanceof Error)) break;
+  }
+  return parts.join(": ") || "unknown error";
 }

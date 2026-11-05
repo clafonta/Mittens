@@ -35,6 +35,24 @@ export const MatchRule = z
   .strict();
 export type MatchRule = z.infer<typeof MatchRule>;
 
+const isRegex = (s: string) => {
+  try {
+    new RegExp(s);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Proxy mode: a regex replace applied to the request path before it is sent upstream. */
+export const RewriteRule = z
+  .object({
+    from: z.string().min(1).refine(isRegex, "Not a valid regular expression"),
+    to: z.string(),
+  })
+  .strict();
+export type RewriteRule = z.infer<typeof RewriteRule>;
+
 /** A scenario as stored on disk (the id comes from the file name). */
 export const ScenarioFile = z
   .object({
@@ -66,6 +84,10 @@ export const ServiceFile = z
     errorScenario: Slug.optional(),
     /** Base URL for proxy mode; the request path and query are appended. */
     upstream: z.url().optional(),
+    /** Proxy mode: removed from the start of the path before it is sent upstream, e.g. /mock-api. */
+    stripPrefix: z.string().startsWith("/", "Must start with /").optional(),
+    /** Proxy mode: applied in order after stripPrefix. */
+    rewrite: z.array(RewriteRule).optional(),
     delayMs: z.number().int().min(0).default(0),
     tags: z.array(z.string()).default([]),
   })

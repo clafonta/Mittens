@@ -271,11 +271,7 @@ export function ServicePage(props: {
           <ServiceRow service={service} modified={modified} inactive={inactive} />
         </tbody>
       </table>
-      {service.upstream && (
-        <p>
-          Upstream: <code>{service.upstream}</code>
-        </p>
-      )}
+      {service.upstream && <UpstreamInfo service={service} />}
       <div class="title-row">
         <h2>Scenarios</h2>
         <a class="button" href={`${base}/scenarios/new`}>
@@ -313,6 +309,47 @@ export function ServicePage(props: {
     </>
   );
 }
+
+/** Upstream URL, rewrite rules, and a box to try a path against them. */
+function UpstreamInfo({ service }: { service: Service }) {
+  const rules = service.rewrite ?? [];
+  return (
+    <>
+      <p>
+        Upstream: <code>{service.upstream}</code>
+        {service.stripPrefix && (
+          <>
+            {" "}
+            · strip prefix <code>{service.stripPrefix}</code>
+          </>
+        )}
+      </p>
+      {rules.length > 0 && (
+        <pre>
+          {rules.map((r) => `${r.from}  ->  ${r.to}`).join("\n")}
+        </pre>
+      )}
+      <form
+        class="switcher"
+        hx-get={`${BASE}/ui/services/${service.id}/upstream`}
+        hx-target={`#upstream-preview-${service.id}`}
+        hx-trigger="submit, input changed delay:300ms from:find input"
+      >
+        <label for={`try-${service.id}`}>Try a path</label>
+        <input id={`try-${service.id}`} name="path" type="text" placeholder="/api/users/7?x=1" />
+        <span id={`upstream-preview-${service.id}`} class="muted"></span>
+      </form>
+    </>
+  );
+}
+
+/** Result of "Try a path": the URL proxy mode would call. */
+export const UpstreamPreview = ({ url, matches }: { url: string; matches: boolean }) => (
+  <>
+    → <code>{url}</code>
+    {!matches && <span class="s4"> (requests to this path don't reach this service)</span>}
+  </>
+);
 
 export function HistoryTable({ entries }: { entries: HistoryEntry[] }) {
   if (entries.length === 0) return <div class="empty">No requests yet.</div>;

@@ -13,9 +13,10 @@ This is a clean break from Mockey: no XML import, new file format, new URL layou
 
 | Concern | Choice | Why |
 |---|---|---|
-| Runtime | Node.js 22+ | `npx` distribution; built-in `fetch`, `parseArgs`, `node:sqlite` |
+| Runtime | Node.js 22.19+ | `npx` distribution; built-in `fetch`, `parseArgs`, `node:sqlite` |
 | HTTP | Hono + `@hono/node-server` | Small, fast, Web-standard `Request`/`Response`; trivial in-process testing via `app.request()` |
 | UI | Server-rendered Hono JSX + htmx | No client build or bundler; types shared with the server; partial updates and polling via attributes. Rich widgets (e.g. a JSON editor) can be added later as isolated islands |
+| Upstream proxying | `undici` (`EnvHttpProxyAgent`) | Built-in `fetch` ignores `HTTP(S)_PROXY`; undici's agent honours them and `NO_PROXY`, with tunnelling for HTTPS. Only used when a proxy is configured |
 | Validation | Zod 4 | One schema for files, API input and TS types |
 | Storage | YAML files (`yaml`) | Git-friendly; block scalars keep bodies readable |
 | Tests | Vitest | Fast; tests hit the real Hono app in-process |
@@ -73,7 +74,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 3. `Engine.resolve` by mode:
    - static → `defaultScenario`
    - dynamic → highest-scoring `match`; fallback `defaultScenario` → `errorScenario` → 404
-   - proxy → `fetch(upstream + path + query)`; on error `errorScenario` → 502
+   - proxy → `fetch(upstream + rewritten path + query)` (through the outbound proxy if configured); on error `errorScenario` → 502
    - anything that would end in Mimic's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mimic.yaml` instead, if one is set
 4. Apply delay (scenario overrides service).
 5. Record to history; respond with `x-mimic-*` headers.
@@ -95,8 +96,8 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 | History → save as scenario | "Save as scenario" from a recorded response (UI + API) | **1 (done)** |
 | Redo request (`/doitagain`) | Replay from history, with a comparison to the original response | **1 (done)** |
 | File watching (n/a) | Reload when YAML changes on disk; last good version kept on errors | **1 (done)** |
-| Corporate proxy settings | Honour `HTTP(S)_PROXY`/`NO_PROXY` for upstream calls | 2 |
-| URL twisting | Path rewrite rules on proxy (`stripPrefix` / regex rewrite) | 2 |
+| Corporate proxy settings | Honour `HTTP(S)_PROXY`/`NO_PROXY` for upstream calls; `--upstream-proxy` / `--no-upstream-proxy` | **2 (done)** |
+| URL twisting | `stripPrefix` + ordered regex `rewrite` rules on proxy; "Try a path" preview | **2 (done)** |
 | Response JSON schema validation | Optional `responseSchema` check, surfaced in history | 2 |
 | Stats / CSV export | History export (JSON/HAR), per-service counts | 2 |
 | Java request-inspector plugins | Optional JS/TS matcher/response functions | 3 |
@@ -107,6 +108,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 
 - **Phase 0 — foundation (done):** schemas, file store, engine with three modes, history, JSON API, dashboard with mode/default switching, CLI (`start`, `init`), tests.
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
+- **Phase 2 — proxy fidelity & export:** ~~corporate proxy~~, ~~path rewrites~~ (done); remaining: history export (JSON/HAR), response schema validation, match JSONPath/regex, history persistence.
 
 ### UI conventions
 

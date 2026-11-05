@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Engine } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import { scenarioFromHistory } from "../core/record.js";
+import { upstreamUrl } from "../core/rewrite.js";
 import { hasAnyTag, ServiceMode, Slug } from "../core/schema.js";
 import type { Store } from "../core/store.js";
 import { errorStatus } from "./errors.js";
@@ -34,6 +35,13 @@ export function createApi(store: Store, history: History, engine: Engine) {
   api.delete("/services/:id", async (c) => {
     await store.deleteService(c.req.param("id"));
     return c.body(null, 204);
+  });
+  /** ?path=/x?y=1 → the URL proxy mode would call for that request path, after rewrites. */
+  api.get("/services/:id/upstream", (c) => {
+    const service = store.getService(c.req.param("id"));
+    const path = c.req.query("path") ?? service.path;
+    const url = upstreamUrl(service, new URL(path.startsWith("/") ? path : `/${path}`, "http://mimic.local"));
+    return url ? c.json({ url: url.toString() }) : c.json({ error: `Service '${service.id}' has no upstream` }, 409);
   });
   api.put("/services/:id/scenarios/:sid", async (c) => {
     const body = await c.req.json();

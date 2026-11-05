@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Engine } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import { scenarioFromHistory } from "../core/record.js";
+import { upstreamUrl } from "../core/rewrite.js";
 import { hasAnyTag, ServiceMode } from "../core/schema.js";
 import { StoreError, type Store } from "../core/store.js";
 import {
@@ -39,6 +40,7 @@ import {
   ServiceRow,
   ServicesPage,
   SettingsPage,
+  UpstreamPreview,
 } from "../ui/pages.js";
 import { errorStatus } from "./errors.js";
 import { BASE } from "./paths.js";
@@ -420,6 +422,17 @@ export function createUi(store: Store, history: History, engine: Engine) {
     c.header("HX-Trigger", "live-changed");
     const service = store.getService(id);
     return c.html(<ServiceRow service={service} modified={false} inactive={!store.isActive(service)} />);
+  });
+  ui.get("/ui/services/:id/upstream", (c) => {
+    const service = store.getService(c.req.param("id"));
+    const raw = c.req.query("path")?.trim();
+    if (!raw) return c.html("");
+    const url = new URL(raw.startsWith("/") ? raw : `/${raw}`, "http://mimic.local");
+    const target = upstreamUrl(service, url);
+    if (!target) return c.html("");
+    const method = service.method === "ANY" ? "GET" : service.method;
+    const matches = store.resolve(method, url.pathname, { includeInactive: true })?.service.id === service.id;
+    return c.html(<UpstreamPreview url={target.toString()} matches={matches} />);
   });
   ui.get("/ui/live-banner", (c) =>
     c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), BASE)} />),

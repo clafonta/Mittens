@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
 import { History } from "./core/history.js";
 import { HistoryFile } from "./core/history-file.js";
+import { Hooks } from "./core/hooks.js";
 import { applyImport, describePlan, ImportError, parseSpec, planImport } from "./core/openapi.js";
 import { ServiceMode } from "./core/schema.js";
 import { FileRepo, LoadError } from "./core/repo.js";
@@ -40,6 +41,7 @@ Options:
   -t, --tag <tags>     Only serve services tagged with one of these (comma-separated
                        or repeated; env MIMIC_TAGS). Changeable from the dashboard.
       --no-watch       Don't reload definitions when files change
+      --no-hooks       Don't run services/<id>/hook.js (or .mjs/.ts/.mts) files
       --persist-history
                        Keep request history across restarts, in
                        <dir>/.mimic/history.jsonl (env MIMIC_PERSIST_HISTORY=1)
@@ -80,6 +82,7 @@ async function main() {
       tag: { type: "string", short: "t", multiple: true },
       open: { type: "boolean", default: false },
       "no-watch": { type: "boolean", default: false },
+      "no-hooks": { type: "boolean", default: false },
       "persist-history": { type: "boolean", default: false },
       "history-file": { type: "string" },
       "history-limit": { type: "string" },
@@ -133,8 +136,11 @@ async function main() {
   const tags = store.setActiveTags((values.tag ?? (process.env.MIMIC_TAGS ? [process.env.MIMIC_TAGS] : [])).flatMap((t) => t.split(",")));
   const unknownTags = tags.filter((t) => !store.allTags().includes(t));
 
+  const hooks = new Hooks(dir, { enabled: !values["no-hooks"], log: (m) => console.error(m) });
+  await hooks.load(store.listServices().map((s) => s.id));
+
   const watching = !values["no-watch"] && existsSync(dir);
-  const watcher = watching ? watchDefinitions(dir, store) : undefined;
+  const watcher = watching ? watchDefinitions(dir, store, { hooks }) : undefined;
 
   let upstreamProxy: UpstreamProxy = {};
   if (values["upstream-proxy"] && values["no-upstream-proxy"]) fail("use either --upstream-proxy or --no-upstream-proxy, not both");
@@ -167,7 +173,7 @@ async function main() {
     }
   }
 
-  const app = createApp({ store, history, fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
+  const app = createApp({ store, history, hooks, fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     const origin = `http://${host.includes(":") ? `[${host}]` : host}:${info.port}`;
     const count = store.listServices().length;
@@ -185,6 +191,10 @@ async function main() {
     }
     console.log(`  Watching:    ${watching ? "on (edits to YAML reload automatically)" : "off"}`);
     if (usesProxy(upstreamProxy)) console.log(`  Upstreams:   via ${describeProxy(upstreamProxy)}`);
+    const loadedHooks = hooks.summary().filter((h) => h.file);
+    if (loadedHooks.length) {
+      console.log(`  Hooks:       ${loadedHooks.map((h) => `${h.serviceId} (${h.exports.join(", ")})`).join(", ")}`);
+    } else if (values["no-hooks"]) console.log("  Hooks:       off");
     if (historyFile) {
       const extra = restored.skipped ? `, skipped ${restored.skipped} unreadable line${restored.skipped === 1 ? "" : "s"}` : "";
       console.log(`  History:     ${historyFile.file} (restored ${restored.restored}${extra})`);

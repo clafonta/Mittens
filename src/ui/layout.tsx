@@ -44,6 +44,8 @@ input[readonly] { color:var(--muted); } textarea.mono { font:12.5px/1.45 ui-mono
 fieldset { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem; margin:0 0 1rem; } legend { padding:0 .3rem; font-weight:500; }
 label.check { display:flex; align-items:center; gap:.4rem; font-weight:500; } label.check input { margin:0; }
 .preview { display:flex; gap:.5rem; align-items:flex-start; flex-wrap:wrap; margin:.25rem 0; } .preview textarea { flex:1; min-width:16rem; }
+.panel { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; padding:.5rem .75rem; border:1px solid var(--line); border-radius:6px; margin:1rem 0; } .panel > span { margin-right:auto; }
+.panel.error-banner { border-color:var(--bad); color:var(--bad); }
 .actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; }
 a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-color:var(--muted); } a.pill.tag.current { background:var(--accent); border-color:var(--accent); color:#fff; }
 .tagbar { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin:0 0 1rem; }

@@ -153,6 +153,42 @@ body: |
 
 Missing values render as nothing, so use `default`. `\{{` writes a literal `{{`. Templates are checked when saved, so a typo is reported in the form (or as a reload error) rather than at request time. Scenarios without `template: true` are sent exactly as written. Try a template from the service page with **Preview with a request**, or `POST /_mimic/api/services/:id/scenarios/:sid/render`.
 
+## Hooks: JavaScript for the tricky cases
+
+When scenarios, match rules and templates aren't enough, put a `hook.js` (or `.mjs`, `.ts`, `.mts`) next to a service's `service.yaml`:
+
+```ts
+// services/users/hook.ts
+import type { RequestHook, ResponseHook } from "@laboriouslabs/mimic"; // optional: types only
+
+/** Runs before a scenario is chosen. Return nothing to carry on as usual. */
+export const request: RequestHook = (req, ctx) => {
+  if (!req.headers.authorization) return { status: 401, body: { error: "unauthorized" } };
+  if (req.query.fail) return ctx.scenario("server-error");
+
+  // ctx.state lasts across requests (until restart): handy for stateful mocks.
+  if (req.method === "POST") {
+    const users = (ctx.state.users ??= []) as object[];
+    users.push({ id: String(users.length + 1), ...(req.json as object) });
+    return { status: 201, body: users.at(-1) };
+  }
+};
+
+/** Runs on every response this service sends, mocked or proxied. */
+export const response: ResponseHook = (req, res) => {
+  res.headers["x-request-path"] = req.path; // change in place, or return { status, headers, body }
+};
+```
+
+- `req` has `method`, `path`, `url`, `params`, `query`, `headers` (lowercase names), `body` (text) and `json` (parsed body, if JSON).
+- `request` returns nothing (normal behaviour), `ctx.scenario(id)` (templates still render), or `{ status, headers, body, delayMs }`; an object body is sent as JSON.
+- `response` sees `{ status, headers, body }` as text and can change it, for proxied responses too. Schema validation sees the result.
+- `ctx` also has `service` (live state) and `log(...)`.
+
+Hooks reload when you save them. If one fails to load, the previous version keeps running and the error shows on the service page; if one throws or takes longer than 10 s, that request gets a 500 explaining why. TypeScript hooks run through Node's built-in type stripping, so stick to erasable syntax (no `enum`s). Clear `ctx.state` from the service page or with `DELETE /_mimic/api/hooks/state`.
+
+Hooks are code from the definitions directory and run with Mimic's permissions, like a test suite would; the startup output lists every hook it loaded. Use `--no-hooks` to run definitions without them.
+
 ## Importing an OpenAPI spec
 
 ```sh
@@ -232,6 +268,7 @@ mimic import <spec> [--dir <path>] [--dry-run] [--mode <mode>] [--prefix <path>]
       --persist-history       keep history across restarts (MIMIC_PERSIST_HISTORY=1)
       --history-file <path>   persist history to this file (MIMIC_HISTORY_FILE)
       --history-limit <n>     requests kept in history, default 500
+      --no-hooks              don't run services/<id>/hook.* files
       --upstream-proxy <url>  send proxy-mode calls through this proxy
       --no-upstream-proxy     ignore HTTP(S)_PROXY for proxy-mode calls
       --open         open the dashboard in a browser
@@ -249,6 +286,8 @@ All under `/_mimic/api`, JSON in and out:
 | GET / PATCH / DELETE | `/services/:id` | read (live view) / edit the definition / delete |
 | PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
 | POST | `/services/:id/scenarios/:sid/render` | render a scenario for a sample request; body `{ method?, path?, headers?, body? }` |
+| GET | `/hooks` | loaded hooks and load errors |
+| DELETE | `/hooks/state` | clear `ctx.state` (`?service=id` for one service) |
 | POST | `/import/openapi` | import an OpenAPI spec (request body: JSON or YAML); `?dryRun=1`, `mode`, `prefix`, `tags` |
 | GET | `/services/:id/upstream?path=` | the upstream URL proxy mode would call for a path, after rewrites |
 | GET | `/state` | live mode and default per service, with `modified` and `starting` values |
@@ -278,9 +317,10 @@ npm run dev        # tsx watch, serves examples/mimic
 npm test           # vitest
 npm run typecheck
 npm run build      # emits dist/
+npm run smoke      # after build: packs, installs the tarball in a scratch project, runs the CLI
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and roadmap.
+CI (`.github/workflows/ci.yml`) runs typecheck, tests, build and the smoke test on Linux (Node 22, 24, 26), macOS and Windows. Releases are published from a version tag; see [docs/RELEASING.md](docs/RELEASING.md). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and roadmap.
 
 ## License
 

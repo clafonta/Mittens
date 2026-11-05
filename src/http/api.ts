@@ -4,6 +4,7 @@ import { type Engine, renderScenario } from "../core/engine.js";
 import { toHar } from "../core/har.js";
 import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
 import type { History } from "../core/history.js";
+import type { Hooks } from "../core/hooks.js";
 import { VERSION } from "../version.js";
 import { scenarioFromHistory } from "../core/record.js";
 import { upstreamUrl } from "../core/rewrite.js";
@@ -12,7 +13,7 @@ import type { Store } from "../core/store.js";
 import { errorStatus } from "./errors.js";
 
 /** JSON management API, mounted at /_mimic/api. */
-export function createApi(store: Store, history: History, engine: Engine) {
+export function createApi(store: Store, history: History, engine: Engine, hooks: Hooks) {
   const api = new Hono();
 
   api.onError((err, c) => {
@@ -151,6 +152,14 @@ export function createApi(store: Store, history: History, engine: Engine) {
       if (err instanceof ImportError) return c.json({ error: err.message }, 400);
       throw err;
     }
+  });
+
+  // hooks
+  api.get("/hooks", (c) => c.json({ enabled: hooks.enabled, hooks: hooks.summary() }));
+  /** Clears ctx.state for every service (or one, with ?service=id). */
+  api.delete("/hooks/state", (c) => {
+    hooks.resetState(c.req.query("service") || undefined);
+    return c.body(null, 204);
   });
 
   // settings (mimic.yaml)

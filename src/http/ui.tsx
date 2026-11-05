@@ -5,6 +5,7 @@ import type { Child } from "hono/jsx";
 import { z } from "zod";
 import { type Engine, renderScenario } from "../core/engine.js";
 import type { History } from "../core/history.js";
+import type { Hooks } from "../core/hooks.js";
 import { scenarioFromHistory } from "../core/record.js";
 import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
 import { upstreamUrl } from "../core/rewrite.js";
@@ -58,7 +59,7 @@ const safeReturn = (v: string | undefined, fallback: string) =>
   v && (v === BASE || v.startsWith(`${BASE}/`) || v.startsWith(`${BASE}?`)) && !v.startsWith("//") ? v : fallback;
 
 /** HTML dashboard, mounted at /_mimic. */
-export function createUi(store: Store, history: History, engine: Engine) {
+export function createUi(store: Store, history: History, engine: Engine, hooks: Hooks) {
   const ui = new Hono();
 
   const page = (c: Context, title: string, body: Child, status: 200 | 404 | 422 = 200) =>
@@ -68,6 +69,12 @@ export function createUi(store: Store, history: History, engine: Engine) {
       </Layout>,
       status,
     );
+
+  const hookInfo = (id: string) => {
+    const loaded = hooks.get(id);
+    const error = hooks.error(id);
+    return loaded || error ? { file: loaded?.name, exports: loaded?.exports ?? [], error, enabled: hooks.enabled } : undefined;
+  };
 
   const profileInfos = (): ProfileInfo[] =>
     store.listProfiles().map((profile) => ({
@@ -171,6 +178,7 @@ export function createUi(store: Store, history: History, engine: Engine) {
         allModified={store.modifiedServiceIds()}
         inactive={!store.isActive(service)}
         globalError={store.getSettings().errorScenario}
+        hook={hookInfo(service.id)}
       />,
     );
   });
@@ -350,6 +358,12 @@ export function createUi(store: Store, history: History, engine: Engine) {
     const body = toValues(await c.req.parseBody());
     const reset = store.resetLiveState();
     return c.redirect(withFlash(safeReturn(body.return, BASE), `Reset ${reset.length} service${reset.length === 1 ? "" : "s"} to starting state`), 303);
+  });
+
+  ui.post("/services/:id/hook/reset", async (c) => {
+    const id = store.getService(c.req.param("id")).id;
+    hooks.resetState(id);
+    return c.redirect(withFlash(`${BASE}/services/${id}`, "Cleared hook state"), 303);
   });
 
   ui.post("/state/tags", async (c) => {

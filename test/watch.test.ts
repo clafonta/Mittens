@@ -139,3 +139,18 @@ describe("watchDefinitions", () => {
     expect(logs).toContain("Definitions are valid again.");
   });
 });
+
+describe("watching hooks", () => {
+  it("loads a hook file when it is saved", async () => {
+    const { dir: root, store } = await fresh();
+    const { Hooks } = await import("../src/core/hooks.js");
+    const hooks = new Hooks(root);
+    await hooks.load(store.listServices().map((s) => s.id));
+    const logs: string[] = [];
+    watcher = watchDefinitions(root, store, { debounceMs: 30, log: (m) => logs.push(m), hooks });
+    await settle();
+    await writeFile(path.join(root, "services/users/hook.js"), "export const request = () => ({ body: 'hooked' });\n");
+    await waitFor(() => logs.some((l) => l.includes("Loaded hook for 'users' (request)")));
+    expect(hooks.get("users")?.exports).toEqual(["request"]);
+  });
+});

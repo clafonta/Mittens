@@ -75,6 +75,12 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 
 `template.ts` is a deliberately small language rather than Handlebars/Mustache: those HTML-escape by default (wrong for JSON) and allow arbitrary helpers. A template is parsed into text and `{{ expression | filter … }}` nodes; parsing happens when a scenario is validated (Zod refinement), and parsed templates are cached, so rendering is a walk over nodes and never throws. Values come from the same `MatchInput` used for matching (lazy JSON body parse). Rendering happens last in `Engine.resolve`, so it applies however the scenario was chosen (static, dynamic, fallback, global error), and validation sees the rendered body.
 
+### Hooks
+
+`hooks.ts` loads `services/<id>/hook.*` with a dynamic `import()` whose URL carries the file's mtime, so an edited hook is a new module; the old one stays in memory (fine for a dev tool, and it means a hook that fails to load can keep the previous version running). The watcher reloads hooks alongside the YAML. In the engine, the `request` hook runs after the service is matched and before its mode is applied; the `response` hook runs last, after templates, on everything except Mimic's own error responses. Both run under a 10 s timeout and any failure becomes a 500 `error` response (so the global error scenario applies), never a crash. A synchronous infinite loop can't be interrupted in-process; worker-thread isolation would fix that at the cost of serialising every request.
+
+Hooks are on by default: they're the user's own code, like a test suite, and the CLI lists every loaded hook at startup. `--no-hooks` disables them.
+
 ### OpenAPI import
 
 `openapi.ts` turns a document into a plan (pure; used for dry runs and previews) and `applyImport` creates services through the store, so the usual validation applies and a service that fails is reported rather than aborting the rest. `$ref`s are inlined into standalone schemas because each service's `responseSchema` is compiled on its own; cycles are cut to `{}`. Sample bodies are deterministic (fixed dates, zero UUID) so imports diff cleanly; for `oneOf`, the generator prefers a sample that matches exactly one option. Checked against GitHub's REST API description: 1,259 operations import in ~7 s, and all generated bodies pass their schemas except one whose `oneOf` can't be satisfied by any object.
@@ -114,7 +120,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 | URL twisting | `stripPrefix` + ordered regex `rewrite` rules on proxy; "Try a path" preview | **2 (done)** |
 | Response JSON schema validation | `responseSchema` per status (Ajv, 2020-12 / draft-07); results in history, `x-mimic-validation`, and per-scenario on the service page | **2 (done)** |
 | Stats / CSV export | History export as HAR 1.2 or JSON, filterable by service / validation | **2 (done)**; per-service counts later |
-| Java request-inspector plugins | Optional JS/TS matcher/response functions | 3 |
+| Java request-inspector plugins | Per-service `hook.{js,mjs,ts,mts}`: `request` (answer, pick a scenario, or pass) and `response` (change any response); `ctx.state` for stateful mocks | **3 (done)** |
 | Templated responses (n/a) | `template: true` scenarios: `{{params.id}}`, `{{body.x \| json}}`, helpers and filters; validated on save; preview | **3 (done)** |
 | (n/a) | OpenAPI 3.0/3.1 import (CLI, API, dashboard): services, scenarios from examples or schema samples, response schemas | **3 (done)** |
 | HTTPS interception, mobile view, file manager, API doc pages | Dropped unless requested | — |
@@ -125,7 +131,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
 - **Phase 2 — proxy fidelity & export (done):** corporate proxy, path rewrites, history export, schema validation, regex/JSONPath matching, history persistence.
   - Still open from this area: faithful header forwarding (`fetch` adds defaults such as `sec-fetch-mode`; `undici.request` would avoid them) and streaming large bodies instead of buffering.
-- **Phase 3 — extensibility:** ~~response templating~~, ~~OpenAPI import~~ (done); remaining: user JS hooks, publish to npm with CI (lint, test, release).
+- **Phase 3 — extensibility (done):** response templating, OpenAPI import, user JS hooks, CI and a tag-triggered npm release workflow. First publish still to do (see RELEASING.md); a linter (e.g. Biome) could join CI later — today `tsc --strict` is the only static check.
   - Import follow-ups: filtering by OpenAPI tag or path at import time (a full GitHub API import is 1,259 services and ~40 MB of YAML, because shared schemas are inlined per service), and re-importing to update services that came from a spec.
 
 ### UI conventions

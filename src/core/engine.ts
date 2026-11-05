@@ -1,6 +1,7 @@
 import type { History, HistoryEntry, Source } from "./history.js";
 import { upstreamUrl } from "./rewrite.js";
 import { validateResponse, type ValidationResult } from "./validate.js";
+import { type HookContext, type HookResponse, type Hooks, hookRequest, pickedScenario, runHook, scenarioPick } from "./hooks.js";
 import { MatchInput, scoreMatch } from "./match.js";
 import { compilePath, matchPath } from "./path.js";
 import { renderTemplate } from "./template.js";
@@ -46,6 +47,35 @@ function fromScenario(service: Service, scenario: Scenario, source: Source, note
   };
 }
 
+/** Renders a template scenario's body and header values for a request. */
+function renderResolution(res: Resolution, scenario: Scenario, input: MatchInput): Resolution {
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(res.headers)) headers[k] = renderTemplate(v, input);
+  return { ...res, headers, body: enc.encode(renderTemplate(scenario.body, input)) };
+}
+
+/** Turns what a hook returned into response fields. Object bodies become JSON. */
+function fromHookResponse(r: HookResponse, base: { status: number; headers: Record<string, string>; delayMs: number }) {
+  const headers = { ...(r.headers ?? base.headers) };
+  let body: Uint8Array<ArrayBuffer>;
+  if (r.body === undefined || r.body === null) body = new Uint8Array();
+  else if (typeof r.body === "string") body = enc.encode(r.body);
+  else {
+    body = enc.encode(JSON.stringify(r.body));
+    if (!Object.keys(headers).some((h) => h.toLowerCase() === "content-type")) headers["content-type"] = "application/json";
+  }
+  const status = Number.isInteger(r.status) && r.status! >= 100 && r.status! <= 599 ? r.status! : base.status;
+  const delayMs = typeof r.delayMs === "number" && r.delayMs >= 0 ? r.delayMs : base.delayMs;
+  return { status, headers, body, delayMs };
+}
+
+function hookFailed(service: Service, err: unknown): Resolution {
+  console.error(`[${service.id}] ${err instanceof Error ? err.message : String(err)}`);
+  const cause = err instanceof Error && err.cause instanceof Error ? err.cause.stack : undefined;
+  if (cause) console.error(cause);
+  return problem(500, err instanceof Error ? err.message : String(err), "error", service);
+}
+
 function problem(status: number, message: string, source: Source, service?: Service): Resolution {
   return {
     service,
@@ -66,6 +96,7 @@ export class Engine {
     private readonly store: Store,
     private readonly history: History,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly hooks?: Hooks,
   ) {}
 
   /** Resolve, delay, and record a request. */
@@ -102,47 +133,98 @@ export class Engine {
   /**
    * Picks the response; when Mimic would answer with its own error, the
    * global error scenario (if set) is used instead. Template scenarios are
-   * rendered from the request last, whichever way they were chosen.
+   * rendered from the request, whichever way they were chosen, and the
+   * service's response hook (if any) runs last.
    */
   async resolve(req: MockRequest): Promise<Resolution> {
-    const { res, params } = await this.resolveWithFallback(req);
-    if (!res.scenario?.template) return res;
-    const input = new MatchInput(req.method, req.url, req.headers, params, dec.decode(req.body));
-    const headers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(res.headers)) headers[k] = renderTemplate(v, input);
-    return { ...res, headers, body: enc.encode(renderTemplate(res.scenario.body, input)) };
+    const { res, input } = await this.resolveWithFallback(req);
+    const rendered = res.scenario?.template ? renderResolution(res, res.scenario, input) : res;
+    return this.applyResponseHook(rendered, input);
   }
 
-  private async resolveWithFallback(req: MockRequest): Promise<{ res: Resolution; params: Record<string, string> }> {
-    const { res, params } = await this.resolveOwn(req);
-    if (res.source !== "error" && res.source !== "unmatched") return { res, params };
+  private async resolveWithFallback(req: MockRequest): Promise<{ res: Resolution; input: MatchInput }> {
+    const { res, input } = await this.resolveOwn(req);
+    if (res.source !== "error" && res.source !== "unmatched") return { res, input };
     const global = this.store.globalErrorScenario();
-    if (!global) return { res, params };
+    if (!global) return { res, input };
     const { service: owner, scenario } = global;
-    return { params, res: {
-      service: res.service,
-      scenario,
-      source: "fallback",
-      note: `${res.note}; used global error scenario ${owner.id}/${scenario.id}`,
-      status: scenario.status,
-      headers: scenario.headers,
-      body: enc.encode(scenario.body),
-      delayMs: scenario.delayMs ?? res.service?.delayMs ?? owner.delayMs,
-    } };
+    return {
+      input,
+      res: {
+        service: res.service,
+        scenario,
+        source: "fallback",
+        note: `${res.note}; used global error scenario ${owner.id}/${scenario.id}`,
+        status: scenario.status,
+        headers: scenario.headers,
+        body: enc.encode(scenario.body),
+        delayMs: scenario.delayMs ?? res.service?.delayMs ?? owner.delayMs,
+      },
+    };
   }
 
-  private async resolveOwn(req: MockRequest): Promise<{ res: Resolution; params: Record<string, string> }> {
+  private async resolveOwn(req: MockRequest): Promise<{ res: Resolution; input: MatchInput }> {
+    const bodyText = dec.decode(req.body);
     const match = this.store.resolve(req.method, req.url.pathname);
     if (!match) {
+      const input = new MatchInput(req.method, req.url, req.headers, {}, bodyText);
       const hidden = this.store.resolve(req.method, req.url.pathname, { includeInactive: true });
       const why = hidden ? ` (service '${hidden.service.id}' matches but is outside the tag filter: ${this.store.activeTags.join(", ")})` : "";
-      return { res: problem(404, `No service matches ${req.method} ${req.url.pathname}${why}`, "unmatched"), params: {} };
+      return { res: problem(404, `No service matches ${req.method} ${req.url.pathname}${why}`, "unmatched"), input };
     }
-    return { res: await this.byMode(match.service, match.params, req), params: match.params };
+    const input = new MatchInput(req.method, req.url, req.headers, match.params, bodyText);
+    const hooked = await this.applyRequestHook(match.service, input);
+    return { res: hooked ?? (await this.byMode(match.service, input, req)), input };
   }
 
-  private async byMode(service: Service, params: Record<string, string>, req: MockRequest): Promise<Resolution> {
+  private hookContext(service: Service): HookContext {
+    return {
+      service,
+      scenario: scenarioPick,
+      state: this.hooks!.state(service.id),
+      log: (...args: unknown[]) => console.log(`[${service.id}]`, ...args),
+    };
+  }
 
+  /** The service's request hook: undefined means "carry on as usual". */
+  private async applyRequestHook(service: Service, input: MatchInput): Promise<Resolution | undefined> {
+    const hook = this.hooks?.get(service.id)?.module.request;
+    if (!hook) return undefined;
+    let result: unknown;
+    try {
+      result = await runHook("Request", () => hook(hookRequest(input), this.hookContext(service)));
+    } catch (err) {
+      return hookFailed(service, err);
+    }
+    if (result === undefined || result === null) return undefined;
+    const picked = pickedScenario(result);
+    if (picked !== undefined) {
+      const sc = findScenario(service, picked);
+      return sc ? fromScenario(service, sc, "scenario", "Chosen by hook") : problem(500, `Hook chose '${picked}', which is not a scenario of '${service.id}'`, "error", service);
+    }
+    if (typeof result !== "object") return problem(500, `Request hook returned ${typeof result}; return a response object, ctx.scenario(id), or nothing`, "error", service);
+    return { ...fromHookResponse(result as HookResponse, { status: 200, headers: {}, delayMs: service.delayMs }), service, source: "hook", note: "Answered by hook" };
+  }
+
+  /** The service's response hook, on everything it answered (not on Mimic's own errors). */
+  private async applyResponseHook(res: Resolution, input: MatchInput): Promise<Resolution> {
+    const service = res.service;
+    const hook = service && res.source !== "error" ? this.hooks?.get(service.id)?.module.response : undefined;
+    if (!service || !hook) return res;
+    const view = { status: res.status, headers: { ...res.headers }, body: dec.decode(res.body) };
+    let result: unknown;
+    try {
+      result = await runHook("Response", () => hook(hookRequest(input), view, this.hookContext(service)));
+    } catch (err) {
+      return hookFailed(service, err);
+    }
+    const changes = result !== undefined && result !== null && typeof result === "object" ? (result as HookResponse) : {};
+    const next = fromHookResponse({ ...view, ...changes }, { status: res.status, headers: {}, delayMs: res.delayMs });
+    const note = [res.note, "changed by response hook"].filter(Boolean).join("; ");
+    return { ...res, ...next, note };
+  }
+
+  private async byMode(service: Service, input: MatchInput, req: MockRequest): Promise<Resolution> {
     switch (service.mode) {
       case "static": {
         const sc = findScenario(service, service.defaultScenario);
@@ -151,7 +233,6 @@ export class Engine {
           : problem(500, `Service '${service.id}' is static but has no default scenario`, "error", service);
       }
       case "dynamic": {
-        const input = new MatchInput(req.method, req.url, req.headers, params, dec.decode(req.body));
         let best: { sc: Scenario; score: number } | null = null;
         for (const sc of service.scenarios) {
           const score = scoreMatch(sc.match, input);

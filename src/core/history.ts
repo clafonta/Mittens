@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import type { ValidationResult } from "./validate.js";
 
-export type Source = "scenario" | "proxy" | "fallback" | "unmatched" | "error";
+export type Source = "scenario" | "proxy" | "hook" | "fallback" | "unmatched" | "error";
 
 export interface HistoryEntry {
   id: string;

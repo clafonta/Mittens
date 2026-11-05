@@ -1,21 +1,24 @@
 import { watch } from "node:fs";
+import type { Hooks } from "./hooks.js";
 import type { Store } from "./store.js";
 
 export interface WatchOptions {
   debounceMs?: number;
   log?: (message: string) => void;
+  /** Reload service hooks (hook.js etc.) too. */
+  hooks?: Hooks;
 }
 
 export interface DefinitionsWatcher {
   close(): void;
 }
 
-/** Only YAML files (and directory renames, which have no extension) are interesting. */
+/** YAML files, hook files, and directory renames (which have no extension) are interesting. */
 function relevant(filename: string | null): boolean {
   if (!filename) return true;
   const base = filename.split(/[\\/]/).pop() ?? "";
   if (base.startsWith(".")) return false; // temp files from atomic writes, editor swap files
-  return base.endsWith(".yaml") || !base.includes(".");
+  return base.endsWith(".yaml") || /^hook\.(m?js|m?ts)$/.test(base) || !base.includes(".");
 }
 
 /**
@@ -39,6 +42,13 @@ export function watchDefinitions(root: string, store: Store, opts: WatchOptions 
     running = true;
     try {
       const result = await store.reload();
+      if (opts.hooks) {
+        const changed = await opts.hooks.load(store.listServices().map((s) => s.id));
+        for (const id of changed) {
+          const hook = opts.hooks.get(id);
+          log(hook ? `Loaded hook for '${id}' (${hook.exports.join(", ")})` : `Removed hook for '${id}'`);
+        }
+      }
       if (result.error) {
         if (result.error !== lastError) log(`Couldn't reload definitions; still serving the last good version.\n${result.error}`);
         lastError = result.error;

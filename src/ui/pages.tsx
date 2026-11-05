@@ -256,8 +256,9 @@ export function ServicePage(props: {
   allModified: string[];
   inactive: boolean;
   globalError?: ScenarioRef;
+  hook?: HookInfo;
 }) {
-  const { service, modified, allModified, inactive, globalError } = props;
+  const { service, modified, allModified, inactive, globalError, hook } = props;
   const base = `${BASE}/services/${service.id}`;
   return (
     <>
@@ -276,6 +277,7 @@ export function ServicePage(props: {
         </tbody>
       </table>
       {service.upstream && <UpstreamInfo service={service} />}
+      {hook && <HookPanel serviceId={service.id} hook={hook} />}
       <div class="title-row">
         <h2>Scenarios</h2>
         <a class="button" href={`${base}/scenarios/new`}>
@@ -352,6 +354,41 @@ export function ServicePage(props: {
         <p class="muted">Loading…</p>
       </div>
     </>
+  );
+}
+
+export interface HookInfo {
+  file?: string;
+  exports: string[];
+  error?: string;
+  enabled: boolean;
+}
+
+function HookPanel({ serviceId, hook }: { serviceId: string; hook: HookInfo }) {
+  return (
+    <div class={`panel${hook.error ? " error-banner" : ""}`}>
+      <span>
+        <strong>Hook</strong>{" "}
+        {hook.file && (
+          <>
+            <code>{hook.file}</code> · {hook.exports.join(", ")}
+          </>
+        )}
+        {hook.error && (
+          <>
+            {hook.file ? " · " : ""}couldn't load{hook.file ? " the latest version (running the previous one)" : ""}:
+            <pre>{hook.error}</pre>
+          </>
+        )}
+      </span>
+      {hook.file && (
+        <form method="post" action={`${BASE}/services/${serviceId}/hook/reset`} class="inline">
+          <button type="submit" class="small" title="Empty ctx.state for this service">
+            Clear hook state
+          </button>
+        </form>
+      )}
+    </div>
   );
 }
 

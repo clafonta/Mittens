@@ -26,6 +26,7 @@ import { ProfileForm, ScenarioForm, ServiceForm } from "../ui/forms.js";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
+  LiveStateBanner,
   HistoryEntryPage,
   HistoryPage,
   HistoryTable,
@@ -109,10 +110,12 @@ export function createUi(store: Store, history: History) {
 
   // ------------------------------------------------------------- services
 
-  ui.get("/", (c) => page(c, "Services", <ServicesPage services={store.listServices()} profiles={profileInfos()} />));
+  ui.get("/", (c) =>
+    page(c, "Services", <ServicesPage services={store.listServices()} profiles={profileInfos()} modified={store.modifiedServiceIds()} />),
+  );
 
   const serviceForm = (values: FormValues, errors: FormErrors, id?: string) => (
-    <ServiceForm service={id ? store.getService(id) : undefined} values={values} errors={errors} />
+    <ServiceForm service={id ? store.getDefinition(id) : undefined} values={values} errors={errors} />
   );
 
   ui.get("/services/new", (c) =>
@@ -135,10 +138,10 @@ export function createUi(store: Store, history: History) {
   );
   ui.get("/services/:id", (c) => {
     const service = store.getService(c.req.param("id"));
-    return page(c, service.name, <ServicePage service={service} />);
+    return page(c, service.name, <ServicePage service={service} modified={store.isModified(service.id)} allModified={store.modifiedServiceIds()} />);
   });
   ui.get("/services/:id/edit", (c) => {
-    const service = store.getService(c.req.param("id"));
+    const service = store.getDefinition(c.req.param("id"));
     return page(c, `Edit ${service.name}`, <FormPage title={`Edit ${service.name}`}>{serviceForm(serviceToValues(service), {}, service.id)}</FormPage>);
   });
   ui.post("/services/:id", (c) => {
@@ -182,7 +185,7 @@ export function createUi(store: Store, history: History) {
       action: async (v) => {
         const scenario = await store.putScenario(service.id, scenarioFromForm(v), { create: true });
         // The first scenario of a service becomes its default, so static mode works straight away.
-        if (!store.getService(service.id).defaultScenario) await store.updateService(service.id, { defaultScenario: scenario.id });
+        if (!store.getDefinition(service.id).defaultScenario) await store.updateService(service.id, { defaultScenario: scenario.id });
         return withFlash(`${BASE}/services/${service.id}`, `Created scenario '${scenario.name}'`);
       },
     });
@@ -221,7 +224,7 @@ export function createUi(store: Store, history: History) {
   async function apply(c: Context, id: string, fallback: string) {
     const body = toValues(await c.req.parseBody());
     const profile = store.getProfile(id);
-    const changed = await store.applyProfile(profile.id);
+    const changed = store.applyProfile(profile.id);
     const msg = `Applied '${profile.name}' (${changed.length} service${changed.length === 1 ? "" : "s"} changed)`;
     return c.redirect(withFlash(safeReturn(body.return, fallback), msg), 303);
   }
@@ -272,6 +275,22 @@ export function createUi(store: Store, history: History) {
     return c.redirect(withFlash(`${BASE}/profiles`, `Deleted profile '${profile.name}'`), 303);
   });
 
+  // ----------------------------------------------------------- live state
+
+  ui.post("/state/save", async (c) => {
+    const body = toValues(await c.req.parseBody());
+    const saved = await store.saveLiveState();
+    const msg = store.readOnly
+      ? `Read-only: kept ${saved.length} change${saved.length === 1 ? "" : "s"} in memory only`
+      : `Saved ${saved.length} service${saved.length === 1 ? "" : "s"} as starting state`;
+    return c.redirect(withFlash(safeReturn(body.return, BASE), msg), 303);
+  });
+  ui.post("/state/reset", async (c) => {
+    const body = toValues(await c.req.parseBody());
+    const reset = store.resetLiveState();
+    return c.redirect(withFlash(safeReturn(body.return, BASE), `Reset ${reset.length} service${reset.length === 1 ? "" : "s"} to starting state`), 303);
+  });
+
   // -------------------------------------------------------------- history
 
   ui.get("/history", (c) => page(c, "History", <HistoryPage />));
@@ -288,14 +307,25 @@ export function createUi(store: Store, history: History) {
     const entries = history.list({ serviceId: c.req.query("service") }).slice(0, limit);
     return c.html(<HistoryTable entries={entries} />);
   });
+  // Mode/default switcher: changes live state only.
   ui.post("/ui/services/:id", async (c) => {
     const form = toValues(await c.req.parseBody());
-    const service = await store.updateService(c.req.param("id"), {
+    const service = store.setLiveState(c.req.param("id"), {
       mode: ServiceMode.parse(form.mode),
       defaultScenario: form.defaultScenario || undefined,
     });
-    return c.html(<ServiceRow service={service} />);
+    c.header("HX-Trigger", "live-changed");
+    return c.html(<ServiceRow service={service} modified={store.isModified(service.id)} />);
   });
+  ui.post("/ui/services/:id/reset", (c) => {
+    const id = c.req.param("id");
+    store.resetLiveState(id);
+    c.header("HX-Trigger", "live-changed");
+    return c.html(<ServiceRow service={store.getService(id)} modified={false} />);
+  });
+  ui.get("/ui/live-banner", (c) =>
+    c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), BASE)} />),
+  );
 
   ui.all("*", (c) => page(c, "Not found", <NotFoundPage message={`No page at ${c.req.path}`} />, 404));
   return ui;

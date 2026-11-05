@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { History } from "../core/history.js";
+import { ServiceMode, Slug } from "../core/schema.js";
 import type { Store } from "../core/store.js";
 import { errorStatus } from "./errors.js";
 
@@ -58,9 +59,41 @@ export function createApi(store: Store, history: History) {
     return c.body(null, 204);
   });
   api.post("/profiles/:id/apply", async (c) => {
-    const changed = await store.applyProfile(c.req.param("id"));
+    const changed = store.applyProfile(c.req.param("id"));
     return c.json({ applied: c.req.param("id"), changed: changed.map((s) => s.id) });
   });
+
+  // live state (in memory; resets on restart)
+  const LivePatch = z
+    .object({ mode: ServiceMode.optional(), defaultScenario: Slug.nullable().optional() })
+    .strict();
+  const liveView = () => {
+    const services: Record<string, unknown> = {};
+    for (const s of store.listServices()) {
+      const def = store.getDefinition(s.id);
+      services[s.id] = {
+        mode: s.mode,
+        defaultScenario: s.defaultScenario ?? null,
+        modified: store.isModified(s.id),
+        starting: { mode: def.mode, defaultScenario: def.defaultScenario ?? null },
+      };
+    }
+    return { modified: store.modifiedServiceIds(), services };
+  };
+  api.get("/state", (c) => c.json(liveView()));
+  /** Body: { mode?, defaultScenario? } — null clears the default scenario. */
+  api.patch("/state/services/:id", async (c) => {
+    const { mode, defaultScenario } = LivePatch.parse(await c.req.json());
+    const patch = {
+      ...(mode !== undefined && { mode }),
+      ...(defaultScenario !== undefined && { defaultScenario: defaultScenario ?? undefined }),
+    };
+    return c.json(store.setLiveState(c.req.param("id"), patch));
+  });
+  api.delete("/state/services/:id", (c) => c.json({ reset: store.resetLiveState(c.req.param("id")) }));
+  api.delete("/state", (c) => c.json({ reset: store.resetLiveState() }));
+  /** Writes the live state back to the YAML definitions. */
+  api.post("/state/save", async (c) => c.json({ saved: await store.saveLiveState() }));
 
   // history
   api.get("/history", (c) => c.json(history.list({ serviceId: c.req.query("service") })));

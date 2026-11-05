@@ -21,6 +21,8 @@ select, button { font:inherit; padding:.2rem .4rem; border:1px solid var(--line)
 .grid { display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; } @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
 .empty { padding:2rem; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:8px; }
 .banner { padding:.5rem .75rem; border:1px solid var(--warn); color:var(--warn); border-radius:6px; margin-bottom:1rem; }
+.banner.live { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; } .banner.live span { margin-right:auto; }
+button.small { padding:.05rem .45rem; font-size:.8rem; }
 .flash { padding:.5rem .75rem; border:1px solid var(--ok); color:var(--ok); border-radius:6px; margin-bottom:1rem; }
 .error-banner { border-color:var(--bad); color:var(--bad); }
 .title-row { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin:0 0 1rem; } .title-row h1, .title-row h2, .title-row h3 { margin:0; margin-right:auto; }

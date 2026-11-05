@@ -24,7 +24,7 @@ Options:
       --host <addr>    Interface to bind (default: 127.0.0.1, env MIMIC_HOST)
   -d, --dir <path>     Definitions directory (default: ./mimic, env MIMIC_DIR)
       --read-only      Load definitions but never write changes to disk
-      --profile <id>   Apply a profile on start (env MIMIC_PROFILE)
+      --profile <id>   Apply a profile on start, in memory only (env MIMIC_PROFILE)
       --open           Open the dashboard in a browser on start
   -h, --help           Show this help
   -v, --version        Show the version
@@ -83,7 +83,7 @@ async function main() {
   const profileId = values.profile ?? process.env.MIMIC_PROFILE;
   if (profileId) {
     try {
-      await store.applyProfile(profileId);
+      store.applyProfile(profileId);
     } catch (err) {
       const known = store.listProfiles().map((p) => p.id);
       fail(`${err instanceof Error ? err.message : String(err)}${known.length ? ` (profiles: ${known.join(", ")})` : ""}`);
@@ -100,7 +100,7 @@ async function main() {
     console.log(
       `  Definitions: ${dir} (${count} service${count === 1 ? "" : "s"}, ${profiles} profile${profiles === 1 ? "" : "s"}${store.readOnly ? ", read-only" : ""})`,
     );
-    if (profileId) console.log(`  Profile:     ${store.getProfile(profileId).name}`);
+    if (profileId) console.log(`  Profile:     ${store.getProfile(profileId).name} (live only; YAML unchanged)`);
     if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });

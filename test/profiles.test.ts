@@ -13,7 +13,7 @@ describe("profiles (store)", () => {
     const { store, request } = await setup(fixtures(), undefined, [outage]);
     expect(store.isProfileActive(store.getProfile("outage"))).toBe(false);
 
-    const changed = await store.applyProfile("outage");
+    const changed = store.applyProfile("outage");
     expect(changed.map((s) => s.id).sort()).toEqual(["orders", "users"]);
     expect(store.getService("users")).toMatchObject({ mode: "static", defaultScenario: "boom" });
     // mode not given → unchanged
@@ -22,9 +22,9 @@ describe("profiles (store)", () => {
     expect((await request("/users/1")).status).toBe(500);
 
     // re-applying changes nothing
-    expect(await store.applyProfile("outage")).toEqual([]);
+    expect(store.applyProfile("outage")).toEqual([]);
     // a manual change makes it inactive again
-    await store.setMode("users", "dynamic");
+    store.setLiveState("users", { mode: "dynamic" });
     expect(store.isProfileActive(store.getProfile("outage"))).toBe(false);
   });
 
@@ -32,7 +32,7 @@ describe("profiles (store)", () => {
     const stale = { ...outage, services: { ...outage.services, ghost: { mode: "static" as const } } };
     const { store } = await setup(fixtures(), undefined, [stale]);
     expect(store.profileProblems(store.getProfile("outage"))).toEqual(["Service 'ghost' does not exist"]);
-    await expect(store.applyProfile("outage")).rejects.toThrow(/ghost/);
+    expect(() => store.applyProfile("outage")).toThrow(/ghost/);
     expect(store.getService("users")).toMatchObject({ mode: "dynamic", defaultScenario: "ok" });
   });
 

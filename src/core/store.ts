@@ -26,14 +26,31 @@ function assertNotReserved(id: string) {
 }
 
 interface Entry {
+  /** The service as defined on disk. */
   service: Service;
   compiled: CompiledPath;
 }
 
-/** In-memory source of truth for definitions, written through to a Repo. */
+/** What is selected for a service right now. Lives in memory only. */
+export interface LiveState {
+  mode: ServiceMode;
+  defaultScenario: string | undefined;
+}
+
+/**
+ * In-memory source of truth for definitions, written through to a Repo.
+ *
+ * Definitions (YAML) hold each service's *starting* mode and default scenario.
+ * Switching modes, picking a default and applying profiles change only the
+ * live state, which is kept in memory and resets on restart; `saveLiveState()`
+ * writes it back to the definitions on purpose. Reads (`getService`,
+ * `listServices`, `resolve`) return the live view.
+ */
 export class Store {
   private entries = new Map<string, Entry>();
   private profiles = new Map<string, Profile>();
+  /** Overrides for services whose live state differs from their definition. */
+  private live = new Map<string, LiveState>();
 
   constructor(
     private readonly repo: Repo,
@@ -47,15 +64,23 @@ export class Store {
   async load(): Promise<void> {
     const [services, profiles] = await Promise.all([this.repo.loadAll(), this.repo.loadProfiles()]);
     this.entries.clear();
+    this.live.clear();
     for (const s of services) this.entries.set(s.id, { service: s, compiled: compilePath(s.path) });
     this.profiles = new Map(profiles.map((p) => [p.id, p]));
   }
 
+  /** All services, live view. */
   listServices(): Service[] {
-    return [...this.entries.values()].map((e) => e.service).sort((a, b) => a.name.localeCompare(b.name));
+    return [...this.entries.values()].map((e) => this.withLive(e.service)).sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /** A service, live view: mode and default scenario reflect the current selection. */
   getService(id: string): Service {
+    return this.withLive(this.getDefinition(id));
+  }
+
+  /** A service exactly as defined on disk (starting mode and default scenario). */
+  getDefinition(id: string): Service {
     const entry = this.entries.get(id);
     if (!entry) throw new NotFoundError(`Service '${id}' not found`);
     return entry.service;
@@ -73,7 +98,8 @@ export class Store {
    */
   resolve(method: string, path: string): { service: Service; params: Record<string, string> } | null {
     let best: { service: Service; params: Record<string, string>; rank: number } | null = null;
-    for (const { service, compiled } of this.entries.values()) {
+    for (const { service: definition, compiled } of this.entries.values()) {
+      const service = this.withLive(definition);
       if (service.method !== "ANY" && service.method !== method.toUpperCase()) continue;
       const params = matchPath(compiled, path);
       if (!params) continue;
@@ -96,29 +122,91 @@ export class Store {
     return service;
   }
 
-  /** Updates service-level fields; scenarios are managed separately. */
+  /**
+   * Updates a service's definition (written to disk); scenarios are managed
+   * separately. Changing the starting mode or default scenario also makes it
+   * the live value for that field, so the edit takes effect immediately.
+   */
   async updateService(id: string, patch: Record<string, unknown>): Promise<Service> {
-    const current = this.getService(id);
-    const service = Service.parse({ ...current, ...patch, id, scenarios: current.scenarios });
+    const before = this.getDefinition(id);
+    const service = Service.parse({ ...before, ...patch, id, scenarios: before.scenarios });
     this.validateRefs(service);
     await this.persist(() => this.repo.saveService(service));
     this.entries.set(id, { service, compiled: compilePath(service.path) });
-    return service;
-  }
 
-  setMode(id: string, mode: ServiceMode) {
-    return this.updateService(id, { mode });
+    const live = this.live.get(id);
+    if (live) {
+      const next: LiveState = {
+        mode: service.mode !== before.mode ? service.mode : live.mode,
+        defaultScenario: service.defaultScenario !== before.defaultScenario ? service.defaultScenario : live.defaultScenario,
+      };
+      // If the edit made the override impossible (e.g. upstream removed while live in proxy), drop it.
+      if (this.liveProblems(service, next).length) this.live.delete(id);
+      else this.storeLive(service, next);
+    }
+    return this.getService(id);
   }
 
   async deleteService(id: string): Promise<void> {
-    this.getService(id);
+    this.getDefinition(id);
     await this.persist(() => this.repo.deleteService(id));
     this.entries.delete(id);
+    this.live.delete(id);
+  }
+
+  // ----------------------------------------------------------- live state
+
+  /** Changes what a service does right now, without touching its definition. */
+  setLiveState(id: string, patch: Partial<LiveState>): Service {
+    const definition = this.getDefinition(id);
+    const current = this.liveOf(definition);
+    const next: LiveState = {
+      mode: patch.mode ?? current.mode,
+      defaultScenario: "defaultScenario" in patch ? patch.defaultScenario : current.defaultScenario,
+    };
+    const problems = this.liveProblems(definition, next);
+    if (problems.length) {
+      const [first] = problems;
+      throw new ConflictError(first!.message, first!.field);
+    }
+    this.storeLive(definition, next);
+    return this.getService(id);
+  }
+
+  /** IDs of services whose live state differs from their definition. */
+  modifiedServiceIds(): string[] {
+    return [...this.live.keys()].sort();
+  }
+
+  isModified(id: string): boolean {
+    return this.live.has(id);
+  }
+
+  /** Discards live changes for one service, or all services, returning to the definitions. */
+  resetLiveState(id?: string): string[] {
+    if (id !== undefined) {
+      this.getDefinition(id);
+      return this.live.delete(id) ? [id] : [];
+    }
+    const ids = this.modifiedServiceIds();
+    this.live.clear();
+    return ids;
+  }
+
+  /** Writes the live state of every modified service back to its definition. */
+  async saveLiveState(): Promise<string[]> {
+    const ids = this.modifiedServiceIds();
+    for (const id of ids) {
+      const live = this.live.get(id)!;
+      await this.updateService(id, { mode: live.mode, defaultScenario: live.defaultScenario });
+      this.live.delete(id);
+    }
+    return ids;
   }
 
   /** Creates or replaces a scenario. With `create`, an existing id is a conflict. */
   async putScenario(serviceId: string, input: unknown, opts: { create?: boolean } = {}): Promise<Scenario> {
-    const service = this.getService(serviceId);
+    const service = this.getDefinition(serviceId);
     const scenario = Scenario.parse(input);
     if (opts.create && service.scenarios.some((s) => s.id === scenario.id)) {
       throw new ConflictError(`Scenario '${scenario.id}' already exists in '${serviceId}'`, "id");
@@ -131,7 +219,7 @@ export class Store {
   }
 
   async deleteScenario(serviceId: string, scenarioId: string): Promise<void> {
-    const service = this.getService(serviceId);
+    const service = this.getDefinition(serviceId);
     this.getScenario(serviceId, scenarioId);
     const next: Service = {
       ...service,
@@ -144,6 +232,8 @@ export class Store {
       await this.repo.saveService(next);
     });
     this.replace(next);
+    const live = this.live.get(serviceId);
+    if (live?.defaultScenario === scenarioId) this.storeLive(next, { ...live, defaultScenario: undefined });
   }
 
   // ------------------------------------------------------------- profiles
@@ -205,7 +295,7 @@ export class Store {
     const entries = Object.entries(profile.services);
     if (entries.length === 0) return false;
     return entries.every(([serviceId, entry]) => {
-      const service = this.entries.get(serviceId)?.service;
+      const service = this.entries.has(serviceId) ? this.getService(serviceId) : undefined;
       return (
         !!service &&
         (entry.mode === undefined || service.mode === entry.mode) &&
@@ -214,30 +304,55 @@ export class Store {
     });
   }
 
-  /** Applies a profile all-or-nothing: if anything is invalid, nothing changes. */
-  async applyProfile(id: string): Promise<Service[]> {
+  /**
+   * Applies a profile to the live state, all-or-nothing: if anything is
+   * invalid, nothing changes. Definitions on disk are not touched.
+   */
+  applyProfile(id: string): Service[] {
     const profile = this.getProfile(id);
     const problems = this.profileProblems(profile);
     if (problems.length) throw new ConflictError(`Cannot apply '${profile.name}': ${problems.join("; ")}`);
 
-    const changed: Service[] = [];
+    const changed: string[] = [];
     for (const [serviceId, entry] of Object.entries(profile.services)) {
-      const current = this.getService(serviceId);
-      const next: Service = {
-        ...current,
-        mode: entry.mode ?? current.mode,
-        defaultScenario: entry.scenario ?? current.defaultScenario,
-      };
-      if (next.mode !== current.mode || next.defaultScenario !== current.defaultScenario) changed.push(next);
+      const definition = this.getDefinition(serviceId);
+      const current = this.liveOf(definition);
+      const next: LiveState = { mode: entry.mode ?? current.mode, defaultScenario: entry.scenario ?? current.defaultScenario };
+      if (next.mode !== current.mode || next.defaultScenario !== current.defaultScenario) {
+        this.storeLive(definition, next);
+        changed.push(serviceId);
+      }
     }
-    await this.persist(async () => {
-      for (const s of changed) await this.repo.saveService(s);
-    });
-    for (const s of changed) this.replace(s);
-    return changed;
+    return changed.map((sid) => this.getService(sid));
   }
 
   // ------------------------------------------------------------- internals
+
+  private liveOf(definition: Service): LiveState {
+    return this.live.get(definition.id) ?? { mode: definition.mode, defaultScenario: definition.defaultScenario };
+  }
+
+  private withLive(definition: Service): Service {
+    const live = this.live.get(definition.id);
+    return live ? { ...definition, mode: live.mode, defaultScenario: live.defaultScenario } : definition;
+  }
+
+  /** Records a live state, dropping the override when it matches the definition. */
+  private storeLive(definition: Service, state: LiveState) {
+    if (state.mode === definition.mode && state.defaultScenario === definition.defaultScenario) this.live.delete(definition.id);
+    else this.live.set(definition.id, state);
+  }
+
+  private liveProblems(definition: Service, state: LiveState): { message: string; field: string }[] {
+    const problems: { message: string; field: string }[] = [];
+    if (state.defaultScenario && !definition.scenarios.some((s) => s.id === state.defaultScenario)) {
+      problems.push({ message: `'${state.defaultScenario}' is not a scenario of '${definition.id}'`, field: "defaultScenario" });
+    }
+    if (state.mode === "proxy" && !definition.upstream) {
+      problems.push({ message: `Proxy mode needs an upstream URL`, field: "mode" });
+    }
+    return problems;
+  }
 
   private replace(service: Service) {
     const entry = this.entries.get(service.id)!;

@@ -14,7 +14,7 @@ export interface ProfileInfo {
 const MODES = ["static", "dynamic", "proxy"] as const;
 
 /** One service row; re-rendered in place by htmx after a change. */
-export function ServiceRow({ service }: { service: Service }) {
+export function ServiceRow({ service, modified }: { service: Service; modified: boolean }) {
   const formId = `svc-${service.id}`;
   return (
     <tr id={formId}>
@@ -48,7 +48,17 @@ export function ServiceRow({ service }: { service: Service }) {
                 {s.name}
               </option>
             ))}
-          </select>
+          </select>{" "}
+          {modified && (
+            <>
+              <span class="pill s4" title="Differs from the YAML definition. Resets on restart.">
+                changed
+              </span>{" "}
+              <button type="button" class="small" hx-post={`${BASE}/ui/services/${service.id}/reset`} hx-target={`#${formId}`} hx-swap="outerHTML">
+                Reset
+              </button>
+            </>
+          )}
         </form>
       </td>
       <td class="muted">{service.scenarios.length}</td>
@@ -79,7 +89,39 @@ function ProfileSwitcher({ profiles }: { profiles: ProfileInfo[] }) {
   );
 }
 
-export function ServicesPage({ services, profiles }: { services: Service[]; profiles: ProfileInfo[] }) {
+/**
+ * Shown when the live state differs from the definitions on disk. Always
+ * renders a container so it can refresh itself after in-place row changes
+ * (the row endpoints send an HX-Trigger: live-changed header).
+ */
+export function LiveStateBanner({ modified, returnTo }: { modified: string[]; returnTo: string }) {
+  const n = modified.length;
+  const refresh = {
+    "hx-get": `${BASE}/ui/live-banner?return=${encodeURIComponent(returnTo)}`,
+    "hx-trigger": "live-changed from:body",
+    "hx-swap": "outerHTML",
+  };
+  if (n === 0) return <div id="live-banner" {...refresh}></div>;
+  return (
+    <div id="live-banner" class="banner live" role="status" {...refresh}>
+      <span>
+        {n} service{n === 1 ? "" : "s"} differ{n === 1 ? "s" : ""} from {n === 1 ? "its" : "their"} starting state. Live changes
+        reset when Mimic restarts.
+      </span>
+      <form method="post" action={`${BASE}/state/save`} class="inline">
+        <input type="hidden" name="return" value={returnTo} />
+        <button type="submit">Save as starting state</button>
+      </form>
+      <form method="post" action={`${BASE}/state/reset`} class="inline">
+        <input type="hidden" name="return" value={returnTo} />
+        <button type="submit">Reset all</button>
+      </form>
+    </div>
+  );
+}
+
+export function ServicesPage({ services, profiles, modified }: { services: Service[]; profiles: ProfileInfo[]; modified: string[] }) {
+  const changed = new Set(modified);
   return (
     <>
       <div class="title-row">
@@ -89,6 +131,7 @@ export function ServicesPage({ services, profiles }: { services: Service[]; prof
           New service
         </a>
       </div>
+      <LiveStateBanner modified={modified} returnTo={BASE} />
       {services.length === 0 ? (
         <div class="empty">
           No services yet. <a href={`${BASE}/services/new`}>Create one</a>, run <code>npx @laboriouslabs/mimic init</code> for
@@ -106,7 +149,7 @@ export function ServicesPage({ services, profiles }: { services: Service[]; prof
           </thead>
           <tbody>
             {services.map((s) => (
-              <ServiceRow service={s} />
+              <ServiceRow service={s} modified={changed.has(s.id)} />
             ))}
           </tbody>
         </table>
@@ -119,7 +162,7 @@ export function ServicesPage({ services, profiles }: { services: Service[]; prof
   );
 }
 
-export function ServicePage({ service }: { service: Service }) {
+export function ServicePage({ service, modified, allModified }: { service: Service; modified: boolean; allModified: string[] }) {
   const base = `${BASE}/services/${service.id}`;
   return (
     <>
@@ -130,10 +173,11 @@ export function ServicePage({ service }: { service: Service }) {
         </a>
         <DeleteButton action={`${base}/delete`} what={`service '${service.name}' and all its scenarios`} />
       </div>
+      <LiveStateBanner modified={allModified} returnTo={base} />
       {service.description && <p class="muted">{service.description}</p>}
       <table>
         <tbody>
-          <ServiceRow service={service} />
+          <ServiceRow service={service} modified={modified} />
         </tbody>
       </table>
       {service.upstream && (

@@ -24,6 +24,7 @@ Requires Node.js 22+. Installed globally (`npm i -g @laboriouslabs/mimic`), the 
 - **Service** — a route (`path` + `method`) and how to answer it.
 - **Scenario** — a canned response: status, headers, body, optional delay and `match` rule.
 - **Profile** — a named preset ("happy path", "outage") that sets the mode and/or default scenario of several services in one step. Apply one from the dashboard, the API, or at startup with `--profile`.
+- **Live state** — what each service is doing right now. The YAML holds each service's *starting* mode and default scenario; switching modes in the dashboard, applying a profile, or `--profile` changes only the live state, which is kept in memory and resets when Mimic restarts. Your definition files never change behind your back. Use **Save as starting state** (or `POST /_mimic/api/state/save`) to write it back on purpose, or **Reset** to return to the files.
 - **Mode** (per service):
   - `static` — always return `defaultScenario`.
   - `dynamic` — return the scenario whose `match` rule best fits the request; otherwise fall back to `defaultScenario`, then `errorScenario`.
@@ -52,8 +53,8 @@ mimic/
 name: Users API
 path: /api/users/{id}     # {param} captures a segment; a trailing /* matches any suffix
 method: GET               # or ANY
-mode: dynamic             # static | dynamic | proxy
-defaultScenario: found
+mode: dynamic             # starting mode: static | dynamic | proxy
+defaultScenario: found    # starting default scenario
 errorScenario: server-error
 upstream: https://api.example.com   # required for proxy mode
 delayMs: 0
@@ -98,7 +99,7 @@ mimic init [--dir <path>]
       --host <addr>  default 127.0.0.1 (MIMIC_HOST)
   -d, --dir <path>   default ./mimic (MIMIC_DIR)
       --read-only    never write changes to disk
-      --profile <id> apply a profile on start (MIMIC_PROFILE)
+      --profile <id> apply a profile on start, live only (MIMIC_PROFILE)
       --open         open the dashboard in a browser
 ```
 
@@ -110,17 +111,21 @@ All under `/_mimic/api`, JSON in and out:
 |---|---|---|
 | GET | `/services` | list services |
 | POST | `/services` | create a service |
-| GET / PATCH / DELETE | `/services/:id` | read / update fields / delete |
+| GET / PATCH / DELETE | `/services/:id` | read (live view) / edit the definition / delete |
 | PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
+| GET | `/state` | live mode and default per service, with `modified` and `starting` values |
+| PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) |
+| DELETE | `/state/services/:id`, `/state` | reset one / all services to their starting state |
+| POST | `/state/save` | write the live state back to the YAML |
 | GET | `/profiles` | list, each with `active` and `problems` |
 | POST | `/profiles` | create (`?from=current` fills `services` from the current state) |
 | GET / PUT / DELETE | `/profiles/:id` | read / replace / delete |
-| POST | `/profiles/:id/apply` | apply all-or-nothing; returns the changed service IDs |
+| POST | `/profiles/:id/apply` | apply to live state, all-or-nothing; returns the changed service IDs |
 | GET / DELETE | `/history` | list (`?service=id`) / clear |
 | GET | `/history/:id` | one request/response |
 | GET | `/health` | liveness |
 
-Handy in test setup, e.g. `POST /_mimic/api/profiles/outage/apply`, or `PATCH /_mimic/api/services/users {"mode":"static","defaultScenario":"server-error"}`.
+Handy in test setup, e.g. `POST /_mimic/api/profiles/outage/apply`, or `PATCH /_mimic/api/state/services/users {"mode":"static","defaultScenario":"server-error"}`, then `DELETE /_mimic/api/state` in teardown. None of these touch your files.
 
 ## Development
 

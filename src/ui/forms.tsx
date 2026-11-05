@@ -132,7 +132,14 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
         />
       </div>
       <div class="row">
-        <Select name="mode" label="Mode" values={values} errors={errors} options={modeOptions} />
+        <Select
+          name="mode"
+          label="Starting mode"
+          values={values}
+          errors={errors}
+          options={modeOptions}
+          hint="Saved to YAML. Switching modes on the dashboard only changes the live state."
+        />
         <Text name="delayMs" label="Delay (ms)" values={values} errors={errors} type="number" />
       </div>
       <Text
@@ -145,7 +152,7 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
       />
       {editing && (
         <div class="row">
-          <Select name="defaultScenario" label="Default scenario" values={values} errors={errors} options={scenarioOptions} />
+          <Select name="defaultScenario" label="Starting default scenario" values={values} errors={errors} options={scenarioOptions} />
           <Select
             name="errorScenario"
             label="Error scenario"

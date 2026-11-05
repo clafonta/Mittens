@@ -32,12 +32,12 @@ describe("FileRepo", () => {
     expect(text).toContain('"name": "Ada Lovelace"');
   });
 
-  it("persists store changes and honours read-only", async () => {
+  it("persists definition changes and honours read-only", async () => {
     dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
     await init(dir);
     const store = new Store(new FileRepo(dir));
     await store.load();
-    await store.setMode("users", "static");
+    await store.updateService("users", { mode: "static" });
     await store.deleteScenario("users", "not-found");
 
     const reloaded = new Store(new FileRepo(dir));
@@ -47,10 +47,35 @@ describe("FileRepo", () => {
 
     const ro = new Store(new FileRepo(dir), { readOnly: true });
     await ro.load();
-    await ro.setMode("users", "dynamic");
+    await ro.updateService("users", { mode: "dynamic" });
     const again = new Store(new FileRepo(dir));
     await again.load();
     expect(again.getService("users").mode).toBe("static");
+  });
+
+  it("never writes live state, profiles applied, or scenario edits' live view to disk", async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
+    await init(dir);
+    const file = path.join(dir, "services/users/service.yaml");
+    const original = await readFile(file, "utf8");
+
+    const store = new Store(new FileRepo(dir));
+    await store.load();
+    store.setLiveState("users", { mode: "static", defaultScenario: "server-error" });
+    store.applyProfile("outage");
+    // Editing a scenario rewrites only the scenario file, never the live mode into service.yaml.
+    await store.putScenario("users", { ...store.getScenario("users", "found"), body: "changed" });
+    expect(await readFile(file, "utf8")).toBe(original);
+
+    const reloaded = new Store(new FileRepo(dir));
+    await reloaded.load();
+    expect(reloaded.getService("users")).toMatchObject({ mode: "dynamic", defaultScenario: "found" });
+
+    // ...until saved on purpose.
+    expect(await store.saveLiveState()).toEqual(["users"]);
+    expect(await readFile(file, "utf8")).toContain("mode: static");
+    expect(await readFile(file, "utf8")).toContain("defaultScenario: server-error");
+    expect(store.modifiedServiceIds()).toEqual([]);
   });
 
   it("reports the offending file for invalid definitions", async () => {

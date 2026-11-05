@@ -31,7 +31,7 @@ src/
     schema.ts       Zod schemas + types (Service, Scenario, MatchRule, Profile)
     path.ts         path templates → regex, specificity ranking
     repo.ts         Repo interface; FileRepo (YAML tree), MemoryRepo (tests)
-    store.ts        in-memory definitions + profiles, validation, write-through to Repo
+    store.ts        definitions + profiles (write-through to Repo) and in-memory live state
     engine.ts       resolve request → scenario/proxy response; delay; record
     history.ts      bounded in-memory request log (event emitter)
   http/
@@ -47,10 +47,21 @@ src/
 test/               vitest suites
 ```
 
+### Definitions vs live state
+
+Definitions (YAML) are what you commit: services, scenarios, profiles, and each service's *starting* mode and default scenario. Live state is what is selected right now and exists only in memory:
+
+- Changes **live state only**: the dashboard mode/default switcher, applying a profile (UI, API or `--profile`), `PATCH /api/state/...`.
+- Changes **definitions**: create/edit/delete forms, `POST/PATCH/DELETE /api/services...`, scenario and profile endpoints, and the explicit "Save as starting state" (`POST /api/state/save`).
+
+The store keeps an override only for services whose live state differs from the definition, so "modified" is simply "has an override". Reads (`getService`, `listServices`, `resolve`) return the live view; `getDefinition` returns the file view. Editing a starting value in the service form also sets that field live, so the edit takes effect immediately; other live overrides are kept. If an edit makes an override impossible (e.g. removing the upstream of a service that is live in proxy mode) the override is dropped.
+
+Live state is deliberately not persisted, so restarts are predictable and CI runs never leave a dirty working tree. A git-ignored state file could be added later if people want selections to survive restarts.
+
 ### Request flow (mock traffic)
 
 1. Answer CORS preflight if present.
-2. `Store.resolve(method, path)` → most specific service (literal > `{param}` > `/*`; exact method > `ANY`).
+2. `Store.resolve(method, path)` → most specific service, in its live state (literal > `{param}` > `/*`; exact method > `ANY`).
 3. `Engine.resolve` by mode:
    - static → `defaultScenario`
    - dynamic → highest-scoring `match`; fallback `defaultScenario` → `errorScenario` → 404

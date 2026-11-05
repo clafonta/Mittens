@@ -3,7 +3,8 @@ import { z } from "zod";
 import { type Engine, renderScenario } from "../core/engine.js";
 import { toHar } from "../core/har.js";
 import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
-import type { History } from "../core/history.js";
+import { type History, type HistoryEntry, summarizeEntry } from "../core/history.js";
+import { streamSSE } from "hono/streaming";
 import type { Hooks } from "../core/hooks.js";
 import { VERSION } from "../version.js";
 import { scenarioFromHistory } from "../core/record.js";
@@ -170,6 +171,31 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
     await store.putSettings(await c.req.json());
     return c.json(settingsView());
   });
+
+  /**
+   * Server-sent events: a `request` event (a RequestSummary as JSON) for each
+   * request Mimic handles, and `clear` when history is cleared. A comment is
+   * sent every 15 s to keep proxies from closing the connection.
+   */
+  api.get("/events", (c) =>
+    streamSSE(c, async (stream) => {
+      let open = true;
+      const onEntry = (e: HistoryEntry) => void stream.writeSSE({ event: "request", id: e.id, data: JSON.stringify(summarizeEntry(e)) });
+      const onClear = () => void stream.writeSSE({ event: "clear", data: "{}" });
+      history.on("entry", onEntry);
+      history.on("clear", onClear);
+      stream.onAbort(() => {
+        open = false;
+        history.off("entry", onEntry);
+        history.off("clear", onClear);
+      });
+      await stream.write(": connected\n\n");
+      while (open) {
+        await stream.sleep(15_000);
+        if (open) await stream.write(": keep-alive\n\n");
+      }
+    }),
+  );
 
   // history
   const ValidationFilter = z.enum(["pass", "fail"]).optional();

@@ -30,10 +30,10 @@ import {
 import { loadHelp, withOrigin } from "../help.js";
 import { ProfileForm, refValue, ScenarioForm, ServiceForm, SettingsForm } from "../ui/forms.js";
 import { HelpPage, SearchDropdown, SearchPage } from "../ui/help.js";
+import { HomePage } from "../ui/home.js";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
-  HomePage,
   LiveStateBanner,
   HistoryEntryPage,
   HistoryPage,
@@ -164,7 +164,18 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     // Links from before the services list moved (e.g. /_mimic?tag=x) still land on it.
     const tag = c.req.query("tag");
     if (tag !== undefined) return c.redirect(`${SERVICES}?tag=${encodeURIComponent(tag)}`, 302);
-    return page(c, "Home", <HomePage />);
+    const services = store.listServices();
+    const data = {
+      services,
+      modified: new Set(store.modifiedServiceIds()),
+      inactive: new Set(services.filter((s) => !store.isActive(s)).map((s) => s.id)),
+      activeProfile: store.listProfiles().find((p) => store.isProfileActive(p))?.name,
+      activeTags: store.activeTags,
+      history: history.list(),
+      historyLimit: history.limit,
+      origin: new URL(c.req.url).origin,
+    };
+    return page(c, "Home", <HomePage data={data} />);
   });
 
   ui.get("/services", (c) => {

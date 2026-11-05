@@ -1028,12 +1028,3 @@ export function SettingsPage({ problems, children }: { problems: string[]; child
   );
 }
 
-/** The dashboard's front page. A placeholder for now. */
-export function HomePage() {
-  return (
-    <>
-      <h1>Homepage</h1>
-      <p class="muted">Placeholder.</p>
-    </>
-  );
-}

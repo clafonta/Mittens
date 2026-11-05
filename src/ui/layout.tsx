@@ -91,6 +91,39 @@ a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-co
 .switcher { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .actions { display:flex; align-items:center; gap:.5rem; margin-top:1.25rem; }
 .field input:not([type=checkbox]), .field select { width:100%; }
+/* ---- home: overview cards */
+.cards { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:.75rem; margin:0 0 1.25rem; } @media (max-width: 900px) { .cards { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+.card { display:flex; flex-direction:column; gap:.15rem; padding:.85rem 1rem; background:var(--surface); border:1px solid var(--line); border-radius:10px; color:var(--fg); text-decoration:none; }
+.card:hover { border-color:var(--line-strong); box-shadow:0 1px 3px color-mix(in srgb, var(--fg) 8%, transparent); }
+.card-label { font-size:.75rem; font-weight:500; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+.card-value { font-size:1.6rem; font-weight:650; line-height:1.2; } .card-detail { font-size:.82rem; color:var(--muted); }
+.card.warn .card-value { color:var(--warn); } .card.bad .card-value { color:var(--bad); }
+.empty.start { text-align:left; padding:1.5rem; } .empty.start .toolbar { margin:1rem 0; }
+/* ---- home: flow diagram */
+.flow { margin:0 0 1.5rem; padding:1rem 1rem .5rem; background:var(--surface); border:1px solid var(--line); border-radius:12px; }
+.flow svg { display:block; width:100%; height:auto; font-family:system-ui, sans-serif; }
+.flow .link { fill:none; stroke:var(--line-strong); stroke-width:1.5; } .flow .link.faint { stroke:var(--line); } .flow .link.dashed { stroke-dasharray:4 4; }
+.flow .node rect { fill:var(--surface); stroke:var(--line-strong); stroke-width:1; transition:stroke .2s, fill .2s; }
+.flow .node .title { font-size:13px; font-weight:600; fill:var(--fg); } .flow .node .title.big { font-size:17px; } .flow .node .title.small { font-size:12px; }
+.flow .node .sub { font-size:11.5px; fill:var(--muted); } .flow .node .count { font-size:13px; font-weight:600; fill:var(--muted); font-variant-numeric:tabular-nums; }
+.flow .node.mimic rect { fill:color-mix(in srgb, var(--accent) 10%, var(--surface)); stroke:var(--accent); stroke-width:1.5; }
+.flow .node.app rect { fill:var(--bg); }
+.flow .node.upstream rect { fill:var(--bg); stroke-dasharray:3 3; }
+.flow .node.nomatch rect { fill:var(--bg); stroke:var(--line); }
+.flow a.node { cursor:pointer; } .flow a.node:hover rect:first-of-type { stroke:var(--accent); }
+.flow .stripe { stroke:none !important; } .flow .mode-static .stripe { fill:var(--muted); } .flow .mode-dynamic .stripe { fill:var(--accent); } .flow .mode-proxy .stripe { fill:var(--ok); } .flow .more .stripe { fill:none; }
+.flow .node.inactive { opacity:.45; }
+.flow .changed { fill:var(--warn); }
+.flow .node.hit rect:first-of-type { animation:hit .7s ease-out; }
+@keyframes hit { from { stroke:var(--accent); stroke-width:3; } to { stroke:var(--line-strong); stroke-width:1; } }
+.flow .node.mimic.hit rect { animation-name:hit-mimic; } @keyframes hit-mimic { from { stroke-width:4; } to { stroke-width:1.5; } }
+.flow circle.dot { stroke:var(--surface); stroke-width:1.5; filter:drop-shadow(0 0 3px color-mix(in srgb, currentColor 60%, transparent)); }
+.flow circle.dot.req { fill:var(--accent); color:var(--accent); } .flow circle.dot.s2 { fill:var(--ok); color:var(--ok); } .flow circle.dot.s3 { fill:var(--accent); color:var(--accent); }
+.flow circle.dot.s4 { fill:var(--warn); color:var(--warn); } .flow circle.dot.s5 { fill:var(--bad); color:var(--bad); }
+.legend { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:.5rem; font-size:.8rem; color:var(--muted); }
+.legend span { display:inline-flex; align-items:center; gap:.35rem; } .legend #flow-status { margin-left:auto; }
+.legend i.dot { width:9px; height:9px; border-radius:50%; display:inline-block; } .legend i.dot.req { background:var(--accent); } .legend i.dot.s2 { background:var(--ok); } .legend i.dot.s4 { background:var(--warn); } .legend i.dot.s5 { background:var(--bad); }
+.legend i.line.dashed { width:18px; border-top:1.5px dashed var(--line-strong); display:inline-block; }
 .form { max-width:820px; } .field { margin-bottom:.9rem; flex:1; min-width:0; }
 .field label { display:block; font-weight:500; margin-bottom:.2rem; }
 .row, .row3 { display:flex; gap:1rem; } .row3 > * { flex:1; } @media (max-width: 700px) { .row, .row3 { flex-direction:column; gap:0; } }

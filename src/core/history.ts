@@ -21,6 +21,34 @@ export interface HistoryEntry {
   response: { status: number; headers: Record<string, string>; body: string; truncated: boolean };
 }
 
+/** What the live event stream sends for each request: enough to draw it, not the bodies. */
+export interface RequestSummary {
+  id: string;
+  at: string;
+  method: string;
+  path: string;
+  status: number;
+  source: Source;
+  serviceId?: string;
+  scenarioId?: string;
+  durationMs: number;
+  /** Schema check result, when a schema applied. */
+  valid?: boolean;
+}
+
+export const summarizeEntry = (e: HistoryEntry): RequestSummary => ({
+  id: e.id,
+  at: e.at,
+  method: e.request.method,
+  path: e.request.path,
+  status: e.response.status,
+  source: e.source,
+  ...(e.serviceId && { serviceId: e.serviceId }),
+  ...(e.scenarioId && { scenarioId: e.scenarioId }),
+  durationMs: e.durationMs,
+  ...(e.validation && { valid: e.validation.ok }),
+});
+
 /** Bounded, newest-first log of handled requests. Emits "entry" on each add. */
 export class History extends EventEmitter<{ entry: [HistoryEntry]; clear: [] }> {
   private entries: HistoryEntry[] = [];

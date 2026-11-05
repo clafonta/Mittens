@@ -133,7 +133,7 @@ describe("home page", () => {
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("<title>Home · Mimic</title>");
-    expect(html).toContain("<h1>Homepage</h1>");
+    expect(html).toContain('<svg id="flow"');
     expect(html).toMatch(/<a class="brand" href="\/_mimic" aria-current="page">Mimic<\/a>/);
     // Every page links the title home; Services is its own section now.
     const services = await (await request("/_mimic/services")).text();

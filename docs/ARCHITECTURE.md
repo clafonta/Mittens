@@ -61,6 +61,7 @@ src/
     pages.tsx       list/detail pages
     forms.tsx       service, scenario, profile and settings forms (fields take a `help` section)
     help.tsx        help pages and the "?" HelpLink
+    home.tsx        home page: overview cards, flow diagram (layout + animation script)
     form-data.ts    form values <-> domain objects, Zod issues -> field errors
 docs/help/          user documentation: shown in the dashboard and readable on GitHub
 test/               vitest suites (+ fixtures/petstore.yaml)
@@ -85,6 +86,12 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 `watch.ts` watches the definitions directory recursively and, after a short debounce, calls `Store.reload()`. Reloads never overlap; events during a reload queue one more. `reload()` loads everything first and swaps only if every file is valid, so a half-finished edit never takes down a running mock: the last good definitions keep serving and `store.reloadError` is shown in the dashboard. Live overrides survive a reload unless they no longer make sense (service or scenario gone, proxy without upstream).
 
 Mimic's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
+
+### Home page and live events
+
+The dashboard root is an overview: cards (services by mode, requests and errors, schema failures, live state), a flow diagram, and recent activity. The diagram is server-rendered SVG with a deterministic layout (`layoutDiagram` in `ui/home.tsx`): your app → Mimic → up to ten services (the rest share a "+N more" node) → one node per upstream host, plus a "No match" node. Each link is a `<path>` with a known id, so the page's small script can animate along it with `getPointAtLength`.
+
+Motion is driven by real traffic only: `GET /_mimic/api/events` is a server-sent-events stream of request summaries (History emits `entry`; the handler subscribes and unsubscribes on disconnect, with a keep-alive comment every 15 s). For each event a dot travels the request's actual route and returns coloured by status; with `prefers-reduced-motion` the nodes flash instead. Without JavaScript the diagram and counts still render; the recent-activity table polls as elsewhere.
 
 ### In-app help
 

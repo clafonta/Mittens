@@ -69,5 +69,21 @@ All paths below start with `/_mimic/api`.
 | DELETE | `/hooks/state` | clear hook state (`?service=id` for one) |
 | GET / PUT | `/settings` | read / replace settings, e.g. `{ "errorScenario": { "service": "users", "scenario": "server-error" } }` |
 | GET | `/health` | `{ "ok": true }` while Mimic is running |
+| GET | `/events` | a live stream ([server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)): a `request` event for every request Mimic handles, `clear` when history is cleared |
+
+## Watching requests live
+
+`/events` sends a short summary of each request as it happens, the same stream the home page's diagram uses:
+
+```sh
+curl -N http://localhost:4000/_mimic/api/events
+```
+
+```
+event: request
+data: {"id":"…","method":"GET","path":"/api/users/42","status":200,"source":"scenario","serviceId":"users","scenarioId":"found","durationMs":1,"valid":true}
+```
+
+Fields: `method`, `path`, `status`, `source` (as in the `x-mimic-source` header), `serviceId` and `scenarioId` when something answered, `durationMs`, and `valid` when a response schema was checked. Fetch `/history/:id` for the full request and response.
 
 Errors come back as JSON with an `error` message; validation errors (400) also list `issues`.

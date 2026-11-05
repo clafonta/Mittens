@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { templateProblem } from "./template.js";
 import { schemaProblem, STATUS_KEY } from "./validate.js";
 
 /** Slugs double as stable IDs and as file/directory names on disk. */
@@ -100,21 +101,36 @@ export const ResponseSchemas = z
     }
   });
 
-/** A scenario as stored on disk (the id comes from the file name). */
-export const ScenarioFile = z
+const scenarioFields = z
   .object({
     name: z.string().min(1),
     status: z.number().int().min(100).max(599).default(200),
     headers: z.record(z.string(), z.string()).default({}),
     body: z.string().default(""),
+    /** Render `{{ … }}` in the body and header values from the request (see template.ts). */
+    template: z.boolean().optional(),
     delayMs: z.number().int().min(0).optional(),
     match: MatchRule.optional(),
     tags: z.array(z.string()).default([]),
   })
   .strict();
+
+/** Templates are checked when saved, so a bad one is reported where it was written. */
+function checkTemplates(sc: { template?: boolean; body: string; headers: Record<string, string> }, ctx: z.RefinementCtx) {
+  if (!sc.template) return;
+  const bodyProblem = templateProblem(sc.body);
+  if (bodyProblem) ctx.addIssue({ code: "custom", path: ["body"], message: bodyProblem });
+  for (const [name, value] of Object.entries(sc.headers)) {
+    const problem = templateProblem(value);
+    if (problem) ctx.addIssue({ code: "custom", path: ["headers"], message: `${name}: ${problem}` });
+  }
+}
+
+/** A scenario as stored on disk (the id comes from the file name). */
+export const ScenarioFile = scenarioFields.superRefine(checkTemplates);
 export type ScenarioFile = z.infer<typeof ScenarioFile>;
 
-export const Scenario = ScenarioFile.extend({ id: Slug });
+export const Scenario = scenarioFields.extend({ id: Slug }).superRefine(checkTemplates);
 export type Scenario = z.infer<typeof Scenario>;
 
 /** A service as stored on disk (the id comes from the directory name). */

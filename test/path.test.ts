@@ -32,3 +32,22 @@ describe("compilePath / matchPath", () => {
     expect(param).toBeGreaterThan(wildcard);
   });
 });
+
+describe("param names and partial segments", () => {
+  it("allows dashes in names", () => {
+    expect(matchPath(compilePath("/users/{user-id}"), "/users/7")).toEqual({ "user-id": "7" });
+  });
+  it("captures params inside a segment", () => {
+    const c = compilePath("/files/{name}.{ext}");
+    expect(matchPath(c, "/files/report.final.pdf")).toEqual({ name: "report", ext: "final.pdf" });
+    expect(matchPath(c, "/files/readme")).toBeNull();
+    expect(matchPath(compilePath("/api/v{version}/x"), "/api/v2/x")).toEqual({ version: "2" });
+  });
+  it("ranks literal > partial > whole-segment param", () => {
+    const literal = compilePath("/files/latest.pdf").specificity;
+    const partial = compilePath("/files/{name}.pdf").specificity;
+    const whole = compilePath("/files/{file}").specificity;
+    expect(literal).toBeGreaterThan(partial);
+    expect(partial).toBeGreaterThan(whole);
+  });
+});

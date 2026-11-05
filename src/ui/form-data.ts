@@ -276,6 +276,7 @@ export const SCENARIO_FIELDS = [
   "status",
   "headers",
   "body",
+  "template",
   "delayMs",
   "tags",
   "match",
@@ -322,6 +323,7 @@ export function scenarioFromForm(values: FormValues) {
     headers: pairs(values, "headers", errors) ?? {},
     // Normalise line endings from browser textareas; keep the body otherwise verbatim.
     body: (values.body ?? "").replace(/\r\n/g, "\n"),
+    template: values.template ? true : undefined,
     delayMs: int(values, "delayMs", errors),
     tags: tags(values.tags),
     match: hasMatch ? match : undefined,
@@ -336,6 +338,7 @@ export function scenarioToValues(s: Scenario): FormValues {
     status: String(s.status),
     headers: unpairs(s.headers),
     body: s.body,
+    template: s.template ? "on" : "",
     delayMs: s.delayMs === undefined ? "" : String(s.delayMs),
     tags: s.tags.join(", "),
     "match.method": s.match?.method ?? "",

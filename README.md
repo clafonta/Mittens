@@ -54,7 +54,7 @@ mimic/
 ```yaml
 # services/users/service.yaml
 name: Users API
-path: /api/users/{id}     # {param} captures a segment; a trailing /* matches any suffix
+path: /api/users/{id}     # {param} captures a segment (also inside one: /files/{name}.{ext}); a trailing /* matches any suffix
 method: GET               # or ANY
 mode: dynamic             # starting mode: static | dynamic | proxy
 defaultScenario: found    # starting default scenario
@@ -123,6 +123,52 @@ Directory and file names are the IDs (lowercase, digits, dashes). `new` and `app
 
 Mimic watches the definitions directory: edit a file in your editor and it reloads within a moment, keeping any live state that still applies. If a file is invalid, Mimic keeps serving the last good version and shows the error in the dashboard and the terminal until you fix it. Turn this off with `--no-watch`.
 
+## Response templates
+
+Set `template: true` on a scenario to fill in parts of the body and header values from the request:
+
+```yaml
+# services/users/scenarios/created.yaml
+name: Created
+status: 201
+template: true
+headers:
+  content-type: application/json
+  location: /api/users/{{params.id}}
+body: |
+  {
+    "id": {{params.id | json}},
+    "name": {{body.name | default "Anonymous" | json}},
+    "page": {{query.page | default 1}},
+    "requestId": "{{uuid}}",
+    "createdAt": "{{now}}"
+  }
+```
+
+| | |
+|---|---|
+| Values | `params.<name>`, `query.<name>`, `headers.<name>`, `body` (raw text), `body.user.name` / `body.items[0]` (JSON), `method`, `path`, `url` |
+| Helpers | `uuid`, `now` (ISO time), `timestamp` (epoch ms), `randomInt <min> <max>` |
+| Filters | `default <value>`, `upper`, `lower`, `json` (quotes and escapes, so the value is safe inside JSON; missing values become `null`) |
+
+Missing values render as nothing, so use `default`. `\{{` writes a literal `{{`. Templates are checked when saved, so a typo is reported in the form (or as a reload error) rather than at request time. Scenarios without `template: true` are sent exactly as written. Try a template from the service page with **Preview with a request**, or `POST /_mimic/api/services/:id/scenarios/:sid/render`.
+
+## Importing an OpenAPI spec
+
+```sh
+npx @laboriouslabs/mimic import openapi.yaml            # or a URL; JSON works too
+npx @laboriouslabs/mimic import openapi.yaml --dry-run  # show what would be created
+```
+
+Or use **Import OpenAPI** on the dashboard (upload or paste, preview, import). Each operation becomes a service (id from `operationId`, e.g. `listPets` → `list-pets`), with:
+
+- a scenario per response, or per named example; bodies come from the spec's examples, or are generated from the schema when there are none
+- the response schemas as `responseSchema`, so every response is validated from the start
+- the first 2xx response as the default scenario
+- `servers[0]` as the upstream (switch a service to proxy mode to hit the real API) and its path as the route prefix (e.g. `/v1`)
+
+Existing services are never overwritten: operations whose id or route already exists are skipped and listed. Options: `--mode static|dynamic|proxy`, `--prefix /api` (instead of the server path), `--tag <tag>` (added to every service). OpenAPI 3.0 and 3.1 are supported; Swagger 2.0 needs converting first. `$ref`s are inlined, recursive schemas are checked to their first level, and OpenAPI 3.0's `nullable` and boolean `exclusiveMinimum` are converted to JSON Schema.
+
 ## Recording real responses
 
 Put a service in `proxy` mode, exercise your app, then open a request in **History** and click **Save as scenario**. The form comes prefilled with the status, the response headers worth keeping, the body, and a match rule built from the request's path params and query, so you can review it before saving. Scripts can do the same with `POST /_mimic/api/history/:id/scenario`.
@@ -173,6 +219,7 @@ Open any request in **History** and click **Replay** to send it again — same m
 ```
 mimic [start] [options]
 mimic init [--dir <path>]
+mimic import <spec> [--dir <path>] [--dry-run] [--mode <mode>] [--prefix <path>] [--tag <tag>]
 
   -p, --port <n>     default 4000   (MIMIC_PORT)
       --host <addr>  default 127.0.0.1 (MIMIC_HOST)
@@ -201,6 +248,8 @@ All under `/_mimic/api`, JSON in and out:
 | POST | `/services` | create a service |
 | GET / PATCH / DELETE | `/services/:id` | read (live view) / edit the definition / delete |
 | PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
+| POST | `/services/:id/scenarios/:sid/render` | render a scenario for a sample request; body `{ method?, path?, headers?, body? }` |
+| POST | `/import/openapi` | import an OpenAPI spec (request body: JSON or YAML); `?dryRun=1`, `mode`, `prefix`, `tags` |
 | GET | `/services/:id/upstream?path=` | the upstream URL proxy mode would call for a path, after rewrites |
 | GET | `/state` | live mode and default per service, with `modified` and `starting` values |
 | PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) |

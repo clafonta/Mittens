@@ -206,6 +206,9 @@ export function ServicesPage(props: {
       <div class="title-row">
         <h1>Services</h1>
         <ProfileSwitcher profiles={profiles} />
+        <a class="button" href={`${BASE}/import`}>
+          Import OpenAPI
+        </a>
         <a class="button primary" href={`${BASE}/services/new`}>
           New service
         </a>
@@ -293,8 +296,17 @@ export function ServicePage(props: {
                 </a>
               )}
               <TagPills tags={sc.tags} />
+              {sc.template && (
+                <>
+                  {" "}
+                  <span class="pill" title="Body and headers are rendered from the request">
+                    template
+                  </span>
+                </>
+              )}
               {(() => {
-                const check = validateResponse(service.responseSchema, sc.status, sc.body);
+                // A template's raw text isn't what clients receive, so it can't be checked statically.
+                const check = sc.template ? undefined : validateResponse(service.responseSchema, sc.status, sc.body);
                 return check && (
                   <>
                     {" "}
@@ -310,6 +322,7 @@ export function ServicePage(props: {
           </div>
           {sc.match && <pre>match: {JSON.stringify(sc.match)}</pre>}
           <pre>{sc.body}</pre>
+          {sc.template && <TemplatePreviewForm serviceId={service.id} scenarioId={sc.id} examplePath={service.path} />}
         </section>
       ))}
       {service.responseSchema && (
@@ -374,6 +387,35 @@ function UpstreamInfo({ service }: { service: Service }) {
     </>
   );
 }
+
+/** Renders a template scenario against a sample request, in place. */
+function TemplatePreviewForm({ serviceId, scenarioId, examplePath }: { serviceId: string; scenarioId: string; examplePath: string }) {
+  const target = `preview-${serviceId}-${scenarioId}`;
+  return (
+    <details>
+      <summary>Preview with a request</summary>
+      <form class="preview" hx-post={`${BASE}/ui/services/${serviceId}/scenarios/${scenarioId}/render`} hx-target={`#${target}`}>
+        <input name="method" type="text" value="GET" aria-label="Method" size={6} />
+        <input name="path" type="text" placeholder={examplePath.replace(/\{(\w+)\}/g, "7")} aria-label="Path and query" />
+        <textarea name="body" rows={2} class="mono" placeholder='{"name":"Ada"}' aria-label="Request body"></textarea>
+        <button type="submit">Render</button>
+      </form>
+      <div id={target}></div>
+    </details>
+  );
+}
+
+export const RenderedPreview = ({ status, headers, body }: { status: number; headers: Record<string, string>; body: string }) => (
+  <pre>
+    {status}
+    {"\n"}
+    {Object.entries(headers)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join("\n")}
+    {Object.keys(headers).length ? "\n\n" : "\n"}
+    {body}
+  </pre>
+);
 
 /** Result of "Try a path": the URL proxy mode would call. */
 export const UpstreamPreview = ({ url, matches }: { url: string; matches: boolean }) => (
@@ -704,6 +746,135 @@ export const NotFoundPage = ({ message }: { message: string }) => (
     <p>{message}</p>
   </>
 );
+
+export interface ImportSummary {
+  title: string;
+  services: { id: string; method: string; path: string; name: string; scenarios: number; schema: boolean }[];
+  skipped: { id: string; route: string; reason: string }[];
+  warnings: string[];
+}
+
+/** OpenAPI import: upload or paste, preview, import. */
+export function ImportPage(props: { values: Record<string, string>; error?: string; summary?: ImportSummary; imported?: boolean }) {
+  const { values, error, summary, imported } = props;
+  return (
+    <>
+      <h1>Import OpenAPI</h1>
+      <p class="muted">
+        Creates a service per operation, with a scenario per response (or per named example) and the response schemas for
+        validation. Existing services are never overwritten. Also available as <code>npx @laboriouslabs/mimic import spec.yaml</code>.
+      </p>
+      {error && <div class="banner error-banner">{error}</div>}
+      {summary && <ImportSummaryView summary={summary} imported={!!imported} />}
+      {!imported && (
+        <form method="post" action={`${BASE}/import`} enctype="multipart/form-data" class="form">
+          <div class="field">
+            <label for="f-file">Spec file (YAML or JSON)</label>
+            <input id="f-file" type="file" name="file" accept=".yaml,.yml,.json,application/json,application/yaml,text/yaml" />
+          </div>
+          <div class="field">
+            <label for="f-spec">…or paste it</label>
+            <textarea id="f-spec" name="spec" rows={10} class="mono" spellcheck={false} placeholder="openapi: 3.1.0">
+              {values.spec ?? ""}
+            </textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="f-mode">Starting mode</label>
+              <select id="f-mode" name="mode">
+                {["static", "dynamic", "proxy"].map((m) => (
+                  <option value={m} selected={(values.mode || "static") === m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="field">
+              <label for="f-prefix">Path prefix</label>
+              <input id="f-prefix" name="prefix" type="text" value={values.prefix ?? ""} placeholder="from servers[0], e.g. /v1" />
+            </div>
+            <div class="field">
+              <label for="f-tags">Extra tags</label>
+              <input id="f-tags" name="tags" type="text" value={values.tags ?? ""} placeholder="petstore" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" name="action" value="preview">
+              Preview
+            </button>
+            <button type="submit" name="action" value="import" class="primary">
+              Import
+            </button>
+            <a href={BASE}>Cancel</a>
+          </div>
+        </form>
+      )}
+    </>
+  );
+}
+
+function ImportSummaryView({ summary, imported }: { summary: ImportSummary; imported: boolean }) {
+  const n = summary.services.length;
+  return (
+    <section>
+      <h2>
+        {imported ? "Imported" : "Would import"} {n} service{n === 1 ? "" : "s"} from “{summary.title}”
+      </h2>
+      {n > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Route</th>
+              <th>Service</th>
+              <th>Scenarios</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.services.map((s) => (
+              <tr>
+                <td>
+                  <code>
+                    {s.method} {s.path}
+                  </code>
+                </td>
+                <td>{imported ? <a href={`${BASE}/services/${s.id}`}>{s.name}</a> : s.name} <span class="muted">({s.id})</span></td>
+                <td>
+                  {s.scenarios}
+                  {s.schema && <span class="muted"> · schema</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {summary.skipped.length > 0 && (
+        <>
+          <h3>Skipped</h3>
+          <ul>
+            {summary.skipped.map((s) => (
+              <li>
+                <code>{s.route}</code> {s.id && <span class="muted">({s.id})</span>}: {s.reason}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {summary.warnings.map((w) => (
+        <p class="hint">{w}</p>
+      ))}
+      {imported && (
+        <p>
+          <a class="button primary" href={BASE}>
+            Go to services
+          </a>{" "}
+          <a class="button" href={`${BASE}/import`}>
+            Import another
+          </a>
+        </p>
+      )}
+    </section>
+  );
+}
 
 /** Project-wide settings (mimic.yaml). */
 export function SettingsPage({ problems, children }: { problems: string[]; children: unknown }) {

@@ -20,9 +20,17 @@ export const STATUS_KEY = /^([1-5]\d\d|[1-5]xx|default)$/;
 const addFormats = ((formatsModule as unknown as { default?: unknown }).default ?? formatsModule) as (ajv: Ajv) => Ajv;
 
 // Real-world schemas (OpenAPI exports especially) carry extra keywords like `example`; don't reject them.
-const options = { strict: false, allErrors: true, validateFormats: true } as const;
-const ajv2020 = addFormats(new Ajv2020(options) as unknown as Ajv);
-const ajv07 = addFormats(new Ajv(options));
+// `logger: false`: unknown formats are ignored quietly rather than warned about on every compile.
+const options = { strict: false, allErrors: true, validateFormats: true, logger: false } as const;
+/** OpenAPI formats that describe storage, not shape; accepted as-is. */
+const OPENAPI_FORMATS = ["int32", "int64", "float", "double", "byte", "binary", "password"];
+const setup = (ajv: Ajv) => {
+  addFormats(ajv);
+  for (const f of OPENAPI_FORMATS) ajv.addFormat(f, true);
+  return ajv;
+};
+const ajv2020 = setup(new Ajv2020(options) as unknown as Ajv);
+const ajv07 = setup(new Ajv(options));
 
 /** Draft-07 and older schemas say so in $schema; everything else is treated as 2020-12. */
 const engineFor = (schema: unknown) => {
@@ -43,6 +51,15 @@ function compile(schema: unknown): ValidateFunction {
     compiled.set(key, fn);
   }
   return fn;
+}
+
+/** Whether a value satisfies a schema (false if the schema doesn't compile). */
+export function matchesSchema(schema: unknown, value: unknown): boolean {
+  try {
+    return compile(schema)(value) === true;
+  } catch {
+    return false;
+  }
 }
 
 /** Why a schema can't be used, or undefined if it compiles. */

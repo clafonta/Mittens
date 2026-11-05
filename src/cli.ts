@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
 import { History } from "./core/history.js";
 import { HistoryFile } from "./core/history-file.js";
+import { applyImport, describePlan, ImportError, parseSpec, planImport } from "./core/openapi.js";
+import { ServiceMode } from "./core/schema.js";
 import { FileRepo, LoadError } from "./core/repo.js";
 import { Store } from "./core/store.js";
 import { describeProxy, proxiedFetch, proxyFromEnv, type UpstreamProxy, usesProxy } from "./core/upstream.js";
@@ -22,6 +25,11 @@ const HELP = `mimic ${pkg.version} — local HTTP mock server and recording prox
 Usage:
   mimic [start] [options]   Start the server
   mimic init [--dir <path>] Create example definitions
+  mimic import <spec>       Create services from an OpenAPI 3 file or URL
+      --dry-run            Show what would be created; write nothing
+      --mode <mode>        Starting mode: static (default), dynamic or proxy
+      --prefix <path>      Route prefix (default: the path of servers[0])
+      --tag <tag>          Add a tag to every imported service (repeatable)
 
 Options:
   -p, --port <n>       Port to listen on (default: 4000, env MIMIC_PORT)
@@ -79,6 +87,9 @@ async function main() {
       "no-upstream-proxy": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       version: { type: "boolean", short: "v", default: false },
+      "dry-run": { type: "boolean", default: false },
+      mode: { type: "string" },
+      prefix: { type: "string" },
     },
   });
 
@@ -94,6 +105,7 @@ async function main() {
     console.log(`Start with: npx @laboriouslabs/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
     return;
   }
+  if (command === "import") return importSpec(positionals[1], dir, values);
   if (command !== "start") fail(`unknown command '${command}'. Run 'mimic --help'.`);
 
   const port = Number(values.port ?? process.env.MIMIC_PORT ?? 4000);
@@ -191,6 +203,53 @@ async function main() {
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
+}
+
+async function importSpec(
+  source: string | undefined,
+  dir: string,
+  values: { "dry-run"?: boolean; mode?: string; prefix?: string; tag?: string[]; "read-only"?: boolean },
+) {
+  if (!source) fail("usage: mimic import <openapi.yaml|json|url> [--dir <path>] [--dry-run]");
+  const mode = values.mode === undefined ? undefined : ServiceMode.safeParse(values.mode).data;
+  if (values.mode !== undefined && !mode) fail(`invalid --mode '${values.mode}' (static, dynamic or proxy)`);
+  if (values.prefix !== undefined && !values.prefix.startsWith("/") && values.prefix !== "") fail("--prefix must start with /");
+
+  let text: string;
+  if (/^https?:\/\//i.test(source)) {
+    const proxy = proxyFromEnv();
+    const res = await (usesProxy(proxy) ? proxiedFetch(proxy) : fetch)(source).catch((err: unknown) =>
+      fail(`couldn't fetch ${source}: ${err instanceof Error ? err.message : String(err)}`),
+    );
+    if (!res.ok) fail(`couldn't fetch ${source}: HTTP ${res.status}`);
+    text = await res.text();
+  } else {
+    text = await readFile(path.resolve(source), "utf8").catch(() => fail(`can't read ${source}`));
+  }
+
+  const store = new Store(new FileRepo(dir), { readOnly: values["dry-run"] });
+  try {
+    await store.load();
+  } catch (err) {
+    fail(err instanceof LoadError ? err.message : String(err));
+  }
+  try {
+    const plan = planImport(parseSpec(text), {
+      mode,
+      prefix: values.prefix,
+      tags: (values.tag ?? []).flatMap((t) => t.split(",")).map((t) => t.trim()).filter(Boolean),
+      existing: store.listServices().map((s) => ({ id: s.id, method: s.method, path: s.path })),
+    });
+    if (values["dry-run"]) {
+      console.log(describePlan(plan, true));
+      return;
+    }
+    const result = await applyImport(store, plan);
+    console.log(describePlan(result, false));
+    console.log(`Definitions: ${dir}`);
+  } catch (err) {
+    fail(err instanceof ImportError ? err.message : String(err));
+  }
 }
 
 main().catch((err) => fail(err instanceof Error ? err.message : String(err)));

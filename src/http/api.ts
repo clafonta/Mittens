@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Engine } from "../core/engine.js";
+import { type Engine, renderScenario } from "../core/engine.js";
 import { toHar } from "../core/har.js";
+import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
 import type { History } from "../core/history.js";
 import { VERSION } from "../version.js";
 import { scenarioFromHistory } from "../core/record.js";
@@ -16,7 +17,12 @@ export function createApi(store: Store, history: History, engine: Engine) {
 
   api.onError((err, c) => {
     const status = errorStatus(err);
-    const body = err instanceof z.ZodError ? { error: "Validation failed", issues: err.issues } : { error: err.message };
+    const body =
+      err instanceof z.ZodError
+        ? { error: "Validation failed", issues: err.issues }
+        : err instanceof SyntaxError
+          ? { error: `Request body must be valid JSON: ${err.message}` }
+          : { error: err.message };
     if (status === 500) console.error(err);
     return c.json(body, status);
   });
@@ -48,6 +54,16 @@ export function createApi(store: Store, history: History, engine: Engine) {
   api.put("/services/:id/scenarios/:sid", async (c) => {
     const body = await c.req.json();
     return c.json(await store.putScenario(c.req.param("id"), { ...body, id: c.req.param("sid") }));
+  });
+  /** Body (all optional): { method, path, headers, body } — renders the scenario as it would answer that request. */
+  const RenderSample = z
+    .object({ method: z.string().optional(), path: z.string().optional(), headers: z.record(z.string(), z.string()).optional(), body: z.string().optional() })
+    .strict();
+  api.post("/services/:id/scenarios/:sid/render", async (c) => {
+    const service = store.getService(c.req.param("id"));
+    const scenario = store.getScenario(service.id, c.req.param("sid"));
+    const raw = await c.req.text();
+    return c.json(renderScenario(service, scenario, RenderSample.parse(raw.trim() ? JSON.parse(raw) : {})));
   });
   api.delete("/services/:id/scenarios/:sid", async (c) => {
     await store.deleteScenario(c.req.param("id"), c.req.param("sid"));
@@ -119,6 +135,23 @@ export function createApi(store: Store, history: History, engine: Engine) {
   });
   /** Writes the live state back to the YAML definitions. */
   api.post("/state/save", async (c) => c.json({ saved: await store.saveLiveState() }));
+
+  // OpenAPI import
+  /** Body: the spec (JSON or YAML). Query: dryRun, mode, prefix, tags (comma-separated). */
+  api.post("/import/openapi", async (c) => {
+    try {
+      const plan = planImport(parseSpec(await c.req.text()), {
+        ...importOptionsFrom({ mode: c.req.query("mode"), prefix: c.req.query("prefix"), tags: c.req.query("tags") }),
+        existing: store.listServices().map((s) => ({ id: s.id, method: s.method, path: s.path })),
+      });
+      if (["1", "true"].includes(c.req.query("dryRun") ?? "")) return c.json({ dryRun: true, ...summarize(plan) });
+      const result = await applyImport(store, plan);
+      return c.json({ dryRun: false, ...summarize(result) }, result.created.length ? 201 : 200);
+    } catch (err) {
+      if (err instanceof ImportError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
+  });
 
   // settings (mimic.yaml)
   const settingsView = () => ({ ...store.getSettings(), problems: store.settingsProblems() });

@@ -59,6 +59,18 @@ export function TextArea(props: FieldProps & { rows?: number; placeholder?: stri
   );
 }
 
+export function Checkbox(props: FieldProps) {
+  const error = props.errors[props.name];
+  return (
+    <div class={`field${error ? " invalid" : ""}`}>
+      <label class="check">
+        <input type="checkbox" name={props.name} checked={!!props.values[props.name]} /> {props.label}
+      </label>
+      {error ? <div class="error">{error}</div> : props.hint && <div class="hint">{props.hint}</div>}
+    </div>
+  );
+}
+
 export function Select(props: FieldProps & { options: { value: string; label: string; disabled?: boolean }[] }) {
   const current = props.values[props.name] ?? "";
   return (
@@ -223,6 +235,21 @@ export function ScenarioForm(props: { service: Service; scenarioId?: string; val
       </div>
       <TextArea name="headers" label="Response headers" values={values} errors={errors} rows={3} mono placeholder="content-type: application/json" hint="One “name: value” per line." />
       <TextArea name="body" label="Response body" values={values} errors={errors} rows={12} mono />
+      <Checkbox
+        name="template"
+        label="Template: fill in {{ … }} from the request"
+        values={values}
+        errors={errors}
+        hint={
+          <>
+            Applies to the body and header values. Values: <code>{"{{params.id}}"}</code> <code>{"{{query.page}}"}</code>{" "}
+            <code>{"{{headers.x-tenant}}"}</code> <code>{"{{body.user.name}}"}</code> <code>{"{{method}}"}</code>{" "}
+            <code>{"{{path}}"}</code>. Helpers: <code>uuid</code> <code>now</code> <code>timestamp</code>{" "}
+            <code>randomInt 1 100</code>. Filters: <code>| default "x"</code> <code>| upper</code> <code>| lower</code>{" "}
+            <code>| json</code> (quotes and escapes, for use inside JSON, e.g. <code>{'"name": {{body.name | json}}'}</code>).
+          </>
+        }
+      />
       <fieldset>
         <legend>Match rule (dynamic mode)</legend>
         <p class="hint">

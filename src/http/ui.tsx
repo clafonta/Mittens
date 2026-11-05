@@ -3,9 +3,10 @@ import { createRequire } from "node:module";
 import { type Context, Hono } from "hono";
 import type { Child } from "hono/jsx";
 import { z } from "zod";
-import type { Engine } from "../core/engine.js";
+import { type Engine, renderScenario } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import { scenarioFromHistory } from "../core/record.js";
+import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
 import { upstreamUrl } from "../core/rewrite.js";
 import { hasAnyTag, ServiceMode } from "../core/schema.js";
 import { StoreError, type Store } from "../core/store.js";
@@ -38,8 +39,10 @@ import {
   ProfilesPage,
   ServicePage,
   ServiceRow,
+  ImportPage,
   ServicesPage,
   SettingsPage,
+  RenderedPreview,
   UpstreamPreview,
 } from "../ui/pages.js";
 import { errorStatus } from "./errors.js";
@@ -356,6 +359,32 @@ export function createUi(store: Store, history: History, engine: Engine) {
     return c.redirect(withFlash(safeReturn(body.return, BASE), msg), 303);
   });
 
+  // --------------------------------------------------------------- import
+
+  ui.get("/import", (c) => page(c, "Import OpenAPI", <ImportPage values={{}} />));
+  ui.post("/import", async (c) => {
+    const body = await c.req.parseBody();
+    const values = toValues(body);
+    // An uploaded file wins over the textarea; either way the text goes back into the textarea for the next step.
+    const file = body.file;
+    const uploaded = file instanceof File && file.size > 0 ? await file.text() : undefined;
+    const spec = uploaded ?? values.spec ?? "";
+    const shown = { ...values, spec };
+    if (!spec.trim()) return page(c, "Import OpenAPI", <ImportPage values={shown} error="Choose a file or paste a spec." />, 422);
+    try {
+      const plan = planImport(parseSpec(spec), {
+        ...importOptionsFrom(values),
+        existing: store.listServices().map((s) => ({ id: s.id, method: s.method, path: s.path })),
+      });
+      if (values.action !== "import") return page(c, "Import OpenAPI", <ImportPage values={shown} summary={summarize(plan)} />);
+      const result = await applyImport(store, plan);
+      return page(c, "Import OpenAPI", <ImportPage values={shown} summary={summarize(result)} imported />);
+    } catch (err) {
+      if (!(err instanceof ImportError)) throw err;
+      return page(c, "Import OpenAPI", <ImportPage values={shown} error={err.message} />, 422);
+    }
+  });
+
   // ------------------------------------------------------------- settings
 
   const settingsPage = (c: Context, values: FormValues, errors: FormErrors, status: 200 | 422 = 200) =>
@@ -434,6 +463,12 @@ export function createUi(store: Store, history: History, engine: Engine) {
     const method = service.method === "ANY" ? "GET" : service.method;
     const matches = store.resolve(method, url.pathname, { includeInactive: true })?.service.id === service.id;
     return c.html(<UpstreamPreview url={target.toString()} matches={matches} />);
+  });
+  ui.post("/ui/services/:id/scenarios/:sid/render", async (c) => {
+    const service = store.getService(c.req.param("id"));
+    const scenario = store.getScenario(service.id, c.req.param("sid"));
+    const form = toValues(await c.req.parseBody());
+    return c.html(<RenderedPreview {...renderScenario(service, scenario, { method: form.method, path: form.path, body: form.body })} />);
   });
   ui.get("/ui/live-banner", (c) =>
     c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), BASE)} />),

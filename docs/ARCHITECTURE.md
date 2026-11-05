@@ -71,6 +71,14 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 
 Mimic's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
 
+### Templates
+
+`template.ts` is a deliberately small language rather than Handlebars/Mustache: those HTML-escape by default (wrong for JSON) and allow arbitrary helpers. A template is parsed into text and `{{ expression | filter … }}` nodes; parsing happens when a scenario is validated (Zod refinement), and parsed templates are cached, so rendering is a walk over nodes and never throws. Values come from the same `MatchInput` used for matching (lazy JSON body parse). Rendering happens last in `Engine.resolve`, so it applies however the scenario was chosen (static, dynamic, fallback, global error), and validation sees the rendered body.
+
+### OpenAPI import
+
+`openapi.ts` turns a document into a plan (pure; used for dry runs and previews) and `applyImport` creates services through the store, so the usual validation applies and a service that fails is reported rather than aborting the rest. `$ref`s are inlined into standalone schemas because each service's `responseSchema` is compiled on its own; cycles are cut to `{}`. Sample bodies are deterministic (fixed dates, zero UUID) so imports diff cleanly; for `oneOf`, the generator prefers a sample that matches exactly one option. Checked against GitHub's REST API description: 1,259 operations import in ~7 s, and all generated bodies pass their schemas except one whose `oneOf` can't be satisfied by any object.
+
 ### Request flow (mock traffic)
 
 1. Answer CORS preflight if present.
@@ -80,9 +88,10 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
    - dynamic → highest-scoring `match` (criteria count, then exact-over-regex); fallback `defaultScenario` → `errorScenario` → 404
    - proxy → `fetch(upstream + rewritten path + query)` (through the outbound proxy if configured); on error `errorScenario` → 502
    - anything that would end in Mimic's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mimic.yaml` instead, if one is set
-4. Validate the full body against the service's `responseSchema` for that status (not for Mimic's own error responses).
-5. Apply delay (scenario overrides service).
-6. Record to history; respond with `x-mimic-*` headers.
+4. Render template scenarios from the request.
+5. Validate the full body against the service's `responseSchema` for that status (not for Mimic's own error responses).
+6. Apply delay (scenario overrides service).
+7. Record to history; respond with `x-mimic-*` headers.
 
 ## Mockey → Mimic feature map
 
@@ -106,7 +115,8 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 | Response JSON schema validation | `responseSchema` per status (Ajv, 2020-12 / draft-07); results in history, `x-mimic-validation`, and per-scenario on the service page | **2 (done)** |
 | Stats / CSV export | History export as HAR 1.2 or JSON, filterable by service / validation | **2 (done)**; per-service counts later |
 | Java request-inspector plugins | Optional JS/TS matcher/response functions | 3 |
-| Templated responses (n/a) | Body templating from request (params, query, body) | 3 |
+| Templated responses (n/a) | `template: true` scenarios: `{{params.id}}`, `{{body.x \| json}}`, helpers and filters; validated on save; preview | **3 (done)** |
+| (n/a) | OpenAPI 3.0/3.1 import (CLI, API, dashboard): services, scenarios from examples or schema samples, response schemas | **3 (done)** |
 | HTTPS interception, mobile view, file manager, API doc pages | Dropped unless requested | — |
 
 ## Roadmap
@@ -115,7 +125,8 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
 - **Phase 2 — proxy fidelity & export (done):** corporate proxy, path rewrites, history export, schema validation, regex/JSONPath matching, history persistence.
   - Still open from this area: faithful header forwarding (`fetch` adds defaults such as `sec-fetch-mode`; `undici.request` would avoid them) and streaming large bodies instead of buffering.
-- **Phase 3 — extensibility:** response templating, user JS hooks, OpenAPI import to bootstrap services, publish to npm with CI (lint, test, release).
+- **Phase 3 — extensibility:** ~~response templating~~, ~~OpenAPI import~~ (done); remaining: user JS hooks, publish to npm with CI (lint, test, release).
+  - Import follow-ups: filtering by OpenAPI tag or path at import time (a full GitHub API import is 1,259 services and ~40 MB of YAML, because shared schemas are inlined per service), and re-importing to update services that came from a spec.
 
 ### UI conventions
 

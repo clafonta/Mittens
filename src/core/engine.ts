@@ -2,6 +2,8 @@ import type { History, HistoryEntry, Source } from "./history.js";
 import { upstreamUrl } from "./rewrite.js";
 import { validateResponse, type ValidationResult } from "./validate.js";
 import { MatchInput, scoreMatch } from "./match.js";
+import { compilePath, matchPath } from "./path.js";
+import { renderTemplate } from "./template.js";
 import type { Scenario, Service } from "./schema.js";
 import type { Store } from "./store.js";
 
@@ -97,14 +99,27 @@ export class Engine {
     return entry;
   }
 
-  /** Picks the response; when Mimic would answer with its own error, the global error scenario (if set) is used instead. */
+  /**
+   * Picks the response; when Mimic would answer with its own error, the
+   * global error scenario (if set) is used instead. Template scenarios are
+   * rendered from the request last, whichever way they were chosen.
+   */
   async resolve(req: MockRequest): Promise<Resolution> {
-    const res = await this.resolveOwn(req);
-    if (res.source !== "error" && res.source !== "unmatched") return res;
+    const { res, params } = await this.resolveWithFallback(req);
+    if (!res.scenario?.template) return res;
+    const input = new MatchInput(req.method, req.url, req.headers, params, dec.decode(req.body));
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(res.headers)) headers[k] = renderTemplate(v, input);
+    return { ...res, headers, body: enc.encode(renderTemplate(res.scenario.body, input)) };
+  }
+
+  private async resolveWithFallback(req: MockRequest): Promise<{ res: Resolution; params: Record<string, string> }> {
+    const { res, params } = await this.resolveOwn(req);
+    if (res.source !== "error" && res.source !== "unmatched") return { res, params };
     const global = this.store.globalErrorScenario();
-    if (!global) return res;
+    if (!global) return { res, params };
     const { service: owner, scenario } = global;
-    return {
+    return { params, res: {
       service: res.service,
       scenario,
       source: "fallback",
@@ -113,17 +128,20 @@ export class Engine {
       headers: scenario.headers,
       body: enc.encode(scenario.body),
       delayMs: scenario.delayMs ?? res.service?.delayMs ?? owner.delayMs,
-    };
+    } };
   }
 
-  private async resolveOwn(req: MockRequest): Promise<Resolution> {
+  private async resolveOwn(req: MockRequest): Promise<{ res: Resolution; params: Record<string, string> }> {
     const match = this.store.resolve(req.method, req.url.pathname);
     if (!match) {
       const hidden = this.store.resolve(req.method, req.url.pathname, { includeInactive: true });
       const why = hidden ? ` (service '${hidden.service.id}' matches but is outside the tag filter: ${this.store.activeTags.join(", ")})` : "";
-      return problem(404, `No service matches ${req.method} ${req.url.pathname}${why}`, "unmatched");
+      return { res: problem(404, `No service matches ${req.method} ${req.url.pathname}${why}`, "unmatched"), params: {} };
     }
-    const { service, params } = match;
+    return { res: await this.byMode(match.service, match.params, req), params: match.params };
+  }
+
+  private async byMode(service: Service, params: Record<string, string>, req: MockRequest): Promise<Resolution> {
 
     switch (service.mode) {
       case "static": {
@@ -229,4 +247,22 @@ function describeError(err: unknown): string {
     if (!(e instanceof Error)) break;
   }
   return parts.join(": ") || "unknown error";
+}
+
+/**
+ * Renders one scenario for a sample request, for previews. Path params come
+ * from the service's route when the sample path matches it.
+ */
+export function renderScenario(
+  service: Service,
+  scenario: Scenario,
+  sample: { method?: string; path?: string; headers?: Record<string, string>; body?: string },
+): { status: number; headers: Record<string, string>; body: string; params: Record<string, string> } {
+  const url = new URL(sample.path?.trim() || service.path, "http://mimic.local");
+  const params = matchPath(compilePath(service.path), url.pathname) ?? {};
+  if (!scenario.template) return { status: scenario.status, headers: scenario.headers, body: scenario.body, params };
+  const input = new MatchInput((sample.method || "GET").toUpperCase(), url, new Headers(sample.headers ?? {}), params, sample.body ?? "");
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(scenario.headers)) headers[k] = renderTemplate(v, input);
+  return { status: scenario.status, headers, body: renderTemplate(scenario.body, input), params };
 }

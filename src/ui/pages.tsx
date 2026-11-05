@@ -280,15 +280,25 @@ const Headers = ({ headers }: { headers: Record<string, string> }) => (
   </pre>
 );
 
-export function HistoryEntryPage({ entry }: { entry: HistoryEntry }) {
+export function HistoryEntryPage({ entry, service }: { entry: HistoryEntry; service?: Service }) {
   return (
     <>
-      <h1>
-        <code>
-          {entry.request.method} {entry.request.path}
-        </code>{" "}
-        → <StatusCode status={entry.response.status} />
-      </h1>
+      <div class="title-row">
+        <h1>
+          <code>
+            {entry.request.method} {entry.request.path}
+          </code>{" "}
+          → <StatusCode status={entry.response.status} />
+        </h1>
+        {service &&
+          (entry.response.truncated ? (
+            <span class="muted">Body truncated; can't save as scenario</span>
+          ) : (
+            <a class="button primary" href={`${BASE}/services/${service.id}/scenarios/new?from=${entry.id}`}>
+              Save as scenario
+            </a>
+          ))}
+      </div>
       <p class="muted">
         {entry.at} · {entry.durationMs} ms · <span class="pill">{entry.source}</span>
         {entry.serviceId && (

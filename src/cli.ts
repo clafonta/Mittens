@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
 import { History } from "./core/history.js";
 import { FileRepo, LoadError } from "./core/repo.js";
 import { Store } from "./core/store.js";
+import { watchDefinitions } from "./core/watch.js";
 import { createApp } from "./http/app.js";
 import { BASE } from "./http/paths.js";
 import { init } from "./init.js";
@@ -25,6 +26,7 @@ Options:
   -d, --dir <path>     Definitions directory (default: ./mimic, env MIMIC_DIR)
       --read-only      Load definitions but never write changes to disk
       --profile <id>   Apply a profile on start, in memory only (env MIMIC_PROFILE)
+      --no-watch       Don't reload definitions when files change
       --open           Open the dashboard in a browser on start
   -h, --help           Show this help
   -v, --version        Show the version
@@ -51,6 +53,7 @@ async function main() {
       "read-only": { type: "boolean", default: false },
       profile: { type: "string" },
       open: { type: "boolean", default: false },
+      "no-watch": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       version: { type: "boolean", short: "v", default: false },
     },
@@ -75,6 +78,8 @@ async function main() {
   const host = values.host ?? process.env.MIMIC_HOST ?? "127.0.0.1";
 
   const store = new Store(new FileRepo(dir), { readOnly: values["read-only"] });
+  // Create the definitions directory up front so it can be watched (not in read-only mode).
+  if (!existsSync(dir) && !store.readOnly) mkdirSync(dir, { recursive: true });
   try {
     await store.load();
   } catch (err) {
@@ -90,6 +95,9 @@ async function main() {
     }
   }
 
+  const watching = !values["no-watch"] && existsSync(dir);
+  const watcher = watching ? watchDefinitions(dir, store) : undefined;
+
   const app = createApp({ store, history: new History() });
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     const origin = `http://${host.includes(":") ? `[${host}]` : host}:${info.port}`;
@@ -101,6 +109,7 @@ async function main() {
       `  Definitions: ${dir} (${count} service${count === 1 ? "" : "s"}, ${profiles} profile${profiles === 1 ? "" : "s"}${store.readOnly ? ", read-only" : ""})`,
     );
     if (profileId) console.log(`  Profile:     ${store.getProfile(profileId).name} (live only; YAML unchanged)`);
+    console.log(`  Watching:    ${watching ? "on (edits to YAML reload automatically)" : "off"}`);
     if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });
@@ -108,7 +117,10 @@ async function main() {
     fail(err.code === "EADDRINUSE" ? `port ${port} is already in use (try --port)` : err.message),
   );
 
-  const shutdown = () => server.close(() => process.exit(0));
+  const shutdown = () => {
+    watcher?.close();
+    server.close(() => process.exit(0));
+  };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
 }

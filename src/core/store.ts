@@ -51,6 +51,8 @@ export class Store {
   private profiles = new Map<string, Profile>();
   /** Overrides for services whose live state differs from their definition. */
   private live = new Map<string, LiveState>();
+  /** Set when the last reload from disk failed; cleared by the next successful one. */
+  private _reloadError: string | undefined;
 
   constructor(
     private readonly repo: Repo,
@@ -61,12 +63,57 @@ export class Store {
     return this.options.readOnly ?? false;
   }
 
+  /** Initial load. Throws if any definition is invalid. Discards live state. */
   async load(): Promise<void> {
-    const [services, profiles] = await Promise.all([this.repo.loadAll(), this.repo.loadProfiles()]);
-    this.entries.clear();
     this.live.clear();
-    for (const s of services) this.entries.set(s.id, { service: s, compiled: compilePath(s.path) });
+    this.replaceDefinitions(...(await this.loadFromRepo()));
+    this._reloadError = undefined;
+  }
+
+  get reloadError(): string | undefined {
+    return this._reloadError;
+  }
+
+  /**
+   * Re-reads definitions from disk (e.g. after an edit in an editor). Live
+   * overrides are kept where they still make sense. If any file is invalid,
+   * nothing changes and the error is kept in `reloadError` — the last good
+   * definitions keep serving.
+   */
+  async reload(): Promise<{ changed: boolean; error?: string }> {
+    let loaded: [Service[], Profile[]];
+    try {
+      loaded = await this.loadFromRepo();
+    } catch (err) {
+      this._reloadError = err instanceof Error ? err.message : String(err);
+      return { changed: false, error: this._reloadError };
+    }
+    this._reloadError = undefined;
+    const before = this.fingerprint();
+    const live = this.live;
+    this.replaceDefinitions(...loaded);
+    this.live = new Map();
+    for (const [id, state] of live) {
+      const definition = this.entries.get(id)?.service;
+      if (definition && this.liveProblems(definition, state).length === 0) this.storeLive(definition, state);
+    }
+    return { changed: this.fingerprint() !== before };
+  }
+
+  private async loadFromRepo(): Promise<[Service[], Profile[]]> {
+    return Promise.all([this.repo.loadAll(), this.repo.loadProfiles()]);
+  }
+
+  private replaceDefinitions(services: Service[], profiles: Profile[]) {
+    this.entries = new Map(services.map((s) => [s.id, { service: s, compiled: compilePath(s.path) }]));
     this.profiles = new Map(profiles.map((p) => [p.id, p]));
+  }
+
+  /** Stable summary of all definitions, to tell whether a reload changed anything. */
+  private fingerprint(): string {
+    const services = [...this.entries.values()].map((e) => e.service).sort((a, b) => a.id.localeCompare(b.id));
+    const profiles = [...this.profiles.values()].sort((a, b) => a.id.localeCompare(b.id));
+    return JSON.stringify([services, profiles]);
   }
 
   /** All services, live view. */

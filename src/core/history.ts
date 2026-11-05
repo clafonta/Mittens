@@ -12,8 +12,8 @@ export interface HistoryEntry {
   scenarioId?: string;
   source: Source;
   note?: string;
-  request: { method: string; url: string; path: string; headers: Record<string, string>; body: string };
-  response: { status: number; headers: Record<string, string>; body: string };
+  request: { method: string; url: string; path: string; headers: Record<string, string>; body: string; truncated: boolean };
+  response: { status: number; headers: Record<string, string>; body: string; truncated: boolean };
 }
 
 /** Bounded, newest-first log of handled requests. Emits "entry" on each add. */

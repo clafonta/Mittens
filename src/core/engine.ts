@@ -21,7 +21,8 @@ export interface Resolution {
   delayMs: number;
 }
 
-const HISTORY_BODY_LIMIT = 256 * 1024;
+/** Bodies longer than this are truncated in history (and can't be saved as scenarios). */
+export const HISTORY_BODY_LIMIT = 256 * 1024;
 const HOP_BY_HOP = ["connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "te", "trailer", "host"];
 
 const enc = new TextEncoder();
@@ -173,14 +174,17 @@ export class Engine {
         url: req.url.toString(),
         path: req.url.pathname,
         headers: headersOf(req.headers),
-        body: preview(req.body),
+        ...preview(req.body),
       },
-      response: { status: res.status, headers: res.headers, body: preview(res.body) },
+      response: { status: res.status, headers: res.headers, ...preview(res.body) },
     });
   }
 }
 
-function preview(bytes: Uint8Array): string {
-  if (bytes.byteLength <= HISTORY_BODY_LIMIT) return dec.decode(bytes);
-  return dec.decode(bytes.subarray(0, HISTORY_BODY_LIMIT)) + `\n… [truncated, ${bytes.byteLength} bytes total]`;
+function preview(bytes: Uint8Array): { body: string; truncated: boolean } {
+  if (bytes.byteLength <= HISTORY_BODY_LIMIT) return { body: dec.decode(bytes), truncated: false };
+  return {
+    body: dec.decode(bytes.subarray(0, HISTORY_BODY_LIMIT)) + `\n… [truncated, ${bytes.byteLength} bytes total]`,
+    truncated: true,
+  };
 }

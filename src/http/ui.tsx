@@ -4,6 +4,7 @@ import { type Context, Hono } from "hono";
 import type { Child } from "hono/jsx";
 import { z } from "zod";
 import type { History } from "../core/history.js";
+import { scenarioFromHistory } from "../core/record.js";
 import { ServiceMode } from "../core/schema.js";
 import { StoreError, type Store } from "../core/store.js";
 import {
@@ -55,7 +56,7 @@ export function createUi(store: Store, history: History) {
 
   const page = (c: Context, title: string, body: Child, status: 200 | 404 | 422 = 200) =>
     c.html(
-      <Layout title={title} readOnly={store.readOnly} flash={c.req.query("flash")}>
+      <Layout title={title} readOnly={store.readOnly} flash={c.req.query("flash")} reloadError={store.reloadError}>
         {body}
       </Layout>,
       status,
@@ -173,8 +174,35 @@ export function createUi(store: Store, history: History) {
   ui.get("/services/:id/scenarios/new", (c) => {
     const service = store.getService(c.req.param("id"));
     const title = `New scenario for ${service.name}`;
-    const defaults = { status: "200", headers: "content-type: application/json" };
-    return page(c, title, <FormPage title={title}>{scenarioForm(service.id, defaults, {})}</FormPage>);
+    const fromId = c.req.query("from");
+    if (!fromId) {
+      const defaults = { status: "200", headers: "content-type: application/json" };
+      return page(c, title, <FormPage title={title}>{scenarioForm(service.id, defaults, {})}</FormPage>);
+    }
+
+    // Prefill from a recorded request/response.
+    const entry = history.get(fromId);
+    if (!entry) return page(c, "Not found", <NotFoundPage message="That request is no longer in history." />, 404);
+    const draft = scenarioFromHistory(entry, service);
+    const warnings = draft.warnings.map((w) => <div class={`banner${draft.blocked ? " error-banner" : ""}`}>{w}</div>);
+    if (draft.blocked) {
+      return page(
+        c,
+        title,
+        <FormPage title={title}>
+          {warnings}
+          <a href={`${BASE}/history/${entry.id}`}>Back to the request</a>
+        </FormPage>,
+      );
+    }
+    return page(
+      c,
+      title,
+      <FormPage title={`Save recorded response as a scenario of ${service.name}`}>
+        {warnings}
+        {scenarioForm(service.id, scenarioToValues(draft.scenario), {})}
+      </FormPage>,
+    );
   });
   ui.post("/services/:id/scenarios", (c) => {
     const service = store.getService(c.req.param("id"));
@@ -297,7 +325,8 @@ export function createUi(store: Store, history: History) {
   ui.get("/history/:id", (c) => {
     const entry = history.get(c.req.param("id"));
     if (!entry) return page(c, "Not found", <NotFoundPage message="That request is no longer in history." />, 404);
-    return page(c, "Request", <HistoryEntryPage entry={entry} />);
+    const service = entry.serviceId ? store.listServices().find((s) => s.id === entry.serviceId) : undefined;
+    return page(c, "Request", <HistoryEntryPage entry={entry} service={service} />);
   });
 
   // -------------------------------------------------------- htmx fragments

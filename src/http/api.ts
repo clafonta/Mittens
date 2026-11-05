@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { History } from "../core/history.js";
+import { scenarioFromHistory } from "../core/record.js";
 import { ServiceMode, Slug } from "../core/schema.js";
 import type { Store } from "../core/store.js";
 import { errorStatus } from "./errors.js";
@@ -100,6 +101,36 @@ export function createApi(store: Store, history: History) {
   api.get("/history/:id", (c) => {
     const entry = history.get(c.req.param("id"));
     return entry ? c.json(entry) : c.json({ error: "Not found" }, 404);
+  });
+  /**
+   * Saves a recorded response as a scenario of the service that handled it.
+   * Body (all optional): { id, name, service, makeDefault }.
+   */
+  const FromHistory = z
+    .object({ id: Slug.optional(), name: z.string().min(1).optional(), service: Slug.optional(), makeDefault: z.boolean().default(false) })
+    .strict();
+  api.post("/history/:id/scenario", async (c) => {
+    const entry = history.get(c.req.param("id"));
+    if (!entry) return c.json({ error: "Not found" }, 404);
+    const raw = await c.req.text();
+    let body: unknown = {};
+    try {
+      if (raw.trim()) body = JSON.parse(raw);
+    } catch {
+      return c.json({ error: "Body must be JSON" }, 400);
+    }
+    const opts = FromHistory.parse(body);
+    const serviceId = opts.service ?? entry.serviceId;
+    if (!serviceId) return c.json({ error: "This request matched no service; pass \"service\"" }, 400);
+    const draft = scenarioFromHistory(entry, store.getService(serviceId));
+    if (draft.blocked) return c.json({ error: draft.warnings[0] }, 409);
+    const scenario = await store.putScenario(
+      serviceId,
+      { ...draft.scenario, ...(opts.id && { id: opts.id }), ...(opts.name && { name: opts.name }) },
+      { create: true },
+    );
+    if (opts.makeDefault) await store.updateService(serviceId, { defaultScenario: scenario.id });
+    return c.json({ ...scenario, serviceId, warnings: draft.warnings }, 201);
   });
   api.delete("/history", (c) => {
     history.clear();

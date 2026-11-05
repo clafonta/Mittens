@@ -1,4 +1,5 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
@@ -34,6 +35,21 @@ export class LoadError extends Error {
 }
 
 const dump = (value: unknown) => YAML.stringify(value, { lineWidth: 0, blockQuote: "literal" });
+
+/**
+ * Write via a temp file + rename so readers (including the file watcher) never
+ * see a half-written file. Temp names don't end in .yaml, so loaders skip them.
+ */
+async function writeAtomic(file: string, content: string) {
+  const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${randomBytes(4).toString("hex")}.tmp`);
+  await writeFile(tmp, content);
+  try {
+    await rename(tmp, file);
+  } catch (err) {
+    await rm(tmp, { force: true });
+    throw err;
+  }
+}
 
 export class FileRepo implements Repo {
   constructor(readonly root: string) {}
@@ -95,7 +111,7 @@ export class FileRepo implements Repo {
     const { id, ...def } = profile;
     const file = this.profilePath(id);
     await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, dump(ProfileFile.parse(def)));
+    await writeAtomic(file, dump(ProfileFile.parse(def)));
   }
 
   async deleteProfile(profileId: string): Promise<void> {
@@ -106,7 +122,7 @@ export class FileRepo implements Repo {
     const { id, scenarios: _scenarios, ...def } = service;
     const dir = this.serviceDir(id);
     await mkdir(path.join(dir, "scenarios"), { recursive: true });
-    await writeFile(path.join(dir, "service.yaml"), dump(ServiceFile.parse(def)));
+    await writeAtomic(path.join(dir, "service.yaml"), dump(ServiceFile.parse(def)));
   }
 
   async deleteService(serviceId: string): Promise<void> {
@@ -117,7 +133,7 @@ export class FileRepo implements Repo {
     const { id, ...def } = scenario;
     const file = this.scenarioPath(serviceId, id);
     await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, dump(ScenarioFile.parse(def)));
+    await writeAtomic(file, dump(ScenarioFile.parse(def)));
   }
 
   async deleteScenario(serviceId: string, scenarioId: string): Promise<void> {

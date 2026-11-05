@@ -30,10 +30,12 @@ src/
   core/
     schema.ts       Zod schemas + types (Service, Scenario, MatchRule, Profile)
     path.ts         path templates → regex, specificity ranking
-    repo.ts         Repo interface; FileRepo (YAML tree), MemoryRepo (tests)
+    repo.ts         Repo interface; FileRepo (YAML tree, atomic writes), MemoryRepo (tests)
     store.ts        definitions + profiles (write-through to Repo) and in-memory live state
     engine.ts       resolve request → scenario/proxy response; delay; record
     history.ts      bounded in-memory request log (event emitter)
+    record.ts       history entry -> scenario draft (headers, body, suggested match)
+    watch.ts        debounced fs.watch -> Store.reload()
   http/
     app.ts          composes the three sub-apps below
     api.ts          /_mimic/api — JSON management API
@@ -57,6 +59,12 @@ Definitions (YAML) are what you commit: services, scenarios, profiles, and each 
 The store keeps an override only for services whose live state differs from the definition, so "modified" is simply "has an override". Reads (`getService`, `listServices`, `resolve`) return the live view; `getDefinition` returns the file view. Editing a starting value in the service form also sets that field live, so the edit takes effect immediately; other live overrides are kept. If an edit makes an override impossible (e.g. removing the upstream of a service that is live in proxy mode) the override is dropped.
 
 Live state is deliberately not persisted, so restarts are predictable and CI runs never leave a dirty working tree. A git-ignored state file could be added later if people want selections to survive restarts.
+
+### Reloading from disk
+
+`watch.ts` watches the definitions directory recursively and, after a short debounce, calls `Store.reload()`. Reloads never overlap; events during a reload queue one more. `reload()` loads everything first and swaps only if every file is valid, so a half-finished edit never takes down a running mock: the last good definitions keep serving and `store.reloadError` is shown in the dashboard. Live overrides survive a reload unless they no longer make sense (service or scenario gone, proxy without upstream).
+
+Mimic's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
 
 ### Request flow (mock traffic)
 
@@ -83,9 +91,9 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 | Service/scenario editing in UI | Create/edit/delete forms | **1 (done)** |
 | Service plans | **Profiles**: named sets of mode + scenario per service, switchable in one call; `--profile` on start | **1 (done)** |
 | Tags + `-F` filter | `--tag` filter, tag filters in UI | 1 |
-| History → save as scenario | "Save as scenario" from a recorded proxy response | 1 |
+| History → save as scenario | "Save as scenario" from a recorded response (UI + API) | **1 (done)** |
 | Redo request (`/doitagain`) | Replay from history | 1 |
-| File watching (n/a) | Reload when YAML changes on disk | 1 |
+| File watching (n/a) | Reload when YAML changes on disk; last good version kept on errors | **1 (done)** |
 | Corporate proxy settings | Honour `HTTP(S)_PROXY`/`NO_PROXY` for upstream calls | 2 |
 | URL twisting | Path rewrite rules on proxy (`stripPrefix` / regex rewrite) | 2 |
 | Response JSON schema validation | Optional `responseSchema` check, surfaced in history | 2 |
@@ -97,7 +105,7 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 ## Roadmap
 
 - **Phase 0 — foundation (done):** schemas, file store, engine with three modes, history, JSON API, dashboard with mode/default switching, CLI (`start`, `init`), tests.
-- **Phase 1 — daily-driver UI:** ~~CRUD forms for services and scenarios~~, ~~profiles~~ (done); remaining: tags, record-to-scenario, replay, file-watch reload, global error scenario.
+- **Phase 1 — daily-driver UI:** ~~CRUD forms~~, ~~profiles~~, ~~live state~~, ~~record-to-scenario~~, ~~file-watch reload~~ (done); remaining: tags, replay, global error scenario.
 
 ### UI conventions
 

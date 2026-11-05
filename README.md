@@ -89,6 +89,14 @@ services:                 # services not listed are left alone
 
 Directory and file names are the IDs (lowercase, digits, dashes). `new` and `apply` are reserved.
 
+Mimic watches the definitions directory: edit a file in your editor and it reloads within a moment, keeping any live state that still applies. If a file is invalid, Mimic keeps serving the last good version and shows the error in the dashboard and the terminal until you fix it. Turn this off with `--no-watch`.
+
+## Recording real responses
+
+Put a service in `proxy` mode, exercise your app, then open a request in **History** and click **Save as scenario**. The form comes prefilled with the status, the response headers worth keeping, the body, and a match rule built from the request's path params and query, so you can review it before saving. Scripts can do the same with `POST /_mimic/api/history/:id/scenario`.
+
+Recorded bodies are kept up to 256 KB; larger responses are marked as truncated and can't be saved as scenarios.
+
 ## CLI
 
 ```
@@ -99,6 +107,7 @@ mimic init [--dir <path>]
       --host <addr>  default 127.0.0.1 (MIMIC_HOST)
   -d, --dir <path>   default ./mimic (MIMIC_DIR)
       --read-only    never write changes to disk
+      --no-watch     don't reload when definition files change
       --profile <id> apply a profile on start, live only (MIMIC_PROFILE)
       --open         open the dashboard in a browser
 ```
@@ -123,6 +132,7 @@ All under `/_mimic/api`, JSON in and out:
 | POST | `/profiles/:id/apply` | apply to live state, all-or-nothing; returns the changed service IDs |
 | GET / DELETE | `/history` | list (`?service=id`) / clear |
 | GET | `/history/:id` | one request/response |
+| POST | `/history/:id/scenario` | save the recorded response as a scenario; body `{ id?, name?, service?, makeDefault? }` |
 | GET | `/health` | liveness |
 
 Handy in test setup, e.g. `POST /_mimic/api/profiles/outage/apply`, or `PATCH /_mimic/api/state/services/users {"mode":"static","defaultScenario":"server-error"}`, then `DELETE /_mimic/api/state` in teardown. None of these touch your files.

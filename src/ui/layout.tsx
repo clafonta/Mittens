@@ -45,7 +45,7 @@ fieldset { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem;
 .actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; }
 `;
 
-export function Layout(props: { title: string; readOnly: boolean; flash?: string; children: Child }) {
+export function Layout(props: { title: string; readOnly: boolean; flash?: string; reloadError?: string; children: Child }) {
   return (
     <html lang="en">
       <head>
@@ -65,6 +65,12 @@ export function Layout(props: { title: string; readOnly: boolean; flash?: string
         </header>
         <main>
           {props.readOnly && <div class="banner">Read-only mode: changes are kept in memory and not saved to disk.</div>}
+          {props.reloadError && (
+            <div class="banner error-banner" role="alert">
+              <strong>Couldn't reload definitions from disk.</strong> Still serving the last good version.
+              <pre>{props.reloadError}</pre>
+            </div>
+          )}
           {props.flash && (
             <div class="flash" role="status">
               {props.flash}

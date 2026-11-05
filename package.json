@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Local-first HTTP mock server and recording proxy for developers.",
   "license": "MIT",
+  "author": "Laborious Labs (https://laboriouslabs.com)",
   "type": "module",
   "bin": {
     "mimic": "dist/cli.js"
@@ -24,7 +25,8 @@
     "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",

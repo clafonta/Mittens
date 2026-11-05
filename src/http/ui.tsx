@@ -33,6 +33,7 @@ import { HelpPage, SearchDropdown, SearchPage } from "../ui/help.js";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
+  HomePage,
   LiveStateBanner,
   HistoryEntryPage,
   HistoryPage,
@@ -49,7 +50,7 @@ import {
   UpstreamPreview,
 } from "../ui/pages.js";
 import { errorStatus } from "./errors.js";
-import { BASE } from "./paths.js";
+import { BASE, SERVICES } from "./paths.js";
 
 const htmxSource = readFileSync(createRequire(import.meta.url).resolve("htmx.org/dist/htmx.min.js"), "utf8");
 
@@ -160,6 +161,13 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
   // ------------------------------------------------------------- services
 
   ui.get("/", (c) => {
+    // Links from before the services list moved (e.g. /_mimic?tag=x) still land on it.
+    const tag = c.req.query("tag");
+    if (tag !== undefined) return c.redirect(`${SERVICES}?tag=${encodeURIComponent(tag)}`, 302);
+    return page(c, "Home", <HomePage />);
+  });
+
+  ui.get("/services", (c) => {
     const viewTag = c.req.query("tag")?.trim().toLowerCase() || undefined;
     const all = store.listServices();
     const services = viewTag ? all.filter((s) => hasAnyTag(s, [viewTag])) : all;
@@ -237,7 +245,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
   ui.post("/services/:id/delete", async (c) => {
     const service = store.getService(c.req.param("id"));
     await store.deleteService(service.id);
-    return c.redirect(withFlash(BASE, `Deleted service '${service.name}'`), 303);
+    return c.redirect(withFlash(SERVICES, `Deleted service '${service.name}'`), 303);
   });
 
   // ------------------------------------------------------------ scenarios
@@ -351,8 +359,8 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
   );
   ui.post("/profiles/apply", async (c) => {
     const body = toValues(await c.req.parseBody());
-    if (!body.id) return c.redirect(safeReturn(body.return, BASE), 303);
-    return apply(c, body.id, BASE);
+    if (!body.id) return c.redirect(safeReturn(body.return, SERVICES), 303);
+    return apply(c, body.id, SERVICES);
   });
   ui.get("/profiles/:id/edit", (c) => {
     const profile = store.getProfile(c.req.param("id"));
@@ -386,12 +394,12 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     const msg = store.readOnly
       ? `Read-only: kept ${saved.length} change${saved.length === 1 ? "" : "s"} in memory only`
       : `Saved ${saved.length} service${saved.length === 1 ? "" : "s"} as starting state`;
-    return c.redirect(withFlash(safeReturn(body.return, BASE), msg), 303);
+    return c.redirect(withFlash(safeReturn(body.return, SERVICES), msg), 303);
   });
   ui.post("/state/reset", async (c) => {
     const body = toValues(await c.req.parseBody());
     const reset = store.resetLiveState();
-    return c.redirect(withFlash(safeReturn(body.return, BASE), `Reset ${reset.length} service${reset.length === 1 ? "" : "s"} to starting state`), 303);
+    return c.redirect(withFlash(safeReturn(body.return, SERVICES), `Reset ${reset.length} service${reset.length === 1 ? "" : "s"} to starting state`), 303);
   });
 
   ui.post("/services/:id/hook/reset", async (c) => {
@@ -404,7 +412,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     const body = toValues(await c.req.parseBody());
     const tags = store.setActiveTags((body.tags ?? "").split(","));
     const msg = tags.length ? `Only serving services tagged ${tags.join(", ")}` : "Serving all services";
-    return c.redirect(withFlash(safeReturn(body.return, BASE), msg), 303);
+    return c.redirect(withFlash(safeReturn(body.return, SERVICES), msg), 303);
   });
 
   // --------------------------------------------------------------- import
@@ -521,7 +529,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     return c.html(<RenderedPreview {...renderScenario(service, scenario, { method: form.method, path: form.path, body: form.body })} />);
   });
   ui.get("/ui/live-banner", (c) =>
-    c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), BASE)} />),
+    c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), SERVICES)} />),
   );
 
   ui.all("*", (c) => page(c, "Not found", <NotFoundPage message={`No page at ${c.req.path}`} />, 404));

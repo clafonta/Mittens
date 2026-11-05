@@ -9,7 +9,7 @@ npx @clafonta/mimic init   # writes example definitions to ./mimic
 npx @clafonta/mimic        # starts on http://localhost:4000
 ```
 
-The dashboard is at [http://localhost:4000/_mimic](http://localhost:4000/_mimic). Everything under `/_mimic` belongs to Mimic itself; every other path is mock traffic.
+The dashboard is at [http://localhost:4000/_mimic](http://localhost:4000/_mimic); your services are under **Services** ([/_mimic/services](http://localhost:4000/_mimic/services)). Everything under `/_mimic` belongs to Mimic itself; every other path is mock traffic.
 
 Try the examples:
 

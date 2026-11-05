@@ -77,32 +77,32 @@ describe("tags", () => {
 
   it("dashboard: chips filter the table, and a tag can become the serving filter", async () => {
     const { request, store } = await setup(services());
-    const all = await (await request("/_mimic")).text();
-    expect(all).toContain('href="/_mimic?tag=checkout"');
+    const all = await (await request("/_mimic/services")).text();
+    expect(all).toContain('href="/_mimic/services?tag=checkout"');
     expect(all).not.toContain("Only serving");
 
-    const filtered = await (await request("/_mimic?tag=checkout")).text();
+    const filtered = await (await request("/_mimic/services?tag=checkout")).text();
     expect(filtered).toContain("Cart");
     expect(filtered).not.toContain(">Search</a>");
     expect(filtered).toContain("Only serve “checkout”");
 
-    const res = await request("/_mimic/state/tags", form({ tags: "checkout", return: "/_mimic?tag=checkout" }));
+    const res = await request("/_mimic/state/tags", form({ tags: "checkout", return: "/_mimic/services?tag=checkout" }));
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toContain("/_mimic?tag=checkout&flash=");
+    expect(res.headers.get("location")).toContain("/_mimic/services?tag=checkout&flash=");
     expect(store.activeTags).toEqual(["checkout"]);
 
-    const page = await (await request("/_mimic")).text();
+    const page = await (await request("/_mimic/services")).text();
     expect(page).toContain("Only serving services tagged <strong>checkout</strong>");
     expect(page).toContain("1 service is not answering requests");
     expect(page).toContain('class="inactive"');
     expect(page).toContain("not serving");
 
-    await request("/_mimic/state/tags", form({ tags: "", return: "/_mimic" }));
+    await request("/_mimic/state/tags", form({ tags: "", return: "/_mimic/services" }));
     expect(store.activeTags).toEqual([]);
   });
 
   it("empty filter result explains itself", async () => {
     const { request } = await setup(services());
-    expect(await (await request("/_mimic?tag=nope")).text()).toContain("No services tagged “nope”");
+    expect(await (await request("/_mimic/services?tag=nope")).text()).toContain("No services tagged “nope”");
   });
 });

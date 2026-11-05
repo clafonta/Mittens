@@ -1,6 +1,6 @@
 import type { Child } from "hono/jsx";
 import { HttpMethod, ServiceMode, type Service } from "../core/schema.js";
-import { BASE } from "../http/paths.js";
+import { BASE, SERVICES } from "../http/paths.js";
 import type { FormErrors, FormValues } from "./form-data.js";
 import { HelpLink } from "./help.js";
 
@@ -227,7 +227,7 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
         }
       />
       <Text name="tags" label="Tags" help="services#tags" values={values} errors={errors} hint="Comma-separated." />
-      <Actions submit={editing ? "Save service" : "Create service"} cancel={editing ? `${BASE}/services/${service.id}` : BASE} />
+      <Actions submit={editing ? "Save service" : "Create service"} cancel={editing ? `${BASE}/services/${service.id}` : SERVICES} />
     </form>
   );
 }
@@ -433,7 +433,7 @@ export function SettingsForm(props: { services: Service[]; values: FormValues; e
           ))}
         </select>
       </Field>
-      <Actions submit="Save settings" cancel={BASE} />
+      <Actions submit="Save settings" cancel={SERVICES} />
     </form>
   );
 }

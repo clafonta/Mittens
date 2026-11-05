@@ -158,12 +158,12 @@ describe("UI forms", () => {
     expect(created.status).toBe(303);
     expect(store.getProfile("fail").services).toEqual({ users: { mode: "static", scenario: "boom" } });
 
-    const applied = await request("/_mimic/profiles/apply", form({ id: "fail", return: "/_mimic" }));
+    const applied = await request("/_mimic/profiles/apply", form({ id: "fail", return: "/_mimic/services" }));
     expect(applied.status).toBe(303);
-    expect(decodeURIComponent(applied.headers.get("location")!)).toBe("/_mimic?flash=Applied 'Fail' (1 service changed)");
+    expect(decodeURIComponent(applied.headers.get("location")!)).toBe("/_mimic/services?flash=Applied 'Fail' (1 service changed)");
     expect(store.getService("users")).toMatchObject({ mode: "static", defaultScenario: "boom" });
 
-    const dashboard = await (await request("/_mimic")).text();
+    const dashboard = await (await request("/_mimic/services")).text();
     expect(dashboard).toMatch(/<option value="fail" selected/);
   });
 

@@ -64,7 +64,7 @@ describe("contextual help links", () => {
     await request("/users/1");
     await request(`/_mimic/api/history/${history.list()[0]!.id}/replay`, { method: "POST" });
     const pages = [
-      "/_mimic",
+      "/_mimic/services",
       "/_mimic/services/users",
       "/_mimic/services/orders",
       "/_mimic/services/new",
@@ -92,7 +92,7 @@ describe("contextual help links", () => {
 
   it("the empty dashboard points newcomers at Getting started", async () => {
     const { request } = await setup([]);
-    expect(await (await request("/_mimic")).text()).toContain('href="/_mimic/help/getting-started"');
+    expect(await (await request("/_mimic/services")).text()).toContain('href="/_mimic/help/getting-started"');
   });
 });
 

@@ -4,7 +4,7 @@ import { fixtures, form, setup } from "./helpers.js";
 describe("services table and service bar", () => {
   it("lists each service with its route and scenario count in one cell", async () => {
     const { request } = await setup(fixtures());
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mimic/services")).text();
     expect(html).toContain('<table class="services">');
     expect(html).toMatch(/class="service-name" href="\/_mimic\/services\/users">Users<\/a>/);
     expect(html).toMatch(/<code class="route">ANY \/users\/\{id\}<\/code> · 2 scenarios/);
@@ -81,7 +81,8 @@ describe("header", () => {
     const { request } = await setup(fixtures());
     const current = async (path: string) =>
       /<a href="[^"]*" class="(?:nav-help )?current" aria-current="page">([^<]+)<\/a>/.exec(await (await request(path)).text())?.[1];
-    expect(await current("/_mimic")).toBe("Services");
+    expect(await current("/_mimic")).toBeUndefined(); // the home page
+    expect(await current("/_mimic/services")).toBe("Services");
     expect(await current("/_mimic/services/users/edit")).toBe("Services");
     expect(await current("/_mimic/import")).toBe("Services");
     expect(await current("/_mimic/profiles/new")).toBe("Profiles");
@@ -96,20 +97,20 @@ describe("controls", () => {
     const tagged = fixtures();
     tagged[0]!.tags = ["team-a"];
     const { request } = await setup(tagged, undefined, [{ id: "p", name: "P", description: "", services: { users: { mode: "static" } } }]);
-    const services = await (await request("/_mimic")).text();
+    const services = await (await request("/_mimic/services")).text();
     expect(services).toContain('<nav class="segmented" aria-label="Show services by tag">');
     expect(services).toMatch(/<span class="group"><select id="profile-switch"[\s\S]*?<button type="submit">Apply<\/button><\/span>/);
     expect(services).toContain('class="button ghost" href="/_mimic/profiles">Manage</a>');
     const history = await (await request("/_mimic/history?validation=fail")).text();
     expect(history).toMatch(/<nav class="segmented" aria-label="Filter history">[\s\S]*?class="current" aria-current="true" href="\/_mimic\/history\?validation=fail">Schema failures/);
-    expect(await (await request("/_mimic/services/new")).text()).toContain('class="button ghost" href="/_mimic">Cancel</a>');
+    expect(await (await request("/_mimic/services/new")).text()).toContain('class="button ghost" href="/_mimic/services">Cancel</a>');
   });
 });
 
 describe("page shell", () => {
   it("doesn't escape the stylesheet", async () => {
     const { request } = await setup(fixtures());
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mimic/services")).text();
     const css = /<style>([\s\S]*?)<\/style>/.exec(html)![1]!;
     expect(css).toContain(".segmented > a");
     expect(css).toContain('url("data:image/svg+xml');
@@ -118,9 +119,38 @@ describe("page shell", () => {
 
   it("has its own icon, so browsers don't request /favicon.ico from the mocks", async () => {
     const { request } = await setup(fixtures());
-    expect(await (await request("/_mimic")).text()).toContain('<link rel="icon" type="image/svg+xml" href="/_mimic/assets/favicon.svg"/>');
+    expect(await (await request("/_mimic/services")).text()).toContain('<link rel="icon" type="image/svg+xml" href="/_mimic/assets/favicon.svg"/>');
     const icon = await request("/_mimic/assets/favicon.svg");
     expect(icon.headers.get("content-type")).toBe("image/svg+xml");
     expect(await icon.text()).toMatch(/^<svg/);
+  });
+});
+
+describe("home page", () => {
+  it("is the dashboard root, linked from the Mimic title", async () => {
+    const { request } = await setup(fixtures());
+    const home = await request("/_mimic");
+    expect(home.status).toBe(200);
+    const html = await home.text();
+    expect(html).toContain("<title>Home · Mimic</title>");
+    expect(html).toContain("<h1>Homepage</h1>");
+    expect(html).toMatch(/<a class="brand" href="\/_mimic" aria-current="page">Mimic<\/a>/);
+    // Every page links the title home; Services is its own section now.
+    const services = await (await request("/_mimic/services")).text();
+    expect(services).toMatch(/<a class="brand" href="\/_mimic">Mimic<\/a>/);
+    expect(services).toContain('href="/_mimic/services" class="current" aria-current="page">Services</a>');
+  });
+
+  it("old service-list links still work", async () => {
+    const { request } = await setup(fixtures());
+    const res = await request("/_mimic?tag=checkout", { redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/_mimic/services?tag=checkout");
+  });
+
+  it("deleting a service returns to the services list", async () => {
+    const { request } = await setup(fixtures());
+    const res = await request("/_mimic/services/orders/delete", form({}));
+    expect(res.headers.get("location")).toMatch(/^\/_mimic\/services\?flash=/);
   });
 });

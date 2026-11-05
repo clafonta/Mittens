@@ -97,8 +97,10 @@ export const request: RequestHook = (req) => (req.query.smoke ? { body: { smoke:
   if (hooked.headers.get("x-mimic-source") !== "hook" || hookedBody !== '{"smoke":"7"}') fail(`hook response: ${hookedBody}`);
   const helpPage = await (await fetch(`${origin}/_mimic/help/getting-started`)).text();
   if (!helpPage.includes(`curl ${origin}/api/users/42`)) fail("help pages missing, or examples don't show the live address");
-  const dashboard = await (await fetch(`${origin}/_mimic`)).text();
-  if (!dashboard.includes("<title>Services · Mimic</title>")) fail("dashboard didn't render");
+  const home = await (await fetch(`${origin}/_mimic`)).text();
+  if (!home.includes("<title>Home · Mimic</title>")) fail("home page didn't render");
+  const dashboard = await (await fetch(`${origin}/_mimic/services`)).text();
+  if (!dashboard.includes("<title>Services · Mimic</title>")) fail("services page didn't render");
   const htmx = await fetch(`${origin}/_mimic/assets/htmx.min.js`);
   if (htmx.status !== 200 || (await htmx.text()).length < 10_000) fail("htmx asset missing");
 

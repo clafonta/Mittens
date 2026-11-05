@@ -1,6 +1,6 @@
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
-import { BASE } from "../http/paths.js";
+import { BASE, SERVICES } from "../http/paths.js";
 
 const css = `
 :root {
@@ -12,7 +12,7 @@ const css = `
 * { box-sizing: border-box; }
 body { margin:0; font:14px/1.5 system-ui, sans-serif; color:var(--fg); background:var(--bg); }
 header { display:flex; gap:.25rem; align-items:center; padding:.6rem 1.5rem; border-bottom:1px solid var(--line); }
-header strong { font-size:1.1rem; margin-right:1rem; }
+header a.brand { font-size:1.1rem; font-weight:700; color:var(--fg); margin-right:1rem; padding:0 .4rem; } header a.brand:hover { background:none; color:var(--accent); }
 header a { display:inline-flex; align-items:center; height:var(--control-h); padding:0 .7rem; border-radius:var(--radius); color:var(--muted); text-decoration:none; }
 header a:hover { color:var(--fg); background:color-mix(in srgb, var(--line) 50%, transparent); }
 header a.current { color:var(--fg); background:color-mix(in srgb, var(--line) 70%, transparent); font-weight:500; }
@@ -132,7 +132,7 @@ tr.inactive td { opacity:.55; } tr.inactive td:nth-child(3) { opacity:1; }
 
 /** Header sections; a page belongs to the first whose prefixes match its path. */
 const NAV: { label: string; href: string; prefixes: string[]; className?: string }[] = [
-  { label: "Services", href: BASE, prefixes: ["/services", "/import"] },
+  { label: "Services", href: SERVICES, prefixes: ["/services", "/import"] },
   { label: "Profiles", href: `${BASE}/profiles`, prefixes: ["/profiles"] },
   { label: "History", href: `${BASE}/history`, prefixes: ["/history"] },
   { label: "Settings", href: `${BASE}/settings`, prefixes: ["/settings"] },
@@ -142,7 +142,6 @@ const NAV: { label: string; href: string; prefixes: string[]; className?: string
 function currentSection(path: string | undefined): string | undefined {
   if (path === undefined) return undefined;
   const rest = path.startsWith(BASE) ? path.slice(BASE.length) : path;
-  if (rest === "" || rest === "/") return "Services";
   return NAV.find((n) => n.prefixes.some((p) => rest === p || rest.startsWith(`${p}/`)))?.label;
 }
 
@@ -161,7 +160,9 @@ export function Layout(props: { title: string; readOnly: boolean; flash?: string
       </head>
       <body>
         <header>
-          <strong>Mimic</strong>
+          <a class="brand" href={BASE} aria-current={current === undefined && props.path !== undefined && /^\/_mimic\/?$/.test(props.path) ? "page" : undefined}>
+            Mimic
+          </a>
           {NAV.map((n) => (
             <a
               href={n.href}

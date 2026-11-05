@@ -153,7 +153,7 @@ describe("import via API and dashboard", () => {
 
   it("dashboard: upload, preview, import", async () => {
     const { request, store } = await setup([]);
-    expect(await (await request("/_mimic")).text()).toContain('href="/_mimic/import"');
+    expect(await (await request("/_mimic/services")).text()).toContain('href="/_mimic/import"');
     expect(await (await request("/_mimic/import")).text()).toContain('enctype="multipart/form-data"');
 
     const submit = (action: string, file?: string, spec = "") => {

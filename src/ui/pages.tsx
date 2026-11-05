@@ -1,7 +1,7 @@
 import type { HistoryEntry } from "../core/history.js";
 import { validateResponse, type ValidationResult } from "../core/validate.js";
 import type { Profile, ScenarioRef, Service } from "../core/schema.js";
-import { BASE } from "../http/paths.js";
+import { BASE, SERVICES } from "../http/paths.js";
 import { DeleteButton } from "./forms.js";
 import { unjsonTests, unmatchPairs } from "./form-data.js";
 import { HelpLink } from "./help.js";
@@ -16,7 +16,7 @@ export interface ProfileInfo {
 
 const MODES = ["static", "dynamic", "proxy"] as const;
 
-const tagHref = (tag: string) => `${BASE}?tag=${encodeURIComponent(tag)}`;
+const tagHref = (tag: string) => `${SERVICES}?tag=${encodeURIComponent(tag)}`;
 
 /** Tag pills that link to the dashboard filtered by that tag. */
 export const TagPills = ({ tags }: { tags: string[] }) => (
@@ -176,7 +176,7 @@ function ProfileSwitcher({ profiles }: { profiles: ProfileInfo[] }) {
       </select>
       <button type="submit">Apply</button>
       </span>
-      <input type="hidden" name="return" value={BASE} />
+      <input type="hidden" name="return" value={SERVICES} />
       <a class="button ghost" href={`${BASE}/profiles`}>
         Manage
       </a>
@@ -244,7 +244,7 @@ function TagBar({ tags, viewTag, activeTags }: { tags: string[]; viewTag?: strin
         Tags <HelpLink to="services#tags" label="Help: tags" />
       </span>
       <nav class="segmented" aria-label="Show services by tag">
-        <a class={viewTag === undefined ? "current" : undefined} aria-current={viewTag === undefined ? "true" : undefined} href={BASE}>
+        <a class={viewTag === undefined ? "current" : undefined} aria-current={viewTag === undefined ? "true" : undefined} href={SERVICES}>
           all
         </a>
         {tags.map((t) => (
@@ -279,7 +279,7 @@ export function ServicesPage(props: {
   const { services, profiles, modified, viewTag } = props;
   const changed = new Set(modified);
   const inactive = new Set(props.inactive);
-  const returnTo = viewTag === undefined ? BASE : tagHref(viewTag);
+  const returnTo = viewTag === undefined ? SERVICES : tagHref(viewTag);
   return (
     <>
       <div class="title-row">
@@ -299,7 +299,7 @@ export function ServicesPage(props: {
       <TagBar tags={props.tags} viewTag={viewTag} activeTags={props.activeTags} />
       {props.totalServices > 0 && services.length === 0 ? (
         <div class="empty">
-          No services tagged “{viewTag}”. <a href={BASE}>Show all</a>
+          No services tagged “{viewTag}”. <a href={SERVICES}>Show all</a>
         </div>
       ) : services.length === 0 ? (
         <div class="empty">
@@ -937,7 +937,7 @@ export function ImportPage(props: { values: Record<string, string>; error?: stri
             <button type="submit" name="action" value="import" class="primary">
               Import
             </button>
-            <a class="button ghost" href={BASE}>
+            <a class="button ghost" href={SERVICES}>
               Cancel
             </a>
           </div>
@@ -998,7 +998,7 @@ function ImportSummaryView({ summary, imported }: { summary: ImportSummary; impo
       ))}
       {imported && (
         <p>
-          <a class="button primary" href={BASE}>
+          <a class="button primary" href={SERVICES}>
             Go to services
           </a>{" "}
           <a class="button" href={`${BASE}/import`}>
@@ -1024,6 +1024,16 @@ export function SettingsPage({ problems, children }: { problems: string[]; child
         <div class="banner error-banner">{p} — it is ignored until fixed.</div>
       ))}
       {children as never}
+    </>
+  );
+}
+
+/** The dashboard's front page. A placeholder for now. */
+export function HomePage() {
+  return (
+    <>
+      <h1>Homepage</h1>
+      <p class="muted">Placeholder.</p>
     </>
   );
 }

@@ -127,7 +127,7 @@ describe("live state (UI)", () => {
     const banner = await (await request("/_mimic/ui/live-banner?return=/_mimic")).text();
     expect(banner).toContain("1 service differs from its starting state");
 
-    const dashboard = await (await request("/_mimic")).text();
+    const dashboard = await (await request("/_mimic/services")).text();
     expect(dashboard).toContain("Save as starting state");
 
     const reset = await request("/_mimic/ui/services/users/reset", form({}));
@@ -145,7 +145,7 @@ describe("live state (UI)", () => {
 
     store.setLiveState("users", { mode: "dynamic" });
     const reset = await request("/_mimic/state/reset", form({ return: "https://evil.test" }));
-    expect(decodeURIComponent(reset.headers.get("location")!)).toBe("/_mimic?flash=Reset 1 service to starting state");
+    expect(decodeURIComponent(reset.headers.get("location")!)).toBe("/_mimic/services?flash=Reset 1 service to starting state");
     expect(store.getService("users").mode).toBe("static");
   });
 

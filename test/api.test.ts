@@ -57,7 +57,7 @@ describe("management API", () => {
 
   it("does not record its own API/UI traffic as mock traffic", async () => {
     const { request, history } = await setup([]);
-    await request("/_mimic");
+    await request("/_mimic/services");
     await request("/_mimic/api/services");
     await request("/_mimic/does-not-exist");
     expect(history.list()).toHaveLength(0);
@@ -69,7 +69,7 @@ describe("UI", () => {
     const { request, store } = await setup([
       { id: "a", name: "Alpha", path: "/a", scenarios: [{ id: "x", name: "X", status: 200, headers: {}, body: "", tags: [] }] },
     ]);
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mimic/services")).text();
     expect(html).toContain("Alpha");
     expect(html).toContain("/_mimic/assets/htmx.min.js");
     expect((await request("/_mimic/assets/htmx.min.js")).status).toBe(200);

@@ -1,7 +1,8 @@
 import type { History, HistoryEntry, Source } from "./history.js";
 import { upstreamUrl } from "./rewrite.js";
 import { validateResponse, type ValidationResult } from "./validate.js";
-import type { MatchRule, Scenario, Service } from "./schema.js";
+import { MatchInput, scoreMatch } from "./match.js";
+import type { Scenario, Service } from "./schema.js";
 import type { Store } from "./store.js";
 
 export interface MockRequest {
@@ -29,25 +30,6 @@ const HOP_BY_HOP = ["connection", "keep-alive", "proxy-connection", "transfer-en
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-
-/** Score a scenario's match rule; null = does not match. Higher = more specific. */
-export function scoreMatch(rule: MatchRule | undefined, req: MockRequest, params: Record<string, string>, bodyText: string): number | null {
-  if (!rule) return null;
-  let score = 0;
-  const check = (ok: boolean) => {
-    if (!ok) return false;
-    score += 1;
-    return true;
-  };
-
-  if (rule.method && rule.method !== "ANY" && !check(rule.method === req.method.toUpperCase())) return null;
-  for (const [k, v] of Object.entries(rule.params ?? {})) if (!check(params[k] === v)) return null;
-  for (const [k, v] of Object.entries(rule.query ?? {})) if (!check(req.url.searchParams.get(k) === v)) return null;
-  for (const [k, v] of Object.entries(rule.headers ?? {})) if (!check(req.headers.get(k) === v)) return null;
-  if (rule.bodyContains !== undefined && !check(bodyText.toLowerCase().includes(rule.bodyContains.toLowerCase()))) return null;
-
-  return score > 0 ? score : null;
-}
 
 function fromScenario(service: Service, scenario: Scenario, source: Source, note?: string): Resolution {
   return {
@@ -151,10 +133,10 @@ export class Engine {
           : problem(500, `Service '${service.id}' is static but has no default scenario`, "error", service);
       }
       case "dynamic": {
-        const bodyText = dec.decode(req.body);
+        const input = new MatchInput(req.method, req.url, req.headers, params, dec.decode(req.body));
         let best: { sc: Scenario; score: number } | null = null;
         for (const sc of service.scenarios) {
-          const score = scoreMatch(sc.match, req, params, bodyText);
+          const score = scoreMatch(sc.match, input);
           if (score !== null && (!best || score > best.score)) best = { sc, score };
         }
         if (best) return fromScenario(service, best.sc, "scenario");

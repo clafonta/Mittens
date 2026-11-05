@@ -84,6 +84,24 @@ match:                    # dynamic mode: every listed criterion must match; mos
 delayMs: 250              # overrides the service delay
 ```
 
+Match values can also be regular expressions, and JSON request bodies can be matched with JSONPath:
+
+```yaml
+match:
+  params:
+    id: { regex: "^9\\d+$" }            # any params/query/headers value can be { regex, flags? }
+  headers:
+    user-agent: { regex: "iphone", flags: i }
+  bodyMatches: { regex: '"type"\s*:\s*"refund"' }
+  json:                                 # passes if any node the path selects matches
+    $.user.role: admin                  # equals (7, true, null keep their JSON type)
+    $.items[*].sku: { regex: "^X-" }
+    $.items[?(@.gift === true)]: { exists: true }
+    $.legacyField: { exists: false }
+```
+
+When two scenarios match the same number of criteria, the one with more exact (non-regex) criteria wins, so `id: "404"` beats `id: { regex: ".*" }`. In the dashboard form, write `name ~ regex` (or `~i` to ignore case) next to the usual `name: value` lines, and JSONPath conditions as `$.path = value`, `$.path ~ regex`, `$.path exists` or `$.path missing`. Regexes aren't anchored unless you add `^`/`$`. Body criteria need a request with a body: GET and HEAD requests never carry one.
+
 ```yaml
 # profiles/outage.yaml
 name: Outage
@@ -144,7 +162,7 @@ Schemas are standard JSON Schema: 2020-12 by default, draft-07 when `$schema` sa
 
 **Export HAR** / **Export JSON** on the History page (or a service page, for just that service) downloads what's in history. HAR 1.2 opens in browser devtools, Charles, Fiddler and similar tools; Mimic's details (which service and scenario answered, validation results) are kept in `_mimic` fields. Scripts: `GET /_mimic/api/history/export?format=har|json&service=id&validation=fail`.
 
-History is in memory, holds the latest 500 requests, and keeps bodies up to 256 KB.
+History holds the latest 500 requests (`--history-limit`) and keeps bodies up to 256 KB. By default it lives in memory and is gone on restart. With `--persist-history` it is also written to `<dir>/.mimic/history.jsonl` and reloaded on start, so you can stop Mimic, come back, and still replay or save what you recorded. That directory gets its own `.gitignore`, because history can contain credentials from proxied traffic; `--history-file <path>` stores it elsewhere. Clearing history in the dashboard empties the file too.
 
 ## Replaying requests
 
@@ -164,6 +182,9 @@ mimic init [--dir <path>]
       --profile <id> apply a profile on start, live only (MIMIC_PROFILE)
   -t, --tag <tags>   only serve services with one of these tags; comma-separated
                      or repeated, live only (MIMIC_TAGS)
+      --persist-history       keep history across restarts (MIMIC_PERSIST_HISTORY=1)
+      --history-file <path>   persist history to this file (MIMIC_HISTORY_FILE)
+      --history-limit <n>     requests kept in history, default 500
       --upstream-proxy <url>  send proxy-mode calls through this proxy
       --no-upstream-proxy     ignore HTTP(S)_PROXY for proxy-mode calls
       --open         open the dashboard in a browser

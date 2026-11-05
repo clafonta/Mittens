@@ -25,8 +25,16 @@ export interface HistoryEntry {
 export class History extends EventEmitter<{ entry: [HistoryEntry]; clear: [] }> {
   private entries: HistoryEntry[] = [];
 
-  constructor(private readonly limit = 500) {
+  /** Where history is saved, when persistence is on. */
+  persistedTo: string | undefined;
+
+  constructor(readonly limit = 500) {
     super();
+  }
+
+  /** Replaces the contents with previously saved entries (newest first), without emitting events. */
+  restore(entries: HistoryEntry[]) {
+    this.entries = entries.slice(0, this.limit);
   }
 
   add(entry: Omit<HistoryEntry, "id">): HistoryEntry {

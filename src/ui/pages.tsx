@@ -463,7 +463,7 @@ export const ExportLinks = (filter: { service?: string; validation?: string }) =
   </span>
 );
 
-export function HistoryPage({ validation }: { validation?: "pass" | "fail" }) {
+export function HistoryPage({ validation, persistedTo, limit }: { validation?: "pass" | "fail"; persistedTo?: string; limit: number }) {
   const fragment = `${BASE}/ui/history?limit=200${validation ? `&validation=${validation}` : ""}`;
   return (
     <>
@@ -482,6 +482,18 @@ export function HistoryPage({ validation }: { validation?: "pass" | "fail" }) {
           Clear history
         </button>
       </div>
+      <p class="muted">
+        {persistedTo ? (
+          <>
+            Keeps the latest {limit} requests, saved to <code>{persistedTo}</code> so they survive restarts.
+          </>
+        ) : (
+          <>
+            Keeps the latest {limit} requests in memory; they're gone when Mimic restarts (use <code>--persist-history</code> to keep
+            them).
+          </>
+        )}
+      </p>
       <div hx-get={fragment} hx-trigger="load, every 2s">
         <p class="muted">Loading…</p>
       </div>

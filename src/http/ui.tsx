@@ -384,7 +384,7 @@ export function createUi(store: Store, history: History, engine: Engine) {
   // -------------------------------------------------------------- history
 
   const validationFilter = (v: string | undefined) => (v === "pass" || v === "fail" ? v : undefined);
-  ui.get("/history", (c) => page(c, "History", <HistoryPage validation={validationFilter(c.req.query("validation"))} />));
+  ui.get("/history", (c) => page(c, "History", <HistoryPage validation={validationFilter(c.req.query("validation"))} persistedTo={history.persistedTo} limit={history.limit} />));
   ui.get("/history/:id", (c) => {
     const entry = history.get(c.req.param("id"));
     if (!entry) return page(c, "Not found", <NotFoundPage message="That request is no longer in history." />, 404);

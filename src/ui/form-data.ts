@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Profile, ProfileEntry, Scenario, Service } from "../core/schema.js";
+import type { JsonTest, Profile, ProfileEntry, Scenario, Service, ValueTest } from "../core/schema.js";
 
 /** Raw form values keyed by field name, as submitted or as prefilled. */
 export type FormValues = Record<string, string>;
@@ -51,6 +51,103 @@ function pairs(values: FormValues, field: string, errors: FormErrors): Record<st
   }
   return Object.keys(out).length ? out : undefined;
 }
+
+/**
+ * Parses match lines: `name: value` (exact) or `name ~ regex` / `name ~i regex`
+ * (regular expression, optional flags). Whichever separator comes first wins.
+ */
+function matchPairs(values: FormValues, field: string, errors: FormErrors): Record<string, ValueTest> | undefined {
+  const out: Record<string, ValueTest> = {};
+  for (const [i, line] of (values[field] ?? "").split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    const colon = line.indexOf(":");
+    const tilde = line.indexOf("~");
+    if (tilde > 0 && (colon < 0 || tilde < colon)) {
+      const m = /^([^~]+?)\s*~([a-z]*)\s+(.+)$/.exec(line.trim());
+      const flags = m?.[2] ?? "";
+      if (!m || !/^[imsu]*$/.test(flags)) {
+        errors[field] = `Line ${i + 1}: expected "name ~ regex" (flags: ~i, ~m, ~s, ~u)`;
+        return undefined;
+      }
+      const regex = m[3]!.trim();
+      if (!validRegex(regex)) {
+        errors[field] = `Line ${i + 1}: "${regex}" is not a valid regular expression`;
+        return undefined;
+      }
+      out[m[1]!.trim()] = flags ? { regex, flags } : { regex };
+    } else if (colon > 0) {
+      out[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
+    } else {
+      errors[field] = `Line ${i + 1}: expected "name: value" or "name ~ regex"`;
+      return undefined;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+const validRegex = (s: string) => {
+  try {
+    new RegExp(s);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const unmatchPairs = (rec: Record<string, ValueTest> | undefined) =>
+  Object.entries(rec ?? {})
+    .map(([k, v]) => (typeof v === "string" ? `${k}: ${v}` : `${k} ~${v.flags ?? ""} ${v.regex}`))
+    .join("\n");
+
+/** A bare word stays a string; JSON scalars (7, true, null, "7") keep their type. */
+function jsonScalar(raw: string): string | number | boolean | null {
+  try {
+    const v: unknown = JSON.parse(raw);
+    if (v === null || ["string", "number", "boolean"].includes(typeof v)) return v as string | number | boolean | null;
+  } catch {
+    // not JSON: a bare string
+  }
+  return raw;
+}
+
+/** Writes a scalar so jsonScalar reads it back unchanged. */
+function showScalar(v: string | number | boolean | null): string {
+  if (typeof v !== "string") return JSON.stringify(v);
+  return jsonScalar(v) === v && v.trim() === v && v !== "" ? v : JSON.stringify(v);
+}
+
+/** Parses JSONPath lines: `$.a = value`, `$.a ~ regex`, `$.a exists`, `$.a missing`. */
+function jsonTests(values: FormValues, field: string, errors: FormErrors): Record<string, JsonTest> | undefined {
+  const out: Record<string, JsonTest> = {};
+  for (const [i, raw] of (values[field] ?? "").split(/\r?\n/).entries()) {
+    const line = raw.trim();
+    if (!line) continue;
+    const fail = (msg: string) => {
+      errors[field] = `Line ${i + 1}: ${msg}`;
+      return undefined;
+    };
+    if (!line.startsWith("$")) return fail("JSONPath expressions start with $");
+    let m: RegExpExecArray | null;
+    if ((m = /^(.+?)\s+(exists|missing)$/.exec(line))) out[m[1]!] = { exists: m[2] === "exists" };
+    else if ((m = /^(.+?)\s+~([a-z]*)\s+(.+)$/.exec(line))) {
+      const [, path, flags = "", regex] = m;
+      if (!/^[imsu]*$/.test(flags)) return fail("regex flags may only be i, m, s, u");
+      if (!validRegex(regex!)) return fail(`"${regex}" is not a valid regular expression`);
+      out[path!] = flags ? { regex: regex!, flags } : { regex: regex! };
+    } else if ((m = /^(.+?)\s+=\s+(.*)$/.exec(line))) out[m[1]!] = jsonScalar(m[2]!);
+    else return fail('expected "$.path = value", "$.path ~ regex", "$.path exists" or "$.path missing"');
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+const unjsonTests = (rec: Record<string, JsonTest> | undefined) =>
+  Object.entries(rec ?? {})
+    .map(([path, t]) => {
+      if (t !== null && typeof t === "object" && "exists" in t) return `${path} ${t.exists ? "exists" : "missing"}`;
+      if (t !== null && typeof t === "object") return `${path} ~${t.flags ?? ""} ${t.regex}`;
+      return `${path} = ${showScalar(t)}`;
+    })
+    .join("\n");
 
 const unpairs = (rec: Record<string, string> | undefined) =>
   Object.entries(rec ?? {})
@@ -187,16 +284,35 @@ export const SCENARIO_FIELDS = [
   "match.query",
   "match.headers",
   "match.bodyContains",
+  "match.bodyMatches",
+  "match.json",
 ];
+
+function bodyRegex(values: FormValues, errors: FormErrors) {
+  const regex = opt(values["match.bodyMatches"]);
+  const flags = opt(values["match.bodyMatchesFlags"]);
+  if (regex === undefined) return undefined;
+  if (!validRegex(regex)) {
+    errors["match.bodyMatches"] = "Not a valid regular expression";
+    return undefined;
+  }
+  if (flags && !/^[imsu]*$/.test(flags)) {
+    errors["match.bodyMatches"] = "Flags may only be i, m, s, u";
+    return undefined;
+  }
+  return flags ? { regex, flags } : { regex };
+}
 
 export function scenarioFromForm(values: FormValues) {
   const errors: FormErrors = {};
   const match = {
     method: opt(values["match.method"]),
-    params: pairs(values, "match.params", errors),
-    query: pairs(values, "match.query", errors),
-    headers: pairs(values, "match.headers", errors),
+    params: matchPairs(values, "match.params", errors),
+    query: matchPairs(values, "match.query", errors),
+    headers: matchPairs(values, "match.headers", errors),
     bodyContains: opt(values["match.bodyContains"]),
+    bodyMatches: bodyRegex(values, errors),
+    json: jsonTests(values, "match.json", errors),
   };
   const hasMatch = Object.values(match).some((v) => v !== undefined);
   const input = {
@@ -223,10 +339,13 @@ export function scenarioToValues(s: Scenario): FormValues {
     delayMs: s.delayMs === undefined ? "" : String(s.delayMs),
     tags: s.tags.join(", "),
     "match.method": s.match?.method ?? "",
-    "match.params": unpairs(s.match?.params),
-    "match.query": unpairs(s.match?.query),
-    "match.headers": unpairs(s.match?.headers),
+    "match.params": unmatchPairs(s.match?.params),
+    "match.query": unmatchPairs(s.match?.query),
+    "match.headers": unmatchPairs(s.match?.headers),
     "match.bodyContains": s.match?.bodyContains ?? "",
+    "match.bodyMatches": s.match?.bodyMatches?.regex ?? "",
+    "match.bodyMatchesFlags": s.match?.bodyMatches?.flags ?? "",
+    "match.json": unjsonTests(s.match?.json),
   };
 }
 

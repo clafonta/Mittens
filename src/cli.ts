@@ -5,6 +5,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
 import { History } from "./core/history.js";
+import { HistoryFile } from "./core/history-file.js";
 import { FileRepo, LoadError } from "./core/repo.js";
 import { Store } from "./core/store.js";
 import { describeProxy, proxiedFetch, proxyFromEnv, type UpstreamProxy, usesProxy } from "./core/upstream.js";
@@ -31,6 +32,13 @@ Options:
   -t, --tag <tags>     Only serve services tagged with one of these (comma-separated
                        or repeated; env MIMIC_TAGS). Changeable from the dashboard.
       --no-watch       Don't reload definitions when files change
+      --persist-history
+                       Keep request history across restarts, in
+                       <dir>/.mimic/history.jsonl (env MIMIC_PERSIST_HISTORY=1)
+      --history-file <path>
+                       Persist history to this file instead (implies the above)
+      --history-limit <n>
+                       Requests kept in history (default: 500)
       --upstream-proxy <url>
                        Send proxy-mode calls through this HTTP proxy. By default
                        HTTP_PROXY / HTTPS_PROXY / NO_PROXY are honoured.
@@ -64,6 +72,9 @@ async function main() {
       tag: { type: "string", short: "t", multiple: true },
       open: { type: "boolean", default: false },
       "no-watch": { type: "boolean", default: false },
+      "persist-history": { type: "boolean", default: false },
+      "history-file": { type: "string" },
+      "history-limit": { type: "string" },
       "upstream-proxy": { type: "string" },
       "no-upstream-proxy": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
@@ -127,7 +138,24 @@ async function main() {
     upstreamProxy = proxyFromEnv();
   }
 
-  const app = createApp({ store, history: new History(), fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
+  const historyLimit = Number(values["history-limit"] ?? 500);
+  if (!Number.isInteger(historyLimit) || historyLimit < 1) fail(`invalid --history-limit '${values["history-limit"]}'`);
+  const history = new History(historyLimit);
+  const historyPath = values["history-file"] ?? process.env.MIMIC_HISTORY_FILE;
+  const persist = !!historyPath || values["persist-history"] || ["1", "true"].includes(process.env.MIMIC_PERSIST_HISTORY ?? "");
+  let historyFile: HistoryFile | undefined;
+  let restored = { restored: 0, skipped: 0 };
+  if (persist) {
+    // The default location gets its own .gitignore; a path you chose is left alone.
+    historyFile = new HistoryFile(path.resolve(historyPath ?? path.join(dir, ".mimic", "history.jsonl")), { gitignore: !historyPath });
+    try {
+      restored = await historyFile.attach(history);
+    } catch (err) {
+      fail(`couldn't load history from ${historyFile.file}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const app = createApp({ store, history, fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     const origin = `http://${host.includes(":") ? `[${host}]` : host}:${info.port}`;
     const count = store.listServices().length;
@@ -145,6 +173,10 @@ async function main() {
     }
     console.log(`  Watching:    ${watching ? "on (edits to YAML reload automatically)" : "off"}`);
     if (usesProxy(upstreamProxy)) console.log(`  Upstreams:   via ${describeProxy(upstreamProxy)}`);
+    if (historyFile) {
+      const extra = restored.skipped ? `, skipped ${restored.skipped} unreadable line${restored.skipped === 1 ? "" : "s"}` : "";
+      console.log(`  History:     ${historyFile.file} (restored ${restored.restored}${extra})`);
+    }
     if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });
@@ -154,7 +186,8 @@ async function main() {
 
   const shutdown = () => {
     watcher?.close();
-    server.close(() => process.exit(0));
+    // Let queued history writes land before exiting.
+    server.close(() => void (historyFile?.flush() ?? Promise.resolve()).finally(() => process.exit(0)));
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);

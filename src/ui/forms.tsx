@@ -239,10 +239,34 @@ export function ScenarioForm(props: { service: Service; scenarioId?: string; val
           />
           <Text name="match.bodyContains" label="Body contains" values={values} errors={errors} hint="Case-insensitive." />
         </div>
+        <p class="hint">
+          In the boxes below, <code>name: value</code> must be equal; <code>name ~ regex</code> tests a regular expression
+          (<code>~i</code> ignores case). Exact criteria beat regexes when scores tie.
+        </p>
         <div class="row3">
-          <TextArea name="match.params" label="Path params" values={values} errors={errors} mono placeholder="id: 404" />
+          <TextArea name="match.params" label="Path params" values={values} errors={errors} mono placeholder={"id: 404\nid ~ ^9\\d+$"} />
           <TextArea name="match.query" label="Query" values={values} errors={errors} mono placeholder="verbose: true" />
           <TextArea name="match.headers" label="Request headers" values={values} errors={errors} mono placeholder="x-tenant: acme" />
+        </div>
+        <TextArea
+          name="match.json"
+          label="JSON body (JSONPath)"
+          values={values}
+          errors={errors}
+          rows={3}
+          mono
+          placeholder={'$.user.role = admin\n$.items[*].sku ~ ^X-\n$.coupon exists'}
+          hint={
+            <>
+              One per line: <code>$.path = value</code> (JSON scalars like <code>7</code> or <code>true</code> keep their type),{" "}
+              <code>$.path ~ regex</code>, <code>$.path exists</code>, or <code>$.path missing</code>. Passes if any selected node
+              matches.
+            </>
+          }
+        />
+        <div class="row">
+          <Text name="match.bodyMatches" label="Body matches (regex)" values={values} errors={errors} placeholder={'"type"\\s*:\\s*"refund"'} />
+          <Text name="match.bodyMatchesFlags" label="Flags" values={values} errors={errors} placeholder="i" />
         </div>
         {errors.match && <div class="error">{errors.match}</div>}
       </fieldset>

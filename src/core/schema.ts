@@ -17,25 +17,6 @@ export type HttpMethod = z.infer<typeof HttpMethod>;
 export const ServiceMode = z.enum(["static", "dynamic", "proxy"]);
 export type ServiceMode = z.infer<typeof ServiceMode>;
 
-/**
- * Criteria a request must satisfy for a scenario to be chosen in dynamic mode.
- * Every criterion present must match; the scenario with the most matching
- * criteria wins.
- */
-export const MatchRule = z
-  .object({
-    method: HttpMethod.optional(),
-    /** Path params captured from the service's path template, e.g. {id}. */
-    params: z.record(z.string(), z.string()).optional(),
-    query: z.record(z.string(), z.string()).optional(),
-    /** Header names are compared case-insensitively. */
-    headers: z.record(z.string(), z.string()).optional(),
-    /** Case-insensitive substring match against the raw request body. */
-    bodyContains: z.string().optional(),
-  })
-  .strict();
-export type MatchRule = z.infer<typeof MatchRule>;
-
 const isRegex = (s: string) => {
   try {
     new RegExp(s);
@@ -44,6 +25,57 @@ const isRegex = (s: string) => {
     return false;
   }
 };
+
+/** A regular expression test, e.g. `{ regex: "^9\\d+$" }`. Unanchored unless you add ^ / $. */
+export const RegexTest = z
+  .object({
+    regex: z.string().min(1).refine(isRegex, "Not a valid regular expression"),
+    /** Any of i, m, s, u. */
+    flags: z.string().regex(/^[imsu]*$/, "Flags may only be i, m, s, u").optional(),
+  })
+  .strict();
+export type RegexTest = z.infer<typeof RegexTest>;
+
+/** A string compares for equality; `{ regex }` tests a regular expression. */
+export const ValueTest = z.union([z.string(), RegexTest]);
+export type ValueTest = z.infer<typeof ValueTest>;
+
+/**
+ * A JSONPath condition on the request body. Passes when any node the path
+ * selects satisfies it:
+ * - a plain value (string, number, boolean, null) — equal to the node
+ * - `{ regex }` — a string or number node matches
+ * - `{ exists: true|false }` — the path selects something / nothing
+ */
+export const JsonTest = z.union([
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  RegexTest,
+  z.object({ exists: z.boolean() }).strict(),
+]);
+export type JsonTest = z.infer<typeof JsonTest>;
+
+/**
+ * Criteria a request must satisfy for a scenario to be chosen in dynamic mode.
+ * Every criterion present must match; the scenario with the most matching
+ * criteria wins, and ties go to the one with more exact (non-regex) criteria.
+ */
+export const MatchRule = z
+  .object({
+    method: HttpMethod.optional(),
+    /** Path params captured from the service's path template, e.g. {id}. */
+    params: z.record(z.string(), ValueTest).optional(),
+    query: z.record(z.string(), ValueTest).optional(),
+    /** Header names are compared case-insensitively. */
+    headers: z.record(z.string(), ValueTest).optional(),
+    /** Case-insensitive substring match against the raw request body. */
+    bodyContains: z.string().optional(),
+    /** Regular expression tested against the raw request body. */
+    bodyMatches: RegexTest.optional(),
+    /** JSONPath conditions on the JSON request body, e.g. { "$.user.role": "admin" }. */
+    json: z.record(z.string().startsWith("$", "JSONPath expressions start with $"), JsonTest).optional(),
+  })
+  .strict();
+export type MatchRule = z.infer<typeof MatchRule>;
 
 /** Proxy mode: a regex replace applied to the request path before it is sent upstream. */
 export const RewriteRule = z

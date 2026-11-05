@@ -13,11 +13,12 @@ This is a clean break from Mockey: no XML import, new file format, new URL layou
 
 | Concern | Choice | Why |
 |---|---|---|
-| Runtime | Node.js 22.19+ | `npx` distribution; built-in `fetch`, `parseArgs`, `node:sqlite` |
+| Runtime | Node.js 22.19+ | `npx` distribution; built-in `fetch` and `parseArgs`. History persistence uses JSON Lines rather than `node:sqlite`, which still prints an experimental warning on Node 22 |
 | HTTP | Hono + `@hono/node-server` | Small, fast, Web-standard `Request`/`Response`; trivial in-process testing via `app.request()` |
 | UI | Server-rendered Hono JSX + htmx | No client build or bundler; types shared with the server; partial updates and polling via attributes. Rich widgets (e.g. a JSON editor) can be added later as isolated islands |
 | Upstream proxying | `undici` (`EnvHttpProxyAgent`) | Built-in `fetch` ignores `HTTP(S)_PROXY`; undici's agent honours them and `NO_PROXY`, with tunnelling for HTTPS. Only used when a proxy is configured |
 | Validation | Zod 4 | One schema for files, API input and TS types |
+| JSONPath | `jsonpath-plus` | Full JSONPath incl. filters; filter expressions run in its sandboxed evaluator, not `eval` |
 | Response schemas | Ajv 8 + ajv-formats | The standard JSON Schema validator; compiled once per schema and cached |
 | Storage | YAML files (`yaml`) | Git-friendly; block scalars keep bodies readable |
 | Tests | Vitest | Fast; tests hit the real Hono app in-process |
@@ -60,6 +61,8 @@ Definitions (YAML) are what you commit: services, scenarios, profiles, and each 
 
 The store keeps an override only for services whose live state differs from the definition, so "modified" is simply "has an override". Reads (`getService`, `listServices`, `resolve`) return the live view; `getDefinition` returns the file view. Editing a starting value in the service form also sets that field live, so the edit takes effect immediately; other live overrides are kept. If an edit makes an override impossible (e.g. removing the upstream of a service that is live in proxy mode) the override is dropped.
 
+History is in memory by default; `--persist-history` adds a `HistoryFile` that appends each entry to a JSON Lines file (queued, so writes never overlap or delay responses), reloads the newest `limit` entries on start (deduplicating by id and skipping torn lines), and rewrites the file with only the in-memory entries once it reaches twice the limit.
+
 Live state is deliberately not persisted, so restarts are predictable and CI runs never leave a dirty working tree. A git-ignored state file could be added later if people want selections to survive restarts.
 
 ### Reloading from disk
@@ -74,7 +77,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 2. `Store.resolve(method, path)` → most specific service that passes the tag filter, in its live state (literal > `{param}` > `/*`; exact method > `ANY`).
 3. `Engine.resolve` by mode:
    - static → `defaultScenario`
-   - dynamic → highest-scoring `match`; fallback `defaultScenario` → `errorScenario` → 404
+   - dynamic → highest-scoring `match` (criteria count, then exact-over-regex); fallback `defaultScenario` → `errorScenario` → 404
    - proxy → `fetch(upstream + rewritten path + query)` (through the outbound proxy if configured); on error `errorScenario` → 502
    - anything that would end in Mimic's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mimic.yaml` instead, if one is set
 4. Validate the full body against the service's `responseSchema` for that status (not for Mimic's own error responses).
@@ -87,8 +90,8 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 |---|---|---|
 | Services, scenarios, static/dynamic/proxy modes | Same concepts, YAML on disk | **0 (done)** |
 | Hang time | `delayMs` on service/scenario | **0** |
-| Dynamic match (substring / JSON rules) | Structured `match` (method, params, query, headers, bodyContains) | **0**; JSONPath/regex in 2 |
-| History + inspect | Live history page and API | **0**; persistence in 2 |
+| Dynamic match (substring / JSON rules) | Structured `match` (method, params, query, headers, bodyContains); regex values, `bodyMatches`, JSONPath `json` conditions | **0** / **2 (done)** |
+| History + inspect | Live history page and API; opt-in JSONL persistence (`--persist-history`) | **0** / **2 (done)** |
 | Error scenario / universal error | Per-service `errorScenario`; global error scenario in `mimic.yaml` | **0** / **1 (done)** |
 | REST API (partial) | Full JSON API | **0** |
 | `-p`, `-l`, `-t` (transient), `-H` | `--port`, `--dir`, `--read-only`, `--open` (opt-in) | **0** |
@@ -110,10 +113,10 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 
 - **Phase 0 — foundation (done):** schemas, file store, engine with three modes, history, JSON API, dashboard with mode/default switching, CLI (`start`, `init`), tests.
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
-- **Phase 2 — proxy fidelity & export:** ~~corporate proxy~~, ~~path rewrites~~, ~~history export~~, ~~schema validation~~ (done); remaining: match JSONPath/regex, history persistence.
+- **Phase 2 — proxy fidelity & export (done):** corporate proxy, path rewrites, history export, schema validation, regex/JSONPath matching, history persistence.
+  - Still open from this area: faithful header forwarding (`fetch` adds defaults such as `sec-fetch-mode`; `undici.request` would avoid them) and streaming large bodies instead of buffering.
+- **Phase 3 — extensibility:** response templating, user JS hooks, OpenAPI import to bootstrap services, publish to npm with CI (lint, test, release).
 
 ### UI conventions
 
 Forms are plain HTML `POST`s (they work without JavaScript). On success the handler redirects (303) with a `?flash=` message; on failure it re-renders the form with the submitted values and per-field errors (422). Zod issue paths and `StoreError.field` map errors onto field names. htmx is used only for in-place updates (the mode/default switcher row, history polling).
-- **Phase 2 — proxy fidelity:** outbound proxy env vars, path rewrites, faithful header forwarding (`fetch` adds a few defaults such as `sec-fetch-mode`; switch to `undici.request` if that matters), streaming for large bodies, optional history persistence (`node:sqlite`), HAR export, schema validation.
-- **Phase 3 — extensibility:** response templating, user JS hooks, OpenAPI import to bootstrap services, publish to npm with CI (lint, test, release).

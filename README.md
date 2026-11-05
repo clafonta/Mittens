@@ -29,6 +29,8 @@ Requires Node.js 22+. Installed globally (`npm i -g @laboriouslabs/mimic`), the 
   - `static` — always return `defaultScenario`.
   - `dynamic` — return the scenario whose `match` rule best fits the request; otherwise fall back to `defaultScenario`, then `errorScenario`.
   - `proxy` — forward to `upstream` and record the exchange; on failure, return `errorScenario` (or a 502).
+- **Tags** — labels on services and scenarios. Click a tag in the dashboard to filter the list, or limit which services answer requests with `--tag checkout` (or **Only serve “checkout”** in the dashboard). Services outside the filter respond as if they didn't exist. A service counts as tagged if it or any of its scenarios carries the tag. The serving filter is live state, like modes.
+- **Global error scenario** — one scenario, chosen on the **Settings** page (stored in `mimic.yaml`), returned whenever Mimic would otherwise answer with its own error: no service matches, a dynamic service has no match and no fallback, a proxy fails without an `errorScenario`. Service-level fallbacks always win.
 
 Services, scenarios and profiles can all be created and edited in the dashboard, or by editing the YAML directly. Everything under `/_mimic` is Mimic's own dashboard and API; every other path is mock traffic. Responses carry `x-mimic-service`, `x-mimic-scenario` and `x-mimic-source` headers so you can tell what answered.
 
@@ -46,6 +48,7 @@ mimic/
         not-found.yaml
   profiles/
     outage.yaml
+  mimic.yaml              # optional project settings
 ```
 
 ```yaml
@@ -87,6 +90,13 @@ services:                 # services not listed are left alone
     scenario: server-error   # optional; becomes the default scenario
 ```
 
+```yaml
+# mimic.yaml
+errorScenario:            # global error scenario
+  service: users
+  scenario: server-error
+```
+
 Directory and file names are the IDs (lowercase, digits, dashes). `new` and `apply` are reserved.
 
 Mimic watches the definitions directory: edit a file in your editor and it reloads within a moment, keeping any live state that still applies. If a file is invalid, Mimic keeps serving the last good version and shows the error in the dashboard and the terminal until you fix it. Turn this off with `--no-watch`.
@@ -96,6 +106,10 @@ Mimic watches the definitions directory: edit a file in your editor and it reloa
 Put a service in `proxy` mode, exercise your app, then open a request in **History** and click **Save as scenario**. The form comes prefilled with the status, the response headers worth keeping, the body, and a match rule built from the request's path params and query, so you can review it before saving. Scripts can do the same with `POST /_mimic/api/history/:id/scenario`.
 
 Recorded bodies are kept up to 256 KB; larger responses are marked as truncated and can't be saved as scenarios.
+
+## Replaying requests
+
+Open any request in **History** and click **Replay** to send it again — same method, path, query, headers and body — through whatever the services are doing *now*. Handy after switching a mode or editing a scenario: the new entry says whether the response matches the original and, if not, what changed (status, body, which scenario answered). Scripts can use `POST /_mimic/api/history/:id/replay`.
 
 ## CLI
 
@@ -109,6 +123,8 @@ mimic init [--dir <path>]
       --read-only    never write changes to disk
       --no-watch     don't reload when definition files change
       --profile <id> apply a profile on start, live only (MIMIC_PROFILE)
+  -t, --tag <tags>   only serve services with one of these tags; comma-separated
+                     or repeated, live only (MIMIC_TAGS)
       --open         open the dashboard in a browser
 ```
 
@@ -118,13 +134,15 @@ All under `/_mimic/api`, JSON in and out:
 
 | Method | Path | |
 |---|---|---|
-| GET | `/services` | list services |
+| GET | `/services` | list services (`?tag=a&tag=b` keeps those with any of the tags) |
+| GET | `/tags` | every tag in use, and the active serving filter |
 | POST | `/services` | create a service |
 | GET / PATCH / DELETE | `/services/:id` | read (live view) / edit the definition / delete |
 | PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
 | GET | `/state` | live mode and default per service, with `modified` and `starting` values |
 | PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) |
 | DELETE | `/state/services/:id`, `/state` | reset one / all services to their starting state |
+| PUT | `/state/tags` | set the serving filter; body `{ "tags": ["checkout"] }`, `[]` serves all |
 | POST | `/state/save` | write the live state back to the YAML |
 | GET | `/profiles` | list, each with `active` and `problems` |
 | POST | `/profiles` | create (`?from=current` fills `services` from the current state) |
@@ -133,6 +151,8 @@ All under `/_mimic/api`, JSON in and out:
 | GET / DELETE | `/history` | list (`?service=id`) / clear |
 | GET | `/history/:id` | one request/response |
 | POST | `/history/:id/scenario` | save the recorded response as a scenario; body `{ id?, name?, service?, makeDefault? }` |
+| POST | `/history/:id/replay` | send the recorded request again; returns the new entry (with `replayOf`) |
+| GET / PUT | `/settings` | read / replace `mimic.yaml` settings, e.g. `{ "errorScenario": { "service": "users", "scenario": "server-error" } }` |
 | GET | `/health` | liveness |
 
 Handy in test setup, e.g. `POST /_mimic/api/profiles/outage/apply`, or `PATCH /_mimic/api/state/services/users {"mode":"static","defaultScenario":"server-error"}`, then `DELETE /_mimic/api/state` in teardown. None of these touch your files.

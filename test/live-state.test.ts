@@ -82,6 +82,7 @@ describe("live state (API)", () => {
     const state = (await (await request("/_mimic/api/state")).json()) as { modified: string[]; services: Record<string, unknown> };
     expect(state.modified).toEqual(["users"]);
     expect(state.services.users).toEqual({
+      active: true,
       mode: "static",
       defaultScenario: "boom",
       modified: true,

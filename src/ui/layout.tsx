@@ -43,6 +43,9 @@ input[readonly] { color:var(--muted); } textarea.mono { font:12.5px/1.45 ui-mono
 .error { color:var(--bad); font-size:.85rem; margin-top:.2rem; } .hint { color:var(--muted); font-size:.85rem; margin-top:.2rem; }
 fieldset { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem; margin:0 0 1rem; } legend { padding:0 .3rem; font-weight:500; }
 .actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; }
+a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-color:var(--muted); } a.pill.tag.current { background:var(--accent); border-color:var(--accent); color:#fff; }
+.tagbar { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin:0 0 1rem; }
+tr.inactive td { opacity:.55; } tr.inactive td:nth-child(3) { opacity:1; }
 `;
 
 export function Layout(props: { title: string; readOnly: boolean; flash?: string; reloadError?: string; children: Child }) {
@@ -61,6 +64,7 @@ export function Layout(props: { title: string; readOnly: boolean; flash?: string
           <a href={BASE}>Services</a>
           <a href={`${BASE}/profiles`}>Profiles</a>
           <a href={`${BASE}/history`}>History</a>
+          <a href={`${BASE}/settings`}>Settings</a>
           <a href={`${BASE}/api/services`}>API</a>
         </header>
         <main>

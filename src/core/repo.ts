@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
-import { type Profile, ProfileFile, type Scenario, ScenarioFile, type Service, ServiceFile, Slug } from "./schema.js";
+import { type Profile, ProfileFile, type Scenario, ScenarioFile, type Service, ServiceFile, Settings, Slug } from "./schema.js";
 
 /**
  * Persists definitions as a git-friendly directory tree:
@@ -12,10 +12,13 @@ import { type Profile, ProfileFile, type Scenario, ScenarioFile, type Service, S
  *   <root>/services/<service-id>/service.yaml
  *   <root>/services/<service-id>/scenarios/<scenario-id>.yaml
  *   <root>/profiles/<profile-id>.yaml
+ *   <root>/mimic.yaml                     (settings; optional)
  */
 export interface Repo {
   loadAll(): Promise<Service[]>;
   loadProfiles(): Promise<Profile[]>;
+  loadSettings(): Promise<Settings>;
+  saveSettings(settings: Settings): Promise<void>;
   saveProfile(profile: Profile): Promise<void>;
   deleteProfile(profileId: string): Promise<void>;
   saveService(service: Service): Promise<void>;
@@ -107,6 +110,23 @@ export class FileRepo implements Repo {
     return profiles;
   }
 
+  private settingsPath() {
+    return path.join(this.root, "mimic.yaml");
+  }
+
+  async loadSettings(): Promise<Settings> {
+    const file = this.settingsPath();
+    return existsSync(file) ? parseFile(file, Settings) : {};
+  }
+
+  /** Empty settings remove the file, so projects that don't use any stay tidy. */
+  async saveSettings(settings: Settings): Promise<void> {
+    const clean = Settings.parse(settings);
+    if (Object.keys(clean).length === 0) return rm(this.settingsPath(), { force: true });
+    await mkdir(this.root, { recursive: true });
+    await writeAtomic(this.settingsPath(), dump(clean));
+  }
+
   async saveProfile(profile: Profile): Promise<void> {
     const { id, ...def } = profile;
     const file = this.profilePath(id);
@@ -146,6 +166,7 @@ export class MemoryRepo implements Repo {
   constructor(
     private readonly seed: Service[] = [],
     private readonly profiles: Profile[] = [],
+    private readonly settings: Settings = {},
   ) {}
   async loadAll() {
     return structuredClone(this.seed);
@@ -153,6 +174,10 @@ export class MemoryRepo implements Repo {
   async loadProfiles() {
     return structuredClone(this.profiles);
   }
+  async loadSettings() {
+    return structuredClone(this.settings);
+  }
+  async saveSettings() {}
   async saveProfile() {}
   async deleteProfile() {}
   async saveService() {}

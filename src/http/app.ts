@@ -15,8 +15,9 @@ export interface AppDeps {
 
 export function createApp({ store, history, fetchImpl }: AppDeps) {
   const app = new Hono();
-  app.route(`${BASE}/api`, createApi(store, history));
-  app.route(BASE, createUi(store, history));
-  app.all("*", mockHandler(new Engine(store, history, fetchImpl)));
+  const engine = new Engine(store, history, fetchImpl);
+  app.route(`${BASE}/api`, createApi(store, history, engine));
+  app.route(BASE, createUi(store, history, engine));
+  app.all("*", mockHandler(engine));
   return app;
 }

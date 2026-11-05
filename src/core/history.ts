@@ -12,6 +12,8 @@ export interface HistoryEntry {
   scenarioId?: string;
   source: Source;
   note?: string;
+  /** Set when this request was a replay of an earlier history entry. */
+  replayOf?: string;
   request: { method: string; url: string; path: string; headers: Record<string, string>; body: string; truncated: boolean };
   response: { status: number; headers: Record<string, string>; body: string; truncated: boolean };
 }

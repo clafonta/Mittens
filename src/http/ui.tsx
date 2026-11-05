@@ -3,9 +3,10 @@ import { createRequire } from "node:module";
 import { type Context, Hono } from "hono";
 import type { Child } from "hono/jsx";
 import { z } from "zod";
+import type { Engine } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import { scenarioFromHistory } from "../core/record.js";
-import { ServiceMode } from "../core/schema.js";
+import { hasAnyTag, ServiceMode } from "../core/schema.js";
 import { StoreError, type Store } from "../core/store.js";
 import {
   FormError,
@@ -23,7 +24,7 @@ import {
   toValues,
   zodToFormErrors,
 } from "../ui/form-data.js";
-import { ProfileForm, ScenarioForm, ServiceForm } from "../ui/forms.js";
+import { ProfileForm, refValue, ScenarioForm, ServiceForm, SettingsForm } from "../ui/forms.js";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
@@ -37,6 +38,7 @@ import {
   ServicePage,
   ServiceRow,
   ServicesPage,
+  SettingsPage,
 } from "../ui/pages.js";
 import { errorStatus } from "./errors.js";
 import { BASE } from "./paths.js";
@@ -44,14 +46,14 @@ import { BASE } from "./paths.js";
 const htmxSource = readFileSync(createRequire(import.meta.url).resolve("htmx.org/dist/htmx.min.js"), "utf8");
 
 /** Redirect target after a POST, carrying a one-off status message. */
-const withFlash = (path: string, flash: string) => `${path}?flash=${encodeURIComponent(flash)}`;
+const withFlash = (path: string, flash: string) => `${path}${path.includes("?") ? "&" : "?"}flash=${encodeURIComponent(flash)}`;
 
 /** Only allow redirects back into the dashboard. */
 const safeReturn = (v: string | undefined, fallback: string) =>
-  v && (v === BASE || v.startsWith(`${BASE}/`)) && !v.startsWith("//") ? v : fallback;
+  v && (v === BASE || v.startsWith(`${BASE}/`) || v.startsWith(`${BASE}?`)) && !v.startsWith("//") ? v : fallback;
 
 /** HTML dashboard, mounted at /_mimic. */
-export function createUi(store: Store, history: History) {
+export function createUi(store: Store, history: History, engine: Engine) {
   const ui = new Hono();
 
   const page = (c: Context, title: string, body: Child, status: 200 | 404 | 422 = 200) =>
@@ -111,9 +113,25 @@ export function createUi(store: Store, history: History) {
 
   // ------------------------------------------------------------- services
 
-  ui.get("/", (c) =>
-    page(c, "Services", <ServicesPage services={store.listServices()} profiles={profileInfos()} modified={store.modifiedServiceIds()} />),
-  );
+  ui.get("/", (c) => {
+    const viewTag = c.req.query("tag")?.trim().toLowerCase() || undefined;
+    const all = store.listServices();
+    const services = viewTag ? all.filter((s) => hasAnyTag(s, [viewTag])) : all;
+    return page(
+      c,
+      "Services",
+      <ServicesPage
+        services={services}
+        profiles={profileInfos()}
+        modified={store.modifiedServiceIds()}
+        tags={store.allTags()}
+        viewTag={viewTag}
+        activeTags={store.activeTags}
+        inactive={all.filter((s) => !store.isActive(s)).map((s) => s.id)}
+        totalServices={all.length}
+      />,
+    );
+  });
 
   const serviceForm = (values: FormValues, errors: FormErrors, id?: string) => (
     <ServiceForm service={id ? store.getDefinition(id) : undefined} values={values} errors={errors} />
@@ -139,7 +157,17 @@ export function createUi(store: Store, history: History) {
   );
   ui.get("/services/:id", (c) => {
     const service = store.getService(c.req.param("id"));
-    return page(c, service.name, <ServicePage service={service} modified={store.isModified(service.id)} allModified={store.modifiedServiceIds()} />);
+    return page(
+      c,
+      service.name,
+      <ServicePage
+        service={service}
+        modified={store.isModified(service.id)}
+        allModified={store.modifiedServiceIds()}
+        inactive={!store.isActive(service)}
+        globalError={store.getSettings().errorScenario}
+      />,
+    );
   });
   ui.get("/services/:id/edit", (c) => {
     const service = store.getDefinition(c.req.param("id"));
@@ -319,6 +347,38 @@ export function createUi(store: Store, history: History) {
     return c.redirect(withFlash(safeReturn(body.return, BASE), `Reset ${reset.length} service${reset.length === 1 ? "" : "s"} to starting state`), 303);
   });
 
+  ui.post("/state/tags", async (c) => {
+    const body = toValues(await c.req.parseBody());
+    const tags = store.setActiveTags((body.tags ?? "").split(","));
+    const msg = tags.length ? `Only serving services tagged ${tags.join(", ")}` : "Serving all services";
+    return c.redirect(withFlash(safeReturn(body.return, BASE), msg), 303);
+  });
+
+  // ------------------------------------------------------------- settings
+
+  const settingsPage = (c: Context, values: FormValues, errors: FormErrors, status: 200 | 422 = 200) =>
+    page(
+      c,
+      "Settings",
+      <SettingsPage problems={store.settingsProblems()}>
+        <SettingsForm services={store.listServices()} values={values} errors={errors} />
+      </SettingsPage>,
+      status,
+    );
+
+  ui.get("/settings", (c) => settingsPage(c, { errorScenario: refValue(store.getSettings().errorScenario) }, {}));
+  ui.post("/settings", async (c) => {
+    const values = toValues(await c.req.parseBody());
+    const [service, scenario] = (values.errorScenario ?? "").split("/");
+    try {
+      await store.putSettings({ ...store.getSettings(), errorScenario: service && scenario ? { service, scenario } : undefined });
+    } catch (err) {
+      if (!(err instanceof StoreError || err instanceof z.ZodError)) throw err;
+      return settingsPage(c, values, { errorScenario: err instanceof StoreError ? err.message : "Choose a scenario from the list" }, 422);
+    }
+    return c.redirect(withFlash(`${BASE}/settings`, "Saved settings"), 303);
+  });
+
   // -------------------------------------------------------------- history
 
   ui.get("/history", (c) => page(c, "History", <HistoryPage />));
@@ -326,7 +386,15 @@ export function createUi(store: Store, history: History) {
     const entry = history.get(c.req.param("id"));
     if (!entry) return page(c, "Not found", <NotFoundPage message="That request is no longer in history." />, 404);
     const service = entry.serviceId ? store.listServices().find((s) => s.id === entry.serviceId) : undefined;
-    return page(c, "Request", <HistoryEntryPage entry={entry} service={service} />);
+    const original = entry.replayOf ? history.get(entry.replayOf) : undefined;
+    return page(c, "Request", <HistoryEntryPage entry={entry} service={service} original={original} />);
+  });
+  ui.post("/history/:id/replay", async (c) => {
+    const entry = history.get(c.req.param("id"));
+    if (!entry) return page(c, "Not found", <NotFoundPage message="That request is no longer in history." />, 404);
+    const replayed = await engine.replay(entry);
+    if (!replayed) return c.redirect(withFlash(`${BASE}/history/${entry.id}`, "The request body was truncated, so it can't be replayed"), 303);
+    return c.redirect(withFlash(`${BASE}/history/${replayed.id}`, `Replayed ${entry.request.method} ${entry.request.path}`), 303);
   });
 
   // -------------------------------------------------------- htmx fragments
@@ -344,13 +412,14 @@ export function createUi(store: Store, history: History) {
       defaultScenario: form.defaultScenario || undefined,
     });
     c.header("HX-Trigger", "live-changed");
-    return c.html(<ServiceRow service={service} modified={store.isModified(service.id)} />);
+    return c.html(<ServiceRow service={service} modified={store.isModified(service.id)} inactive={!store.isActive(service)} />);
   });
   ui.post("/ui/services/:id/reset", (c) => {
     const id = c.req.param("id");
     store.resetLiveState(id);
     c.header("HX-Trigger", "live-changed");
-    return c.html(<ServiceRow service={store.getService(id)} modified={false} />);
+    const service = store.getService(id);
+    return c.html(<ServiceRow service={service} modified={false} inactive={!store.isActive(service)} />);
   });
   ui.get("/ui/live-banner", (c) =>
     c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), BASE)} />),

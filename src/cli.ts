@@ -26,6 +26,8 @@ Options:
   -d, --dir <path>     Definitions directory (default: ./mimic, env MIMIC_DIR)
       --read-only      Load definitions but never write changes to disk
       --profile <id>   Apply a profile on start, in memory only (env MIMIC_PROFILE)
+  -t, --tag <tags>     Only serve services tagged with one of these (comma-separated
+                       or repeated; env MIMIC_TAGS). Changeable from the dashboard.
       --no-watch       Don't reload definitions when files change
       --open           Open the dashboard in a browser on start
   -h, --help           Show this help
@@ -52,6 +54,7 @@ async function main() {
       dir: { type: "string", short: "d" },
       "read-only": { type: "boolean", default: false },
       profile: { type: "string" },
+      tag: { type: "string", short: "t", multiple: true },
       open: { type: "boolean", default: false },
       "no-watch": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
@@ -95,6 +98,9 @@ async function main() {
     }
   }
 
+  const tags = store.setActiveTags((values.tag ?? (process.env.MIMIC_TAGS ? [process.env.MIMIC_TAGS] : [])).flatMap((t) => t.split(",")));
+  const unknownTags = tags.filter((t) => !store.allTags().includes(t));
+
   const watching = !values["no-watch"] && existsSync(dir);
   const watcher = watching ? watchDefinitions(dir, store) : undefined;
 
@@ -109,6 +115,11 @@ async function main() {
       `  Definitions: ${dir} (${count} service${count === 1 ? "" : "s"}, ${profiles} profile${profiles === 1 ? "" : "s"}${store.readOnly ? ", read-only" : ""})`,
     );
     if (profileId) console.log(`  Profile:     ${store.getProfile(profileId).name} (live only; YAML unchanged)`);
+    if (tags.length) {
+      const serving = store.listServices().filter((s) => store.isActive(s)).length;
+      console.log(`  Tags:        only serving services tagged ${tags.join(", ")} (${serving} of ${count})`);
+      if (unknownTags.length) console.log(`  Warning:     no service or scenario is tagged ${unknownTags.join(", ")}`);
+    }
     console.log(`  Watching:    ${watching ? "on (edits to YAML reload automatically)" : "off"}`);
     if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);

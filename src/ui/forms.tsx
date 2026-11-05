@@ -294,3 +294,43 @@ export function ProfileForm(props: { services: Service[]; profileId?: string; va
     </form>
   );
 }
+
+// ------------------------------------------------------------------ settings
+
+/** Form value for a scenario reference: "<service>/<scenario>". */
+export const refValue = (ref: { service: string; scenario: string } | undefined) => (ref ? `${ref.service}/${ref.scenario}` : "");
+
+export function SettingsForm(props: { services: Service[]; values: FormValues; errors: FormErrors }) {
+  const { services, values, errors } = props;
+  const current = values.errorScenario ?? "";
+  const withScenarios = services.filter((s) => s.scenarios.length > 0);
+  return (
+    <form method="post" action={`${BASE}/settings`} class="form">
+      <FormErrorBanner errors={errors} />
+      <Field
+        name="errorScenario"
+        label="Global error scenario"
+        values={values}
+        errors={errors}
+        hint="Returned whenever Mimic would otherwise answer with its own error: no service matches the request, no scenario matches and the service has no fallback, or a proxy call fails and the service has no error scenario."
+      >
+        <select id={fieldId("errorScenario")} name="errorScenario">
+          <option value="">— none (Mimic's JSON error) —</option>
+          {withScenarios.map((s) => (
+            <optgroup label={s.name}>
+              {s.scenarios.map((sc) => {
+                const value = refValue({ service: s.id, scenario: sc.id });
+                return (
+                  <option value={value} selected={value === current}>
+                    {sc.name} ({sc.status})
+                  </option>
+                );
+              })}
+            </optgroup>
+          ))}
+        </select>
+      </Field>
+      <Actions submit="Save settings" cancel={BASE} />
+    </form>
+  );
+}

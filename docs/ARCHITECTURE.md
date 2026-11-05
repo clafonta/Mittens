@@ -53,8 +53,8 @@ test/               vitest suites
 
 Definitions (YAML) are what you commit: services, scenarios, profiles, and each service's *starting* mode and default scenario. Live state is what is selected right now and exists only in memory:
 
-- Changes **live state only**: the dashboard mode/default switcher, applying a profile (UI, API or `--profile`), `PATCH /api/state/...`.
-- Changes **definitions**: create/edit/delete forms, `POST/PATCH/DELETE /api/services...`, scenario and profile endpoints, and the explicit "Save as starting state" (`POST /api/state/save`).
+- Changes **live state only**: the dashboard mode/default switcher, applying a profile (UI, API or `--profile`), `PATCH /api/state/...`, and the tag serving filter (`--tag`, "Only serve", `PUT /api/state/tags`). The tag filter is separate from per-service overrides: "Reset all" and "Save as starting state" don't touch it.
+- Changes **definitions**: create/edit/delete forms, `POST/PATCH/DELETE /api/services...`, scenario and profile endpoints, the Settings page (`mimic.yaml`), and the explicit "Save as starting state" (`POST /api/state/save`).
 
 The store keeps an override only for services whose live state differs from the definition, so "modified" is simply "has an override". Reads (`getService`, `listServices`, `resolve`) return the live view; `getDefinition` returns the file view. Editing a starting value in the service form also sets that field live, so the edit takes effect immediately; other live overrides are kept. If an edit makes an override impossible (e.g. removing the upstream of a service that is live in proxy mode) the override is dropped.
 
@@ -69,11 +69,12 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 ### Request flow (mock traffic)
 
 1. Answer CORS preflight if present.
-2. `Store.resolve(method, path)` → most specific service, in its live state (literal > `{param}` > `/*`; exact method > `ANY`).
+2. `Store.resolve(method, path)` → most specific service that passes the tag filter, in its live state (literal > `{param}` > `/*`; exact method > `ANY`).
 3. `Engine.resolve` by mode:
    - static → `defaultScenario`
    - dynamic → highest-scoring `match`; fallback `defaultScenario` → `errorScenario` → 404
    - proxy → `fetch(upstream + path + query)`; on error `errorScenario` → 502
+   - anything that would end in Mimic's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mimic.yaml` instead, if one is set
 4. Apply delay (scenario overrides service).
 5. Record to history; respond with `x-mimic-*` headers.
 
@@ -85,14 +86,14 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 | Hang time | `delayMs` on service/scenario | **0** |
 | Dynamic match (substring / JSON rules) | Structured `match` (method, params, query, headers, bodyContains) | **0**; JSONPath/regex in 2 |
 | History + inspect | Live history page and API | **0**; persistence in 2 |
-| Error scenario / universal error | Per-service `errorScenario` | **0**; global default in 1 |
+| Error scenario / universal error | Per-service `errorScenario`; global error scenario in `mimic.yaml` | **0** / **1 (done)** |
 | REST API (partial) | Full JSON API | **0** |
 | `-p`, `-l`, `-t` (transient), `-H` | `--port`, `--dir`, `--read-only`, `--open` (opt-in) | **0** |
 | Service/scenario editing in UI | Create/edit/delete forms | **1 (done)** |
 | Service plans | **Profiles**: named sets of mode + scenario per service, switchable in one call; `--profile` on start | **1 (done)** |
-| Tags + `-F` filter | `--tag` filter, tag filters in UI | 1 |
+| Tags + `-F` filter | Tag chips filter the dashboard; `--tag` / "Only serve" limits which services answer (live state) | **1 (done)** |
 | History → save as scenario | "Save as scenario" from a recorded response (UI + API) | **1 (done)** |
-| Redo request (`/doitagain`) | Replay from history | 1 |
+| Redo request (`/doitagain`) | Replay from history, with a comparison to the original response | **1 (done)** |
 | File watching (n/a) | Reload when YAML changes on disk; last good version kept on errors | **1 (done)** |
 | Corporate proxy settings | Honour `HTTP(S)_PROXY`/`NO_PROXY` for upstream calls | 2 |
 | URL twisting | Path rewrite rules on proxy (`stripPrefix` / regex rewrite) | 2 |
@@ -105,7 +106,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 ## Roadmap
 
 - **Phase 0 — foundation (done):** schemas, file store, engine with three modes, history, JSON API, dashboard with mode/default switching, CLI (`start`, `init`), tests.
-- **Phase 1 — daily-driver UI:** ~~CRUD forms~~, ~~profiles~~, ~~live state~~, ~~record-to-scenario~~, ~~file-watch reload~~ (done); remaining: tags, replay, global error scenario.
+- **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
 
 ### UI conventions
 

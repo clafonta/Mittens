@@ -1,4 +1,4 @@
-import type { History, Source } from "./history.js";
+import type { History, HistoryEntry, Source } from "./history.js";
 import type { MatchRule, Scenario, Service } from "./schema.js";
 import type { Store } from "./store.js";
 
@@ -83,17 +83,59 @@ export class Engine {
   ) {}
 
   /** Resolve, delay, and record a request. */
-  async handle(req: MockRequest): Promise<Resolution> {
+  async handle(req: MockRequest, opts: { replayOf?: string } = {}): Promise<Resolution & { entry: HistoryEntry }> {
     const started = performance.now();
     const res = await this.resolve(req);
     if (res.delayMs > 0) await new Promise((r) => setTimeout(r, res.delayMs));
-    this.record(req, res, performance.now() - started);
-    return res;
+    const entry = this.record(req, res, performance.now() - started, opts.replayOf);
+    return { ...res, entry };
   }
 
+  /**
+   * Sends a recorded request through the current live state again. Returns
+   * undefined when the recorded request body was truncated (it can't be
+   * reproduced faithfully).
+   */
+  async replay(original: HistoryEntry): Promise<HistoryEntry | undefined> {
+    if (original.request.truncated) return undefined;
+    const { entry } = await this.handle(
+      {
+        method: original.request.method,
+        url: new URL(original.request.url),
+        headers: new Headers(original.request.headers),
+        body: enc.encode(original.request.body),
+      },
+      { replayOf: original.id },
+    );
+    return entry;
+  }
+
+  /** Picks the response; when Mimic would answer with its own error, the global error scenario (if set) is used instead. */
   async resolve(req: MockRequest): Promise<Resolution> {
+    const res = await this.resolveOwn(req);
+    if (res.source !== "error" && res.source !== "unmatched") return res;
+    const global = this.store.globalErrorScenario();
+    if (!global) return res;
+    const { service: owner, scenario } = global;
+    return {
+      service: res.service,
+      scenario,
+      source: "fallback",
+      note: `${res.note}; used global error scenario ${owner.id}/${scenario.id}`,
+      status: scenario.status,
+      headers: scenario.headers,
+      body: enc.encode(scenario.body),
+      delayMs: scenario.delayMs ?? res.service?.delayMs ?? owner.delayMs,
+    };
+  }
+
+  private async resolveOwn(req: MockRequest): Promise<Resolution> {
     const match = this.store.resolve(req.method, req.url.pathname);
-    if (!match) return problem(404, `No service matches ${req.method} ${req.url.pathname}`, "unmatched");
+    if (!match) {
+      const hidden = this.store.resolve(req.method, req.url.pathname, { includeInactive: true });
+      const why = hidden ? ` (service '${hidden.service.id}' matches but is outside the tag filter: ${this.store.activeTags.join(", ")})` : "";
+      return problem(404, `No service matches ${req.method} ${req.url.pathname}${why}`, "unmatched");
+    }
     const { service, params } = match;
 
     switch (service.mode) {
@@ -159,9 +201,10 @@ export class Engine {
     }
   }
 
-  private record(req: MockRequest, res: Resolution, durationMs: number) {
+  private record(req: MockRequest, res: Resolution, durationMs: number, replayOf?: string): HistoryEntry {
     const headersOf = (h: Headers) => Object.fromEntries(h.entries());
-    this.history.add({
+    return this.history.add({
+      ...(replayOf && { replayOf }),
       at: new Date().toISOString(),
       durationMs: Math.round(durationMs),
       serviceId: res.service?.id,

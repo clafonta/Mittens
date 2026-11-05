@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import type { Engine } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import { scenarioFromHistory } from "../core/record.js";
-import { ServiceMode, Slug } from "../core/schema.js";
+import { hasAnyTag, ServiceMode, Slug } from "../core/schema.js";
 import type { Store } from "../core/store.js";
 import { errorStatus } from "./errors.js";
 
 /** JSON management API, mounted at /_mimic/api. */
-export function createApi(store: Store, history: History) {
+export function createApi(store: Store, history: History, engine: Engine) {
   const api = new Hono();
 
   api.onError((err, c) => {
@@ -20,7 +21,13 @@ export function createApi(store: Store, history: History) {
   api.get("/health", (c) => c.json({ ok: true, readOnly: store.readOnly }));
 
   // services & scenarios
-  api.get("/services", (c) => c.json(store.listServices()));
+  /** ?tag=a&tag=b lists services carrying any of the tags (on the service or a scenario). */
+  api.get("/services", (c) => {
+    const tags = c.req.queries("tag") ?? [];
+    const services = store.listServices();
+    return c.json(tags.length ? services.filter((s) => hasAnyTag(s, tags)) : services);
+  });
+  api.get("/tags", (c) => c.json({ tags: store.allTags(), active: store.activeTags }));
   api.post("/services", async (c) => c.json(await store.createService(await c.req.json()), 201));
   api.get("/services/:id", (c) => c.json(store.getService(c.req.param("id"))));
   api.patch("/services/:id", async (c) => c.json(await store.updateService(c.req.param("id"), await c.req.json())));
@@ -73,13 +80,14 @@ export function createApi(store: Store, history: History) {
     for (const s of store.listServices()) {
       const def = store.getDefinition(s.id);
       services[s.id] = {
+        active: store.isActive(s),
         mode: s.mode,
         defaultScenario: s.defaultScenario ?? null,
         modified: store.isModified(s.id),
         starting: { mode: def.mode, defaultScenario: def.defaultScenario ?? null },
       };
     }
-    return { modified: store.modifiedServiceIds(), services };
+    return { modified: store.modifiedServiceIds(), tags: store.activeTags, services };
   };
   api.get("/state", (c) => c.json(liveView()));
   /** Body: { mode?, defaultScenario? } — null clears the default scenario. */
@@ -93,8 +101,23 @@ export function createApi(store: Store, history: History) {
   });
   api.delete("/state/services/:id", (c) => c.json({ reset: store.resetLiveState(c.req.param("id")) }));
   api.delete("/state", (c) => c.json({ reset: store.resetLiveState() }));
+  /** Body: { tags: string[] }. Only services with one of the tags answer requests; [] serves all. */
+  api.put("/state/tags", async (c) => {
+    const { tags } = z.object({ tags: z.array(z.string()) }).strict().parse(await c.req.json());
+    store.setActiveTags(tags);
+    return c.json({ tags: store.activeTags, active: store.listServices().filter((s) => store.isActive(s)).map((s) => s.id) });
+  });
   /** Writes the live state back to the YAML definitions. */
   api.post("/state/save", async (c) => c.json({ saved: await store.saveLiveState() }));
+
+  // settings (mimic.yaml)
+  const settingsView = () => ({ ...store.getSettings(), problems: store.settingsProblems() });
+  api.get("/settings", (c) => c.json(settingsView()));
+  /** Body: { errorScenario?: { service, scenario } }. Replaces all settings. */
+  api.put("/settings", async (c) => {
+    await store.putSettings(await c.req.json());
+    return c.json(settingsView());
+  });
 
   // history
   api.get("/history", (c) => c.json(history.list({ serviceId: c.req.query("service") })));
@@ -131,6 +154,14 @@ export function createApi(store: Store, history: History) {
     );
     if (opts.makeDefault) await store.updateService(serviceId, { defaultScenario: scenario.id });
     return c.json({ ...scenario, serviceId, warnings: draft.warnings }, 201);
+  });
+  /** Sends a recorded request again, through the current live state. Returns the new history entry. */
+  api.post("/history/:id/replay", async (c) => {
+    const entry = history.get(c.req.param("id"));
+    if (!entry) return c.json({ error: "Not found" }, 404);
+    const replayed = await engine.replay(entry);
+    if (!replayed) return c.json({ error: "The recorded request body was truncated, so it can't be replayed" }, 409);
+    return c.json(replayed, 201);
   });
   api.delete("/history", (c) => {
     history.clear();

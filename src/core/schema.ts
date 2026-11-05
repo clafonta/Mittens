@@ -104,3 +104,33 @@ export type ProfileFile = z.infer<typeof ProfileFile>;
 
 export const Profile = ProfileFile.extend({ id: Slug });
 export type Profile = z.infer<typeof Profile>;
+
+/** Points at one scenario of one service. */
+export const ScenarioRef = z.object({ service: Slug, scenario: Slug }).strict();
+export type ScenarioRef = z.infer<typeof ScenarioRef>;
+
+/** Project-wide settings, stored in <root>/mimic.yaml. */
+export const Settings = z
+  .object({
+    /**
+     * Returned whenever Mimic would otherwise answer with its own error: no
+     * service matches, no scenario matches and the service has no fallback,
+     * a proxy fails without an errorScenario, and so on.
+     */
+    errorScenario: ScenarioRef.optional(),
+  })
+  .strict();
+export type Settings = z.infer<typeof Settings>;
+
+/** All tags on a service and its scenarios, lowercased. */
+export function tagsOf(service: Service): Set<string> {
+  const tags = new Set(service.tags.map((t) => t.toLowerCase()));
+  for (const sc of service.scenarios) for (const t of sc.tags) tags.add(t.toLowerCase());
+  return tags;
+}
+
+/** True when the service or one of its scenarios carries any of the tags. */
+export const hasAnyTag = (service: Service, tags: string[]) => {
+  const own = tagsOf(service);
+  return tags.some((t) => own.has(t.toLowerCase()));
+};

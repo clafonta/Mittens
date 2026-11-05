@@ -1,6 +1,6 @@
 import { type CompiledPath, compilePath, matchPath } from "./path.js";
 import type { Repo } from "./repo.js";
-import { Profile, ProfileEntry, Scenario, Service, type ServiceMode } from "./schema.js";
+import { hasAnyTag, Profile, ProfileEntry, Scenario, Service, type ServiceMode, Settings, tagsOf } from "./schema.js";
 
 /** Store errors may name the input field at fault so forms can show the message in place. */
 export class StoreError extends Error {
@@ -53,6 +53,9 @@ export class Store {
   private live = new Map<string, LiveState>();
   /** Set when the last reload from disk failed; cleared by the next successful one. */
   private _reloadError: string | undefined;
+  private settings: Settings = {};
+  /** Live tag filter: when non-empty, only services carrying one of these tags answer requests. */
+  private _activeTags: string[] = [];
 
   constructor(
     private readonly repo: Repo,
@@ -81,7 +84,7 @@ export class Store {
    * definitions keep serving.
    */
   async reload(): Promise<{ changed: boolean; error?: string }> {
-    let loaded: [Service[], Profile[]];
+    let loaded: [Service[], Profile[], Settings];
     try {
       loaded = await this.loadFromRepo();
     } catch (err) {
@@ -100,20 +103,21 @@ export class Store {
     return { changed: this.fingerprint() !== before };
   }
 
-  private async loadFromRepo(): Promise<[Service[], Profile[]]> {
-    return Promise.all([this.repo.loadAll(), this.repo.loadProfiles()]);
+  private async loadFromRepo(): Promise<[Service[], Profile[], Settings]> {
+    return Promise.all([this.repo.loadAll(), this.repo.loadProfiles(), this.repo.loadSettings()]);
   }
 
-  private replaceDefinitions(services: Service[], profiles: Profile[]) {
+  private replaceDefinitions(services: Service[], profiles: Profile[], settings: Settings) {
     this.entries = new Map(services.map((s) => [s.id, { service: s, compiled: compilePath(s.path) }]));
     this.profiles = new Map(profiles.map((p) => [p.id, p]));
+    this.settings = settings;
   }
 
   /** Stable summary of all definitions, to tell whether a reload changed anything. */
   private fingerprint(): string {
     const services = [...this.entries.values()].map((e) => e.service).sort((a, b) => a.id.localeCompare(b.id));
     const profiles = [...this.profiles.values()].sort((a, b) => a.id.localeCompare(b.id));
-    return JSON.stringify([services, profiles]);
+    return JSON.stringify([services, profiles, this.settings]);
   }
 
   /** All services, live view. */
@@ -141,11 +145,17 @@ export class Store {
 
   /**
    * Finds the service for an incoming request. When several services match,
-   * the most specific path wins, then an exact method beats ANY.
+   * the most specific path wins, then an exact method beats ANY. Services
+   * outside the tag filter are skipped unless `includeInactive` is set.
    */
-  resolve(method: string, path: string): { service: Service; params: Record<string, string> } | null {
+  resolve(
+    method: string,
+    path: string,
+    opts: { includeInactive?: boolean } = {},
+  ): { service: Service; params: Record<string, string> } | null {
     let best: { service: Service; params: Record<string, string>; rank: number } | null = null;
     for (const { service: definition, compiled } of this.entries.values()) {
+      if (!opts.includeInactive && !this.isActive(definition)) continue;
       const service = this.withLive(definition);
       if (service.method !== "ANY" && service.method !== method.toUpperCase()) continue;
       const params = matchPath(compiled, path);
@@ -199,6 +209,79 @@ export class Store {
     await this.persist(() => this.repo.deleteService(id));
     this.entries.delete(id);
     this.live.delete(id);
+    if (this.settings.errorScenario?.service === id) await this.clearGlobalErrorScenario();
+  }
+
+  // ------------------------------------------------------------------ tags
+
+  /** Every tag used by a service or scenario, sorted. */
+  allTags(): string[] {
+    const tags = new Set<string>();
+    for (const { service } of this.entries.values()) for (const t of tagsOf(service)) tags.add(t);
+    return [...tags].sort();
+  }
+
+  get activeTags(): string[] {
+    return [...this._activeTags];
+  }
+
+  /**
+   * Limits which services answer requests to those tagged (on the service or
+   * any scenario) with one of `tags`. An empty list serves every service.
+   * Live state: kept in memory only.
+   */
+  setActiveTags(tags: string[]): string[] {
+    this._activeTags = [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))].sort();
+    return this.activeTags;
+  }
+
+  /** Whether the service answers requests under the current tag filter. */
+  isActive(service: Service): boolean {
+    return this._activeTags.length === 0 || hasAnyTag(service, this._activeTags);
+  }
+
+  // -------------------------------------------------------------- settings
+
+  getSettings(): Settings {
+    return structuredClone(this.settings);
+  }
+
+  /** Replaces the settings. References must point at existing scenarios. */
+  async putSettings(input: unknown): Promise<Settings> {
+    const settings = Settings.parse(input);
+    const problem = settings.errorScenario && this.refProblem(settings.errorScenario);
+    if (problem) throw new NotFoundError(problem, "errorScenario");
+    await this.persist(() => this.repo.saveSettings(settings));
+    this.settings = settings;
+    return this.getSettings();
+  }
+
+  /** Problems with the settings, e.g. a global error scenario that no longer exists (it is then ignored). */
+  settingsProblems(): string[] {
+    const ref = this.settings.errorScenario;
+    const problem = ref && this.refProblem(ref);
+    return problem ? [`Global error scenario: ${problem}`] : [];
+  }
+
+  /** The global error scenario and the service that owns it, if set and valid. */
+  globalErrorScenario(): { service: Service; scenario: Scenario } | undefined {
+    const ref = this.settings.errorScenario;
+    if (!ref || this.refProblem(ref)) return undefined;
+    const service = this.getService(ref.service);
+    return { service, scenario: service.scenarios.find((s) => s.id === ref.scenario)! };
+  }
+
+  private refProblem(ref: { service: string; scenario: string }): string | undefined {
+    const service = this.entries.get(ref.service)?.service;
+    if (!service) return `service '${ref.service}' does not exist`;
+    if (!service.scenarios.some((s) => s.id === ref.scenario)) return `'${ref.scenario}' is not a scenario of '${ref.service}'`;
+    return undefined;
+  }
+
+  private async clearGlobalErrorScenario() {
+    const { errorScenario: _removed, ...rest } = this.settings;
+    await this.persist(() => this.repo.saveSettings(rest));
+    this.settings = rest;
   }
 
   // ----------------------------------------------------------- live state
@@ -281,6 +364,8 @@ export class Store {
     this.replace(next);
     const live = this.live.get(serviceId);
     if (live?.defaultScenario === scenarioId) this.storeLive(next, { ...live, defaultScenario: undefined });
+    const global = this.settings.errorScenario;
+    if (global?.service === serviceId && global.scenario === scenarioId) await this.clearGlobalErrorScenario();
   }
 
   // ------------------------------------------------------------- profiles

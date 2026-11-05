@@ -3,6 +3,7 @@ import { validateResponse, type ValidationResult } from "../core/validate.js";
 import type { Profile, ScenarioRef, Service } from "../core/schema.js";
 import { BASE } from "../http/paths.js";
 import { DeleteButton } from "./forms.js";
+import { unjsonTests, unmatchPairs } from "./form-data.js";
 import { HelpLink } from "./help.js";
 import { StatusCode } from "./layout.js";
 
@@ -31,59 +32,126 @@ export const TagPills = ({ tags }: { tags: string[] }) => (
   </>
 );
 
-/** One service row; re-rendered in place by htmx after a change. */
-export function ServiceRow({ service, modified, inactive = false }: { service: Service; modified: boolean; inactive?: boolean }) {
-  const formId = `svc-${service.id}`;
+export type ServiceView = "row" | "bar";
+
+const NotServing = () => (
+  <span class="pill s4" title="Outside the tag filter: requests to this service get a 404 (or the global error scenario).">
+    not serving
+  </span>
+);
+
+/**
+ * Live mode and default-scenario switcher. Changes post to /ui/services/:id
+ * and the server re-renders the whole row or bar (`view`) in place.
+ */
+function LiveSwitcher({ service, modified, view }: { service: Service; modified: boolean; view: ServiceView }) {
+  const target = `#svc-${service.id}`;
   return (
-    <tr id={formId} class={inactive ? "inactive" : undefined}>
+    <form class="switcher" hx-post={`${BASE}/ui/services/${service.id}`} hx-trigger="change" hx-target={target} hx-swap="outerHTML">
+      <input type="hidden" name="view" value={view} />
+      <select name="mode" aria-label={`Mode of ${service.name}`}>
+        {MODES.map((m) => (
+          <option value={m} selected={service.mode === m} disabled={m === "proxy" && !service.upstream}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <select name="defaultScenario" aria-label={`Default scenario of ${service.name}`}>
+        <option value="">— no default —</option>
+        {service.scenarios.map((s) => (
+          <option value={s.id} selected={service.defaultScenario === s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      {modified && (
+        <>
+          <span class="pill s4" title="Differs from the YAML definition. Resets on restart.">
+            changed
+          </span>
+          <button type="button" class="small" hx-post={`${BASE}/ui/services/${service.id}/reset`} hx-target={target} hx-swap="outerHTML">
+            Reset
+          </button>
+        </>
+      )}
+    </form>
+  );
+}
+
+const Route = ({ service }: { service: Service }) => (
+  <code class="route">
+    {service.method} {service.path}
+  </code>
+);
+
+/** One row of the services table; re-rendered in place by htmx after a change. */
+export function ServiceRow({ service, modified, inactive = false }: { service: Service; modified: boolean; inactive?: boolean }) {
+  const n = service.scenarios.length;
+  return (
+    <tr id={`svc-${service.id}`} class={inactive ? "inactive" : undefined}>
       <td>
-        <a href={`${BASE}/services/${service.id}`}>{service.name}</a>
-        <TagPills tags={service.tags} />
-        {inactive && (
-          <>
-            {" "}
-            <span class="pill s4" title="Outside the tag filter: requests to this service get a 404 (or the global error scenario).">
-              not serving
-            </span>
-          </>
-        )}
-      </td>
-      <td>
-        <code>
-          {service.method} {service.path}
-        </code>
-      </td>
-      <td>
-        <form hx-post={`${BASE}/ui/services/${service.id}`} hx-trigger="change" hx-target={`#${formId}`} hx-swap="outerHTML">
-          <select name="mode" aria-label="Mode">
-            {MODES.map((m) => (
-              <option value={m} selected={service.mode === m} disabled={m === "proxy" && !service.upstream}>
-                {m}
-              </option>
-            ))}
-          </select>{" "}
-          <select name="defaultScenario" aria-label="Default scenario">
-            <option value="">— no default —</option>
-            {service.scenarios.map((s) => (
-              <option value={s.id} selected={service.defaultScenario === s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>{" "}
-          {modified && (
+        <div>
+          <a class="service-name" href={`${BASE}/services/${service.id}`}>
+            {service.name}
+          </a>
+          <TagPills tags={service.tags} />
+          {inactive && (
             <>
-              <span class="pill s4" title="Differs from the YAML definition. Resets on restart.">
-                changed
-              </span>{" "}
-              <button type="button" class="small" hx-post={`${BASE}/ui/services/${service.id}/reset`} hx-target={`#${formId}`} hx-swap="outerHTML">
-                Reset
-              </button>
+              {" "}
+              <NotServing />
             </>
           )}
-        </form>
+        </div>
+        <div class="muted small">
+          <Route service={service} /> · {n} scenario{n === 1 ? "" : "s"}
+        </div>
       </td>
-      <td class="muted">{service.scenarios.length}</td>
+      <td>
+        <LiveSwitcher service={service} modified={modified} view="row" />
+      </td>
     </tr>
+  );
+}
+
+/** The service page's summary line: route, tags and the live switcher. */
+export function ServiceBar({ service, modified, inactive = false }: { service: Service; modified: boolean; inactive?: boolean }) {
+  return (
+    <div id={`svc-${service.id}`} class="service-bar">
+      <Route service={service} />
+      <TagPills tags={service.tags} />
+      {inactive && <NotServing />}
+      <span class="spacer"></span>
+      <span class="muted">
+        Live <HelpLink to="live-state#what-changes-your-files-and-what-doesnt" label="Help: live state" />
+      </span>
+      <LiveSwitcher service={service} modified={modified} view="bar" />
+    </div>
+  );
+}
+
+/** Renders the row or bar variant, for htmx updates. */
+export const ServiceLive = (props: { service: Service; modified: boolean; inactive?: boolean; view: ServiceView }) =>
+  props.view === "bar" ? <ServiceBar {...props} /> : <ServiceRow {...props} />;
+
+/** A scenario's match rule as readable chips, in the same syntax as the form. */
+export function MatchSummary({ match }: { match: NonNullable<Service["scenarios"][number]["match"]> }) {
+  const chips: string[] = [];
+  if (match.method) chips.push(`method ${match.method}`);
+  const lines = (prefix: string, text: string) => text.split("\n").filter(Boolean).forEach((l) => chips.push(`${prefix}${l}`));
+  lines("param ", unmatchPairs(match.params));
+  lines("query ", unmatchPairs(match.query));
+  lines("header ", unmatchPairs(match.headers));
+  if (match.bodyContains !== undefined) chips.push(`body contains "${match.bodyContains}"`);
+  if (match.bodyMatches) chips.push(`body ~${match.bodyMatches.flags ?? ""} ${match.bodyMatches.regex}`);
+  lines("", unjsonTests(match.json));
+  if (chips.length === 0) return null;
+  return (
+    <div class="match-summary">
+      <span class="muted">Matches when</span>
+      {chips.map((c) => (
+        <code class="chip">{c}</code>
+      ))}
+    </div>
   );
 }
 
@@ -235,15 +303,13 @@ export function ServicesPage(props: {
           New to Mimic? Start with <a href={`${BASE}/help/getting-started`}>Getting started</a>.
         </div>
       ) : (
-        <table>
+        <table class="services">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Route</th>
+              <th>Service</th>
               <th>
-                Mode / default scenario <HelpLink to="services#modes" label="Help: modes" />
+                Live mode / default scenario <HelpLink to="services#modes" label="Help: modes" />
               </th>
-              <th>Scenarios</th>
             </tr>
           </thead>
           <tbody>
@@ -282,11 +348,7 @@ export function ServicePage(props: {
       </div>
       <LiveStateBanner modified={allModified} returnTo={base} />
       {service.description && <p class="muted">{service.description}</p>}
-      <table>
-        <tbody>
-          <ServiceRow service={service} modified={modified} inactive={inactive} />
-        </tbody>
-      </table>
+      <ServiceBar service={service} modified={modified} inactive={inactive} />
       {service.upstream && <UpstreamInfo service={service} />}
       {hook && <HookPanel serviceId={service.id} hook={hook} />}
       <div class="title-row">
@@ -335,7 +397,7 @@ export function ServicePage(props: {
             </a>
             <DeleteButton action={`${base}/scenarios/${sc.id}/delete`} what={`scenario '${sc.name}'`} />
           </div>
-          {sc.match && <pre>match: {JSON.stringify(sc.match)}</pre>}
+          {sc.match && <MatchSummary match={sc.match} />}
           <pre>{sc.body}</pre>
           {sc.template && <TemplatePreviewForm serviceId={service.id} scenarioId={sc.id} examplePath={service.path} />}
         </section>

@@ -26,14 +26,18 @@ button.small { padding:.05rem .45rem; font-size:.8rem; }
 .flash { padding:.5rem .75rem; border:1px solid var(--ok); color:var(--ok); border-radius:6px; margin-bottom:1rem; }
 .error-banner { border-color:var(--bad); color:var(--bad); }
 .title-row { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin:0 0 1rem; } .title-row h1, .title-row h2, .title-row h3 { margin:0; margin-right:auto; }
-h2 + .title-row, .title-row h2 { margin-top:2rem; }
+.title-row:has(> h2) { margin-top:2rem; }
 .scenario { border-top:1px solid var(--line); padding-top:.75rem; margin-top:.75rem; } .scenario .title-row { margin-bottom:.25rem; }
 .button, button { display:inline-block; font:inherit; padding:.3rem .7rem; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; text-decoration:none; cursor:pointer; line-height:1.4; }
 .button:hover, button:hover { border-color:var(--muted); } button:disabled { opacity:.5; cursor:not-allowed; }
 .primary { background:var(--accent); border-color:var(--accent); color:#fff; } .primary:hover { filter:brightness(1.1); border-color:var(--accent); }
 .danger { color:var(--bad); } .danger:hover { border-color:var(--bad); }
-form.inline { display:inline; } .nowrap { white-space:nowrap; }
-.switcher { display:flex; align-items:center; gap:.4rem; } .switcher label { color:var(--muted); }
+form.inline { display:inline-flex; align-items:center; margin:0; } .nowrap { white-space:nowrap; }
+.switcher { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+table.services td { vertical-align:middle; } table.services td:first-child { width:55%; }
+.service-name { font-weight:500; } .small { font-size:.85rem; } code.route { font-size:.8rem; }
+.service-bar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; padding:.6rem .75rem; border:1px solid var(--line); border-radius:8px; margin:0 0 1rem; } .service-bar .spacer { flex:1; }
+.match-summary { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; margin:.4rem 0; font-size:.85rem; } code.chip { padding:.1rem .45rem; border:1px solid var(--line); border-radius:5px; background:color-mix(in srgb, var(--line) 30%, transparent); } .switcher label { color:var(--muted); }
 .form { max-width:820px; } .field { margin-bottom:.9rem; flex:1; min-width:0; }
 .field label { display:block; font-weight:500; margin-bottom:.2rem; }
 .row, .row3 { display:flex; gap:1rem; } .row3 > * { flex:1; } @media (max-width: 700px) { .row, .row3 { flex-direction:column; gap:0; } }

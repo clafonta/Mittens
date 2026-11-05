@@ -94,7 +94,7 @@ const validRegex = (s: string) => {
   }
 };
 
-const unmatchPairs = (rec: Record<string, ValueTest> | undefined) =>
+export const unmatchPairs = (rec: Record<string, ValueTest> | undefined) =>
   Object.entries(rec ?? {})
     .map(([k, v]) => (typeof v === "string" ? `${k}: ${v}` : `${k} ~${v.flags ?? ""} ${v.regex}`))
     .join("\n");
@@ -140,7 +140,7 @@ function jsonTests(values: FormValues, field: string, errors: FormErrors): Recor
   return Object.keys(out).length ? out : undefined;
 }
 
-const unjsonTests = (rec: Record<string, JsonTest> | undefined) =>
+export const unjsonTests = (rec: Record<string, JsonTest> | undefined) =>
   Object.entries(rec ?? {})
     .map(([path, t]) => {
       if (t !== null && typeof t === "object" && "exists" in t) return `${path} ${t.exists ? "exists" : "missing"}`;

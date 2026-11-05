@@ -41,7 +41,7 @@ import {
   type ProfileInfo,
   ProfilesPage,
   ServicePage,
-  ServiceRow,
+  ServiceLive,
   ImportPage,
   ServicesPage,
   SettingsPage,
@@ -466,6 +466,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     const entries = history.list({ serviceId: c.req.query("service"), validation: validationFilter(c.req.query("validation")) }).slice(0, limit);
     return c.html(<HistoryTable entries={entries} />);
   });
+  const viewOf = (v: string | undefined) => (v === "bar" ? "bar" : "row");
   // Mode/default switcher: changes live state only.
   ui.post("/ui/services/:id", async (c) => {
     const form = toValues(await c.req.parseBody());
@@ -474,14 +475,15 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
       defaultScenario: form.defaultScenario || undefined,
     });
     c.header("HX-Trigger", "live-changed");
-    return c.html(<ServiceRow service={service} modified={store.isModified(service.id)} inactive={!store.isActive(service)} />);
+    return c.html(<ServiceLive service={service} modified={store.isModified(service.id)} inactive={!store.isActive(service)} view={viewOf(form.view)} />);
   });
-  ui.post("/ui/services/:id/reset", (c) => {
+  ui.post("/ui/services/:id/reset", async (c) => {
+    const form = toValues(await c.req.parseBody());
     const id = c.req.param("id");
     store.resetLiveState(id);
     c.header("HX-Trigger", "live-changed");
     const service = store.getService(id);
-    return c.html(<ServiceRow service={service} modified={false} inactive={!store.isActive(service)} />);
+    return c.html(<ServiceLive service={service} modified={false} inactive={!store.isActive(service)} view={viewOf(form.view)} />);
   });
   ui.get("/ui/services/:id/upstream", (c) => {
     const service = store.getService(c.req.param("id"));

@@ -37,7 +37,14 @@ pre { background:color-mix(in srgb, var(--line) 40%, transparent); padding:.75re
 .title-row:has(> h2) { margin-top:2rem; }
 .scenario { border-top:1px solid var(--line); padding-top:.75rem; margin-top:.75rem; } .scenario .title-row { margin-bottom:.25rem; }
 form.inline { display:inline-flex; align-items:center; margin:0; } .nowrap { white-space:nowrap; }
-table.services td { vertical-align:middle; } table.services td:first-child { width:55%; }
+table.services td { vertical-align:middle; } table.services td:first-child { width:42%; } table.services td.traffic { width:1%; white-space:nowrap; padding-right:2rem; }
+/* ---- sparklines */
+.spark-wrap { display:inline-flex; align-items:center; gap:.5rem; vertical-align:middle; }
+svg.spark { display:block; overflow:visible; } .spark .bar { fill:color-mix(in srgb, var(--accent) 60%, transparent); } .spark .bar.empty { fill:var(--line); } .spark .bar.err { fill:var(--bad); }
+.flow .node .spark rect { stroke:none; } .flow .node .spark .bar { fill:color-mix(in srgb, var(--accent) 60%, transparent); } .flow .node .spark .bar.empty { fill:var(--line); } .flow .node .spark .bar.err { fill:var(--bad); }
+.flow .node .count.small { font-size:11.5px; }
+.service-bar .divider { width:1px; height:20px; background:var(--line-strong); margin:0 .35rem; }
+.spark-total { min-width:1.5rem; font-size:.85rem; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }
 .service-name { font-weight:500; } .small { font-size:.85rem; } code.route { font-size:.8rem; }
 .service-bar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; padding:.5rem .5rem .5rem .75rem; border:1px solid var(--line); border-radius:8px; margin:0 0 1rem; } .service-bar .spacer { flex:1; }
 .match-summary { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; margin:.4rem 0; font-size:.85rem; } code.chip { padding:.1rem .45rem; border:1px solid var(--line); border-radius:5px; background:color-mix(in srgb, var(--line) 30%, transparent); } .switcher label { color:var(--muted); }

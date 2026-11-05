@@ -57,7 +57,7 @@ describe("home page", () => {
     for (const id of ["p-app", "p-nomatch", "p-svc-users", "p-svc-orders", "p-up-orders", "n-mimic", "n-nomatch", "n-svc-users", "n-svc-orders"]) {
       expect(html, id).toContain(`id="${id}"`);
     }
-    expect(html).toContain('data-events="/_mimic/api/events"');
+    expect(html).toContain("new EventSource('/_mimic/api/events')");
     expect(html).toMatch(/data-count="users">2</);
     expect(html).toMatch(/data-count="orders">1</);
     expect(html).toMatch(/data-count="nomatch">1</);
@@ -93,6 +93,7 @@ describe("home page", () => {
 describe("events stream", () => {
   it("sends a summary of each request as it's handled", async () => {
     const { request, history } = await setup(fixtures());
+    const before = history.listenerCount("entry"); // e.g. the rate counter
     const abort = new AbortController();
     const res = await request("/_mimic/api/events", { signal: abort.signal });
     expect(res.headers.get("content-type")).toContain("text/event-stream");
@@ -106,11 +107,11 @@ describe("events stream", () => {
     await request("/users/9");
     await request("/_mimic/api/history", { method: "DELETE" });
     await until("event: clear");
-    expect(history.listenerCount("entry")).toBe(1);
+    expect(history.listenerCount("entry")).toBe(before + 1);
     abort.abort();
     await reader.cancel().catch(() => {});
     await new Promise((r) => setTimeout(r, 20));
-    expect(history.listenerCount("entry")).toBe(0); // a closed tab doesn't leave a listener behind
+    expect(history.listenerCount("entry")).toBe(before); // a closed tab doesn't leave a listener behind
     // Parse the SSE blocks rather than assume a field order.
     const events = text
       .split("\n\n")

@@ -29,6 +29,10 @@ A service's page shows a diagram of everything that can answer its requests: eac
 
 Each request to the service travels across the diagram as a dot to whatever answered it, and back in the colour of its status. The counts show how many requests in History each answer has handled.
 
+## Traffic
+
+Each service shows a small bar chart of its requests over the last 10 minutes, one bar per 30 seconds, with the part that got an error response (4xx or 5xx) in red. You'll find it in the Services table, on the service's page, and on the home page's diagram; it updates as requests arrive, and hovering shows the totals. The numbers are counted separately from History, so they stay right when History is cleared or full.
+
 ## Default and error scenarios
 
 - The **default scenario** is what static mode sends, and dynamic mode's fallback when no match rule fits.

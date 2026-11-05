@@ -1,7 +1,8 @@
 import { raw } from "hono/html";
 import type { ServiceMode } from "../core/schema.js";
 import { BASE, SERVICES } from "../http/paths.js";
-import { FLOW_SCRIPT, FlowDiagram, type HomeData } from "./flow.js";
+import { FlowDiagram, type HomeData } from "./flow.js";
+import { LiveScripts } from "./live.js";
 import { HelpLink } from "./help.js";
 import { HistoryTable } from "./pages.js";
 
@@ -117,7 +118,7 @@ export function HomePage({ data }: { data: HomeData }) {
       <div hx-get={`${BASE}/ui/history?limit=8`} hx-trigger="load, every 2s">
         <HistoryTable entries={data.history.slice(0, 8)} />
       </div>
-      <script>{raw(FLOW_SCRIPT)}</script>
+      <LiveScripts flow sparks />
     </>
   );
 }

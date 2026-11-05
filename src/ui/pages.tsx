@@ -4,7 +4,10 @@ import type { Profile, ScenarioRef, Service } from "../core/schema.js";
 import { BASE, SERVICES } from "../http/paths.js";
 import { DeleteButton } from "./forms.js";
 import { raw } from "hono/html";
-import { FLOW_SCRIPT, ServiceFlow } from "./flow.js";
+import type { RateSeries } from "../core/rates.js";
+import { ServiceFlow } from "./flow.js";
+import { LiveScripts } from "./live.js";
+import { Sparkline } from "./spark.js";
 import { unjsonTests, unmatchPairs } from "./form-data.js";
 import { HelpLink } from "./help.js";
 import { StatusCode } from "./layout.js";
@@ -87,7 +90,7 @@ const Route = ({ service }: { service: Service }) => (
 );
 
 /** One row of the services table; re-rendered in place by htmx after a change. */
-export function ServiceRow({ service, modified, inactive = false }: { service: Service; modified: boolean; inactive?: boolean }) {
+export function ServiceRow({ service, modified, inactive = false, rate }: { service: Service; modified: boolean; inactive?: boolean; rate: RateSeries }) {
   const n = service.scenarios.length;
   return (
     <tr id={`svc-${service.id}`} class={inactive ? "inactive" : undefined}>
@@ -108,6 +111,9 @@ export function ServiceRow({ service, modified, inactive = false }: { service: S
           <Route service={service} /> · {n} scenario{n === 1 ? "" : "s"}
         </div>
       </td>
+      <td class="traffic">
+        <Sparkline id={service.id} series={rate} />
+      </td>
       <td>
         <LiveSwitcher service={service} modified={modified} view="row" />
       </td>
@@ -116,13 +122,16 @@ export function ServiceRow({ service, modified, inactive = false }: { service: S
 }
 
 /** The service page's summary line: route, tags and the live switcher. */
-export function ServiceBar({ service, modified, inactive = false }: { service: Service; modified: boolean; inactive?: boolean }) {
+export function ServiceBar({ service, modified, inactive = false, rate }: { service: Service; modified: boolean; inactive?: boolean; rate: RateSeries }) {
   return (
     <div id={`svc-${service.id}`} class="service-bar">
       <Route service={service} />
       <TagPills tags={service.tags} />
       {inactive && <NotServing />}
       <span class="spacer"></span>
+      <span class="muted small">Traffic, last 10 min</span>
+      <Sparkline id={service.id} series={rate} />
+      <span class="divider" aria-hidden="true"></span>
       <span class="muted">
         Live <HelpLink to="live-state#what-changes-your-files-and-what-doesnt" label="Help: live state" />
       </span>
@@ -139,7 +148,7 @@ export const ServiceFlowLive = (props: { service: Service; history: HistoryEntry
 );
 
 /** Renders the row or bar variant, for htmx updates. */
-export const ServiceLive = (props: { service: Service; modified: boolean; inactive?: boolean; view: ServiceView }) =>
+export const ServiceLive = (props: { service: Service; modified: boolean; inactive?: boolean; view: ServiceView; rate: RateSeries }) =>
   props.view === "bar" ? <ServiceBar {...props} /> : <ServiceRow {...props} />;
 
 /** A scenario's match rule as readable chips, in the same syntax as the form. */
@@ -284,6 +293,7 @@ export function ServicesPage(props: {
   activeTags: string[];
   inactive: string[];
   totalServices: number;
+  rateOf: (id: string) => RateSeries;
 }) {
   const { services, profiles, modified, viewTag } = props;
   const changed = new Set(modified);
@@ -322,6 +332,7 @@ export function ServicesPage(props: {
           <thead>
             <tr>
               <th>Service</th>
+              <th>Traffic, last 10 min</th>
               <th>
                 Live mode / default scenario <HelpLink to="services#modes" label="Help: modes" />
               </th>
@@ -329,11 +340,12 @@ export function ServicesPage(props: {
           </thead>
           <tbody>
             {services.map((s) => (
-              <ServiceRow service={s} modified={changed.has(s.id)} inactive={inactive.has(s.id)} />
+              <ServiceRow service={s} modified={changed.has(s.id)} inactive={inactive.has(s.id)} rate={props.rateOf(s.id)} />
             ))}
           </tbody>
         </table>
       )}
+      <LiveScripts sparks />
       <h2>Recent requests</h2>
       <div hx-get={`${BASE}/ui/history?limit=10`} hx-trigger="load, every 2s">
         <p class="muted">Loading…</p>
@@ -350,6 +362,7 @@ export function ServicePage(props: {
   globalError?: ScenarioRef;
   hook?: HookInfo;
   history: HistoryEntry[];
+  rate: RateSeries;
 }) {
   const { service, modified, allModified, inactive, globalError, hook } = props;
   const base = `${BASE}/services/${service.id}`;
@@ -364,9 +377,9 @@ export function ServicePage(props: {
       </div>
       <LiveStateBanner modified={allModified} returnTo={base} />
       {service.description && <p class="muted">{service.description}</p>}
-      <ServiceBar service={service} modified={modified} inactive={inactive} />
+      <ServiceBar service={service} modified={modified} inactive={inactive} rate={props.rate} />
       <ServiceFlowLive service={service} history={props.history} requestHook={!!hook?.exports.includes("request")} inactive={inactive} />
-      <script>{raw(FLOW_SCRIPT)}</script>
+      <LiveScripts flow sparks />
       {service.upstream && <UpstreamInfo service={service} />}
       {hook && <HookPanel serviceId={service.id} hook={hook} />}
       <div class="title-row">

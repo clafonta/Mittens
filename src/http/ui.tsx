@@ -6,6 +6,7 @@ import { z } from "zod";
 import { type Engine, renderScenario } from "../core/engine.js";
 import type { History } from "../core/history.js";
 import type { Hooks } from "../core/hooks.js";
+import type { Rates } from "../core/rates.js";
 import { scenarioFromHistory } from "../core/record.js";
 import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize } from "../core/openapi.js";
 import { upstreamUrl } from "../core/rewrite.js";
@@ -65,7 +66,8 @@ const safeReturn = (v: string | undefined, fallback: string) =>
   v && (v === BASE || v.startsWith(`${BASE}/`) || v.startsWith(`${BASE}?`)) && !v.startsWith("//") ? v : fallback;
 
 /** HTML dashboard, mounted at /_mimic. */
-export function createUi(store: Store, history: History, engine: Engine, hooks: Hooks) {
+export function createUi(store: Store, history: History, engine: Engine, hooks: Hooks, rates: Rates) {
+  const rateOf = (id: string) => rates.series(id);
   const ui = new Hono();
 
   const page = (c: Context, title: string, body: Child, status: 200 | 404 | 422 = 200) =>
@@ -175,6 +177,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
       history: history.list(),
       historyLimit: history.limit,
       origin: new URL(c.req.url).origin,
+      rateOf,
     };
     return page(c, "Home", <HomePage data={data} />);
   });
@@ -195,6 +198,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
         activeTags={store.activeTags}
         inactive={all.filter((s) => !store.isActive(s)).map((s) => s.id)}
         totalServices={all.length}
+        rateOf={rateOf}
       />,
     );
   });
@@ -234,6 +238,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
         globalError={store.getSettings().errorScenario}
         hook={hookInfo(service.id)}
         history={history.list({ serviceId: service.id })}
+        rate={rateOf(service.id)}
       />,
     );
   });
@@ -514,7 +519,9 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
       defaultScenario: form.defaultScenario || undefined,
     });
     c.header("HX-Trigger", "live-changed");
-    return c.html(<ServiceLive service={service} modified={store.isModified(service.id)} inactive={!store.isActive(service)} view={viewOf(form.view)} />);
+    return c.html(
+      <ServiceLive service={service} modified={store.isModified(service.id)} inactive={!store.isActive(service)} view={viewOf(form.view)} rate={rateOf(service.id)} />,
+    );
   });
   ui.post("/ui/services/:id/reset", async (c) => {
     const form = toValues(await c.req.parseBody());
@@ -522,7 +529,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     store.resetLiveState(id);
     c.header("HX-Trigger", "live-changed");
     const service = store.getService(id);
-    return c.html(<ServiceLive service={service} modified={false} inactive={!store.isActive(service)} view={viewOf(form.view)} />);
+    return c.html(<ServiceLive service={service} modified={false} inactive={!store.isActive(service)} view={viewOf(form.view)} rate={rateOf(service.id)} />);
   });
   ui.get("/ui/services/:id/upstream", (c) => {
     const service = store.getService(c.req.param("id"));

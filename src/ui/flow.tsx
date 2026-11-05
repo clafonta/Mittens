@@ -1,6 +1,8 @@
 import type { HistoryEntry } from "../core/history.js";
 import type { Service, ServiceMode } from "../core/schema.js";
+import type { RateSeries } from "../core/rates.js";
 import { BASE, SERVICES } from "../http/paths.js";
+import { SPARK_WIDTH, Sparkline } from "./spark.js";
 
 /** What the home page needs to know, gathered by the route. */
 export interface HomeData {
@@ -12,6 +14,7 @@ export interface HomeData {
   history: HistoryEntry[];
   historyLimit: number;
   origin: string;
+  rateOf: (id: string) => RateSeries;
 }
 
 // ------------------------------------------------------------------ layout
@@ -141,7 +144,6 @@ export function FlowDiagram({ data }: { data: HomeData }) {
         viewBox={`0 0 ${W} ${l.height}`}
         role="img"
         aria-labelledby="flow-title"
-        data-events={`${BASE}/api/events`}
         data-shown={[...shownIds].join(" ")}
       >
         <title id="flow-title">Requests from your app go to Mimic, which answers from each service's scenarios or proxies to the real API.</title>
@@ -195,17 +197,18 @@ export function FlowDiagram({ data }: { data: HomeData }) {
             <rect x={box.x} y={box.y} width={box.w} height={box.h} rx="9" />
             <rect class="stripe" x={box.x} y={box.y} width="4" height={box.h} rx="2" />
             <text x={box.x + 16} y={box.y + 22} class="title">
-              {clip(service.name, 26)}
+              {clip(service.name, 18)}
             </text>
             <text x={box.x + 16} y={box.y + 40} class="sub">
-              {clip(subtitle(service), 34)}
+              {clip(subtitle(service), 22)}
             </text>
+            <Sparkline id={service.id} series={data.rateOf(service.id)} x={right(box) - 14 - SPARK_WIDTH} y={box.y + 9} label={false} />
             {data.modified.has(service.id) && (
               <circle class="changed" cx={right(box) - 46} cy={box.y + 17} r="4">
                 <title>Live state differs from its definition</title>
               </circle>
             )}
-            <text x={right(box) - 14} y={midY(box) + 5} class="count" text-anchor="end" data-count={service.id}>
+            <text x={right(box) - 14} y={box.y + 44} class="count small" text-anchor="end" data-count={service.id}>
               {counts.get(service.id) ?? 0}
             </text>
           </a>
@@ -251,7 +254,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
         <span>
           <i class="line dashed"></i> upstream not in use (service isn't in proxy mode)
         </span>
-        <span id="flow-status" class="muted" aria-live="polite"></span>
+        <span id="flow-status" class="muted" aria-live="polite" data-live-status></span>
       </figcaption>
     </figure>
   );
@@ -367,7 +370,6 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
         viewBox={`0 0 ${W} ${l.height}`}
         role="img"
         aria-labelledby="flow-title"
-        data-events={`${BASE}/api/events`}
         data-service={service.id}
         data-scenarios={service.scenarios.map((s) => s.id).join(" ")}
       >
@@ -449,7 +451,7 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
         <span>
           <i class="line dashed"></i> can't answer in {service.mode} mode
         </span>
-        <span id="flow-status" class="muted" aria-live="polite"></span>
+        <span id="flow-status" class="muted" aria-live="polite" data-live-status></span>
       </figcaption>
     </figure>
   );
@@ -463,14 +465,13 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
  */
 export const FLOW_SCRIPT = `
 (function () {
-  if (!document.getElementById('flow') || !window.EventSource) return;
+  if (!document.getElementById('flow')) return;
   // Looked up per event: the service page re-renders the diagram when its mode changes.
   var svg = document.getElementById('flow');
   function attr(name) { svg = document.getElementById('flow') || svg; return svg.getAttribute(name) || ''; }
   var NS = 'http://www.w3.org/2000/svg';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  var status = document.getElementById('flow-status');
   var live = 0, MAX_DOTS = 40, SEG_MS = 420;
 
   function el(id) { return document.getElementById(id); }
@@ -554,9 +555,7 @@ export const FLOW_SCRIPT = `
     travel(out, 'req', function () { travel(back, tone(r.status), function () {}); });
   }
 
-  var es = new EventSource(attr('data-events'));
-  es.addEventListener('request', function (m) { try { onRequest(JSON.parse(m.data)); } catch (e) {} });
-  es.addEventListener('open', function () { if (status) status.textContent = 'Live'; });
-  es.addEventListener('error', function () { if (status) status.textContent = 'Reconnecting…'; });
+  // Requests arrive as DOM events from the page's live connection (see live.tsx).
+  document.addEventListener('mimic:request', function (ev) { try { onRequest(ev.detail); } catch (e) {} });
 })();
 `;

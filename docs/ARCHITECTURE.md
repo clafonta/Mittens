@@ -44,6 +44,7 @@ src/
     hooks.ts        load and run services/<id>/hook.*; hook types
     validate.ts     responseSchema checks (Ajv, 2020-12 / draft-07)
     rewrite.ts      stripPrefix / rewrite → upstream URL
+    rates.ts        requests per service in 30 s buckets, for sparklines
     upstream.ts     HTTP(S)_PROXY support for proxy-mode calls (undici)
     openapi.ts      OpenAPI 3 → import plan → services
     history.ts      bounded in-memory request log (event emitter)
@@ -61,6 +62,8 @@ src/
     pages.tsx       list/detail pages
     forms.tsx       service, scenario, profile and settings forms (fields take a `help` section)
     help.tsx        help pages and the "?" HelpLink
+    live.tsx        the page's single live connection, and which scripts it loads
+    spark.tsx       per-service request-rate sparklines (server render + updater script)
     flow.tsx        request-flow diagrams (overview and per service): layout, SVG, animation script
     home.tsx        home page: overview cards, diagram, recent activity
     form-data.ts    form values <-> domain objects, Zod issues -> field errors
@@ -93,6 +96,10 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 The dashboard root is an overview: cards (services by mode, requests and errors, schema failures, live state), a flow diagram, and recent activity. The diagram is server-rendered SVG with a deterministic layout (`layoutDiagram` in `ui/home.tsx`): your app → Mimic → up to ten services (the rest share a "+N more" node) → one node per upstream host, plus a "No match" node. Each link is a `<path>` with a known id, so the page's small script can animate along it with `getPointAtLength`.
 
 Motion is driven by real traffic only: `GET /_mimic/api/events` is a server-sent-events stream of request summaries (History emits `entry`; the handler subscribes and unsubscribes on disconnect, with a keep-alive comment every 15 s). A service's page has a focused version (`ServiceFlow`): app → Mimic → that service → each scenario, the real API, the hook and "Mimic error", with answers that can't be used in the current mode drawn faint; it ignores events for other services and is re-rendered (htmx, on `live-changed`) when the live mode changes. Both diagrams live in `ui/flow.tsx` and share one script. For each event a dot travels the request's actual route and returns coloured by status; with `prefers-reduced-motion` the nodes flash instead. Without JavaScript the diagram and counts still render; the recent-activity table polls as elsewhere.
+
+### Request rates
+
+`core/rates.ts` counts requests per service (and unmatched) in 30-second buckets over the last 10 minutes, fed by History's `entry` event but independent of History's size limit and of it being cleared (it seeds from History at startup, so restored history shows up). Sparklines (`ui/spark.tsx`) are drawn on the server with the same geometry the script uses, carry their series in `data-*` attributes, and are updated in the browser: each `mimic:request` adds to the newest bar, and a 5-second timer slides the window as buckets pass. Pages open a single EventSource (`ui/live.tsx`), which re-dispatches each request as a `mimic:request` DOM event for the diagram and sparklines to share.
 
 ### In-app help
 

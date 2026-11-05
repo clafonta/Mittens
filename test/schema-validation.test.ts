@@ -106,7 +106,7 @@ describe("response validation", () => {
     const page = await (await request("/_mimic/services/users")).text();
     expect(page.match(/schema ✓/g)).toHaveLength(2); // good, missing
     expect(page.match(/schema ✗/g)).toHaveLength(1); // drifted
-    expect(page).toContain("<h2>Response schema</h2>");
+    expect(page).toContain("<h2>Response schema");
 
     await request("/users/2");
     const id = history.list()[0]!.id;

@@ -2,6 +2,7 @@ import type { Child } from "hono/jsx";
 import { HttpMethod, ServiceMode, type Service } from "../core/schema.js";
 import { BASE } from "../http/paths.js";
 import type { FormErrors, FormValues } from "./form-data.js";
+import { HelpLink } from "./help.js";
 
 interface FieldProps {
   name: string;
@@ -9,6 +10,8 @@ interface FieldProps {
   values: FormValues;
   errors: FormErrors;
   hint?: Child;
+  /** Help section for a "?" next to the label, e.g. "services#modes". */
+  help?: string;
 }
 
 const fieldId = (name: string) => `f-${name.replace(/[^a-zA-Z0-9-]/g, "-")}`;
@@ -17,7 +20,10 @@ function Field(props: FieldProps & { children: Child }) {
   const error = props.errors[props.name];
   return (
     <div class={`field${error ? " invalid" : ""}`}>
-      <label for={fieldId(props.name)}>{props.label}</label>
+      <label for={fieldId(props.name)}>
+        {props.label}
+        {props.help && <HelpLink to={props.help} label={`Help: ${props.label}`} />}
+      </label>
       {props.children}
       {error ? <div class="error">{error}</div> : props.hint && <div class="hint">{props.hint}</div>}
     </div>
@@ -65,6 +71,7 @@ export function Checkbox(props: FieldProps) {
     <div class={`field${error ? " invalid" : ""}`}>
       <label class="check">
         <input type="checkbox" name={props.name} checked={!!props.values[props.name]} /> {props.label}
+        {props.help && <HelpLink to={props.help} label={`Help: ${props.label}`} />}
       </label>
       {error ? <div class="error">{error}</div> : props.hint && <div class="hint">{props.hint}</div>}
     </div>
@@ -128,13 +135,14 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
       </div>
       <TextArea name="description" label="Description" values={values} errors={errors} rows={2} />
       <div class="row">
-        <Select name="method" label="Method" values={values} errors={errors} options={HttpMethod.options.map((m) => ({ value: m, label: m }))} />
+        <Select name="method" label="Method" help="services#methods" values={values} errors={errors} options={HttpMethod.options.map((m) => ({ value: m, label: m }))} />
         <Text
           name="path"
           label="Path"
           values={values}
           errors={errors}
           required
+          help="services#paths"
           placeholder="/api/users/{id}"
           hint={
             <>
@@ -147,23 +155,27 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
         <Select
           name="mode"
           label="Starting mode"
+          help="services#modes"
           values={values}
           errors={errors}
           options={modeOptions}
           hint="Saved to YAML. Switching modes on the dashboard only changes the live state."
         />
-        <Text name="delayMs" label="Delay (ms)" values={values} errors={errors} type="number" />
+        <Text name="delayMs" label="Delay (ms)" help="services#delays" values={values} errors={errors} type="number" />
       </div>
       <Text
         name="upstream"
         label="Upstream URL"
+        help="proxying#upstreams"
         values={values}
         errors={errors}
         placeholder="https://api.example.com"
         hint="Required for proxy mode. The request path (after the rewrites below) and query are appended; the URL may include a base path."
       />
       <fieldset>
-        <legend>Path rewrites (proxy mode)</legend>
+        <legend>
+          Path rewrites (proxy mode) <HelpLink to="proxying#path-rewrites" label="Help: path rewrites" />
+        </legend>
         <Text name="stripPrefix" label="Strip prefix" values={values} errors={errors} placeholder="/mock-api" hint="Removed from the start of the path before it is sent upstream." />
         <TextArea
           name="rewrite"
@@ -183,10 +195,11 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
       </fieldset>
       {editing && (
         <div class="row">
-          <Select name="defaultScenario" label="Starting default scenario" values={values} errors={errors} options={scenarioOptions} />
+          <Select name="defaultScenario" label="Starting default scenario" help="services#default-and-error-scenarios" values={values} errors={errors} options={scenarioOptions} />
           <Select
             name="errorScenario"
             label="Error scenario"
+            help="scenarios#error-scenarios"
             values={values}
             errors={errors}
             options={scenarioOptions}
@@ -197,6 +210,7 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
       <TextArea
         name="responseSchema"
         label="Response schema (JSON)"
+        help="schemas"
         values={values}
         errors={errors}
         rows={6}
@@ -210,7 +224,7 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
           </>
         }
       />
-      <Text name="tags" label="Tags" values={values} errors={errors} hint="Comma-separated." />
+      <Text name="tags" label="Tags" help="services#tags" values={values} errors={errors} hint="Comma-separated." />
       <Actions submit={editing ? "Save service" : "Create service"} cancel={editing ? `${BASE}/services/${service.id}` : BASE} />
     </form>
   );
@@ -238,20 +252,19 @@ export function ScenarioForm(props: { service: Service; scenarioId?: string; val
       <Checkbox
         name="template"
         label="Template: fill in {{ … }} from the request"
+        help="templates"
         values={values}
         errors={errors}
         hint={
           <>
-            Applies to the body and header values. Values: <code>{"{{params.id}}"}</code> <code>{"{{query.page}}"}</code>{" "}
-            <code>{"{{headers.x-tenant}}"}</code> <code>{"{{body.user.name}}"}</code> <code>{"{{method}}"}</code>{" "}
-            <code>{"{{path}}"}</code>. Helpers: <code>uuid</code> <code>now</code> <code>timestamp</code>{" "}
-            <code>randomInt 1 100</code>. Filters: <code>| default "x"</code> <code>| upper</code> <code>| lower</code>{" "}
-            <code>| json</code> (quotes and escapes, for use inside JSON, e.g. <code>{'"name": {{body.name | json}}'}</code>).
+            Fills in the body and header values, e.g. <code>{"{{params.id}}"}</code> or <code>{'"name": {{body.name | json}}'}</code>.
           </>
         }
       />
       <fieldset>
-        <legend>Match rule (dynamic mode)</legend>
+        <legend>
+          Match rule (dynamic mode) <HelpLink to="scenarios#match-rules" label="Help: match rules" />
+        </legend>
         <p class="hint">
           Every criterion you fill in must match. When several scenarios match, the one with the most criteria wins. Leave all
           blank to only use this scenario as a default.
@@ -278,6 +291,7 @@ export function ScenarioForm(props: { service: Service; scenarioId?: string; val
         <TextArea
           name="match.json"
           label="JSON body (JSONPath)"
+          help="scenarios#jsonpath"
           values={values}
           errors={errors}
           rows={3}
@@ -285,19 +299,17 @@ export function ScenarioForm(props: { service: Service; scenarioId?: string; val
           placeholder={'$.user.role = admin\n$.items[*].sku ~ ^X-\n$.coupon exists'}
           hint={
             <>
-              One per line: <code>$.path = value</code> (JSON scalars like <code>7</code> or <code>true</code> keep their type),{" "}
-              <code>$.path ~ regex</code>, <code>$.path exists</code>, or <code>$.path missing</code>. Passes if any selected node
-              matches.
+              One per line: <code>$.path = value</code>, <code>$.path ~ regex</code>, <code>$.path exists</code> or <code>$.path missing</code>.
             </>
           }
         />
         <div class="row">
-          <Text name="match.bodyMatches" label="Body matches (regex)" values={values} errors={errors} placeholder={'"type"\\s*:\\s*"refund"'} />
+          <Text name="match.bodyMatches" label="Body matches (regex)" help="scenarios#regular-expressions" values={values} errors={errors} placeholder={'"type"\\s*:\\s*"refund"'} />
           <Text name="match.bodyMatchesFlags" label="Flags" values={values} errors={errors} placeholder="i" />
         </div>
         {errors.match && <div class="error">{errors.match}</div>}
       </fieldset>
-      <Text name="tags" label="Tags" values={values} errors={errors} hint="Comma-separated." />
+      <Text name="tags" label="Tags" help="services#tags" values={values} errors={errors} hint="Comma-separated." />
       <Actions submit={editing ? "Save scenario" : "Create scenario"} cancel={`${BASE}/services/${service.id}`} />
     </form>
   );
@@ -321,7 +333,9 @@ export function ProfileForm(props: { services: Service[]; profileId?: string; va
         <Text name="id" label="ID" values={values} errors={errors} required readonly={editing} hint={editing ? undefined : slugHint} />
       </div>
       <TextArea name="description" label="Description" values={values} errors={errors} rows={2} />
-      <h2>Services</h2>
+      <h2>
+        Services <HelpLink to="live-state#profiles" label="Help: profiles" />
+      </h2>
       <p class="hint">Tick the services this profile controls. “Leave as is” keeps whatever the service has when the profile is applied.</p>
       {errors.services && <div class="error">{errors.services}</div>}
       <table>
@@ -396,6 +410,7 @@ export function SettingsForm(props: { services: Service[]; values: FormValues; e
       <Field
         name="errorScenario"
         label="Global error scenario"
+        help="scenarios#the-global-error-scenario"
         values={values}
         errors={errors}
         hint="Returned whenever Mimic would otherwise answer with its own error: no service matches the request, no scenario matches and the service has no fallback, or a proxy call fails and the service has no error scenario."

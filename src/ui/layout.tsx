@@ -46,6 +46,23 @@ label.check { display:flex; align-items:center; gap:.4rem; font-weight:500; } la
 .preview { display:flex; gap:.5rem; align-items:flex-start; flex-wrap:wrap; margin:.25rem 0; } .preview textarea { flex:1; min-width:16rem; }
 .panel { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; padding:.5rem .75rem; border:1px solid var(--line); border-radius:6px; margin:1rem 0; } .panel > span { margin-right:auto; }
 .panel.error-banner { border-color:var(--bad); color:var(--bad); }
+header .nav-help { margin-left:auto; }
+a.help-link { display:inline-flex; align-items:center; justify-content:center; width:1.15rem; height:1.15rem; border-radius:50%; border:1px solid var(--line); color:var(--muted); font-size:.72rem; font-weight:600; text-decoration:none; vertical-align:middle; margin-left:.3rem; line-height:1; }
+a.help-link:hover { color:var(--accent); border-color:var(--accent); }
+.help { display:grid; grid-template-columns: 15rem minmax(0, 1fr); gap:2.5rem; align-items:start; }
+@media (max-width: 900px) { .help { grid-template-columns: 1fr; } .help-nav { position:static; } }
+.help-nav { position:sticky; top:1rem; font-size:.9rem; } .help-nav ol { padding-left:1.4rem; margin:.5rem 0; } .help-nav li { margin:.2rem 0; }
+.help-nav ul { list-style:none; padding-left:.6rem; margin:.25rem 0 .5rem; border-left:2px solid var(--line); } .help-nav ul a { color:var(--muted); font-size:.85rem; }
+.help-nav a { color:var(--fg); text-decoration:none; } .help-nav a:hover { color:var(--accent); } .help-nav a.current { color:var(--accent); font-weight:600; }
+.prose { max-width:46rem; line-height:1.6; } .prose h1 { font-size:1.6rem; margin-bottom:1rem; } .prose h2 { font-size:1.2rem; margin:2.2rem 0 .6rem; padding-top:.4rem; } .prose h3 { font-size:1rem; margin:1.6rem 0 .4rem; }
+.prose h2 .anchor, .prose h3 .anchor { margin-left:.4rem; color:var(--muted); text-decoration:none; opacity:0; } .prose h2:hover .anchor, .prose h3:hover .anchor { opacity:1; }
+.prose :target { scroll-margin-top:1rem; } .prose h2:target, .prose h3:target { color:var(--accent); }
+.prose p, .prose ul, .prose ol { margin:.6rem 0; } .prose li { margin:.25rem 0; }
+.prose code { background:color-mix(in srgb, var(--line) 45%, transparent); padding:.05rem .3rem; border-radius:4px; } .prose pre code { background:none; padding:0; }
+.prose pre { position:relative; max-height:none; white-space:pre; word-break:normal; } .prose pre .copy { position:absolute; top:.4rem; right:.4rem; font-size:.75rem; padding:.1rem .45rem; opacity:0; background:var(--bg); } .prose pre:hover .copy, .prose pre .copy:focus { opacity:1; }
+.prose table { margin:.8rem 0; font-size:.92rem; } .prose th { text-transform:none; letter-spacing:0; font-size:.85rem; }
+.pager { display:flex; justify-content:space-between; gap:1rem; margin-top:3rem; padding-top:1rem; border-top:1px solid var(--line); }
+.pager a { display:flex; flex-direction:column; text-decoration:none; } .pager a.next { text-align:right; margin-left:auto; } .pager .muted { font-size:.8rem; }
 .actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; }
 a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-color:var(--muted); } a.pill.tag.current { background:var(--accent); border-color:var(--accent); color:#fff; }
 .tagbar { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin:0 0 1rem; }
@@ -69,7 +86,9 @@ export function Layout(props: { title: string; readOnly: boolean; flash?: string
           <a href={`${BASE}/profiles`}>Profiles</a>
           <a href={`${BASE}/history`}>History</a>
           <a href={`${BASE}/settings`}>Settings</a>
-          <a href={`${BASE}/api/services`}>API</a>
+          <a class="nav-help" href={`${BASE}/help`}>
+            Help
+          </a>
         </header>
         <main>
           {props.readOnly && <div class="banner">Read-only mode: changes are kept in memory and not saved to disk.</div>}

@@ -30,6 +30,7 @@
   },
   "files": [
     "dist",
+    "docs/help",
     "README.md",
     "LICENSE"
   ],
@@ -56,6 +57,7 @@
     "hono": "^4.13.16",
     "htmx.org": "^2.0.11",
     "jsonpath-plus": "^11.3.0",
+    "marked": "^18.1.3",
     "undici": "^8.12.4",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"

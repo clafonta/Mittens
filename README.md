@@ -27,304 +27,24 @@ curl localhost:4000/anything/hi     # proxied to httpbin.org
 
 Requires Node.js 22.19+. Installed globally (`npm i -g @clafonta/mimic`), the command is just `mimic`.
 
-## Concepts
+## Documentation
 
-- **Service** — a route (`path` + `method`) and how to answer it.
-- **Scenario** — a canned response: status, headers, body, optional delay and `match` rule.
-- **Profile** — a named preset ("happy path", "outage") that sets the mode and/or default scenario of several services in one step. Apply one from the dashboard, the API, or at startup with `--profile`.
-- **Live state** — what each service is doing right now. The YAML holds each service's *starting* mode and default scenario; switching modes in the dashboard, applying a profile, or `--profile` changes only the live state, which is kept in memory and resets when Mimic restarts. Your definition files never change behind your back. Use **Save as starting state** (or `POST /_mimic/api/state/save`) to write it back on purpose, or **Reset** to return to the files.
-- **Mode** (per service):
-  - `static` — always return `defaultScenario`.
-  - `dynamic` — return the scenario whose `match` rule best fits the request; otherwise fall back to `defaultScenario`, then `errorScenario`.
-  - `proxy` — forward to `upstream` and record the exchange; on failure, return `errorScenario` (or a 502).
-- **Tags** — labels on services and scenarios. Click a tag in the dashboard to filter the list, or limit which services answer requests with `--tag checkout` (or **Only serve “checkout”** in the dashboard). Services outside the filter respond as if they didn't exist. A service counts as tagged if it or any of its scenarios carries the tag. The serving filter is live state, like modes.
-- **Global error scenario** — one scenario, chosen on the **Settings** page (stored in `mimic.yaml`), returned whenever Mimic would otherwise answer with its own error: no service matches, a dynamic service has no match and no fallback, a proxy fails without an `errorScenario`. Service-level fallbacks always win.
+Mimic's help is built in: open **Help** in the dashboard ([/_mimic/help](http://localhost:4000/_mimic/help)), or follow the **?** next to any setting. The same pages are in [`docs/help`](docs/help/README.md):
 
-Services, scenarios and profiles can all be created and edited in the dashboard, or by editing the YAML directly. Everything under `/_mimic` is Mimic's own dashboard and API; every other path is mock traffic. Responses carry `x-mimic-service`, `x-mimic-scenario` and `x-mimic-source` headers so you can tell what answered (and `x-mimic-validation` when a response schema applies).
-
-The dashboard has pages for **Services** (switch modes and default scenarios, filter by tag, apply a profile), each service (scenarios, upstream, hook, recent requests), **Profiles**, **History**, **Settings** and **Import OpenAPI**.
-
-## Definitions on disk
-
-Definitions are plain YAML, one file per service and per scenario, so they diff and review cleanly in git:
-
-```
-mimic/
-  services/
-    users/
-      service.yaml
-      scenarios/
-        found.yaml
-        not-found.yaml
-  profiles/
-    outage.yaml
-  mimic.yaml              # optional project settings
-```
-
-```yaml
-# services/users/service.yaml
-name: Users API
-path: /api/users/{id}     # {param} captures a segment (also inside one: /files/{name}.{ext}); a trailing /* matches any suffix
-method: GET               # GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, or ANY (the default)
-mode: dynamic             # starting mode: static | dynamic | proxy
-defaultScenario: found    # starting default scenario
-errorScenario: server-error
-upstream: https://api.example.com   # required for proxy mode; may include a base path
-stripPrefix: /mock        # proxy mode: removed from the path before calling upstream
-rewrite:                  # proxy mode: regex replaces on the path, in order, after stripPrefix
-  - from: ^/users/(\d+)$
-    to: /people/$1
-delayMs: 0
-```
-
-```yaml
-# services/users/scenarios/not-found.yaml
-name: User not found
-status: 404
-headers:
-  content-type: application/json
-body: |
-  { "error": "user_not_found" }
-match:                    # dynamic mode: every listed criterion must match; most criteria wins
-  method: GET
-  params: { id: "404" }
-  query: { verbose: "true" }
-  headers: { x-tenant: acme }
-  bodyContains: needle    # case-insensitive substring
-delayMs: 250              # overrides the service delay
-```
-
-Match values can also be regular expressions, and JSON request bodies can be matched with JSONPath:
-
-```yaml
-match:
-  params:
-    id: { regex: "^9\\d+$" }            # any params/query/headers value can be { regex, flags? }
-  headers:
-    user-agent: { regex: "iphone", flags: i }
-  bodyMatches: { regex: '"type"\s*:\s*"refund"' }
-  json:                                 # passes if any node the path selects matches
-    $.user.role: admin                  # equals (7, true, null keep their JSON type)
-    $.items[*].sku: { regex: "^X-" }
-    $.items[?(@.gift === true)]: { exists: true }
-    $.legacyField: { exists: false }
-```
-
-When two scenarios match the same number of criteria, the one with more exact (non-regex) criteria wins, so `id: "404"` beats `id: { regex: ".*" }`. In the dashboard form, write `name ~ regex` (or `~i` to ignore case) next to the usual `name: value` lines, and JSONPath conditions as `$.path = value`, `$.path ~ regex`, `$.path exists` or `$.path missing`. Regexes aren't anchored unless you add `^`/`$`. Body criteria need a request with a body: GET and HEAD requests never carry one.
-
-```yaml
-# profiles/outage.yaml
-name: Outage
-description: Every users lookup fails with a 500.
-services:                 # services not listed are left alone
-  users:
-    mode: static          # optional
-    scenario: server-error   # optional; becomes the default scenario
-```
-
-```yaml
-# mimic.yaml
-errorScenario:            # global error scenario
-  service: users
-  scenario: server-error
-```
-
-Directory and file names are the IDs (lowercase, digits, dashes). `new` and `apply` are reserved.
-
-Mimic watches the definitions directory: edit a file in your editor and it reloads within a moment, keeping any live state that still applies. If a file is invalid, Mimic keeps serving the last good version and shows the error in the dashboard and the terminal until you fix it. Turn this off with `--no-watch`.
-
-## Response templates
-
-Set `template: true` on a scenario to fill in parts of the body and header values from the request:
-
-```yaml
-# services/users/scenarios/created.yaml
-name: Created
-status: 201
-template: true
-headers:
-  content-type: application/json
-  location: /api/users/{{params.id}}
-body: |
-  {
-    "id": {{params.id | json}},
-    "name": {{body.name | default "Anonymous" | json}},
-    "page": {{query.page | default 1}},
-    "requestId": "{{uuid}}",
-    "createdAt": "{{now}}"
-  }
-```
-
-| | |
-|---|---|
-| Values | `params.<name>`, `query.<name>`, `headers.<name>`, `body` (raw text), `body.user.name` / `body.items[0]` (JSON), `method`, `path`, `url` |
-| Helpers | `uuid`, `now` (ISO time), `timestamp` (epoch ms), `randomInt <min> <max>` |
-| Filters | `default <value>`, `upper`, `lower`, `json` (quotes and escapes, so the value is safe inside JSON; missing values become `null`) |
-
-Missing values render as nothing, so use `default`. `\{{` writes a literal `{{`. Templates are checked when saved, so a typo is reported in the form (or as a reload error) rather than at request time. Scenarios without `template: true` are sent exactly as written. Try a template from the service page with **Preview with a request**, or `POST /_mimic/api/services/:id/scenarios/:sid/render`.
-
-## Hooks: JavaScript for the tricky cases
-
-When scenarios, match rules and templates aren't enough, put a `hook.js` (or `.mjs`, `.ts`, `.mts`) next to a service's `service.yaml`:
-
-```ts
-// services/users/hook.ts
-import type { RequestHook, ResponseHook } from "@clafonta/mimic"; // optional: types only
-
-/** Runs before a scenario is chosen. Return nothing to carry on as usual. */
-export const request: RequestHook = (req, ctx) => {
-  if (!req.headers.authorization) return { status: 401, body: { error: "unauthorized" } };
-  if (req.query.fail) return ctx.scenario("server-error");
-
-  // ctx.state lasts across requests (until restart): handy for stateful mocks.
-  if (req.method === "POST") {
-    const users = (ctx.state.users ??= []) as object[];
-    users.push({ id: String(users.length + 1), ...(req.json as object) });
-    return { status: 201, body: users.at(-1) };
-  }
-};
-
-/** Runs on every response this service sends, mocked or proxied. */
-export const response: ResponseHook = (req, res) => {
-  res.headers["x-request-path"] = req.path; // change in place, or return { status, headers, body }
-};
-```
-
-- `req` has `method`, `path`, `url`, `params`, `query`, `headers` (lowercase names), `body` (text) and `json` (parsed body, if JSON).
-- `request` returns nothing (normal behaviour), `ctx.scenario(id)` (templates still render), or `{ status, headers, body, delayMs }`; an object body is sent as JSON.
-- `response` sees `{ status, headers, body }` as text and can change it, for proxied responses too. Schema validation sees the result.
-- `ctx` also has `service` (live state) and `log(...)`.
-
-Hooks reload when you save them. If one fails to load, the previous version keeps running and the error shows on the service page; if one throws or takes longer than 10 s, that request gets a 500 explaining why. TypeScript hooks run through Node's built-in type stripping, so stick to erasable syntax (no `enum`s). Clear `ctx.state` from the service page or with `DELETE /_mimic/api/hooks/state`.
-
-Hooks are code from the definitions directory and run with Mimic's permissions, like a test suite would; the startup output lists every hook it loaded. Use `--no-hooks` to run definitions without them.
-
-## Importing an OpenAPI spec
-
-```sh
-npx @clafonta/mimic import openapi.yaml            # or a URL; JSON works too
-npx @clafonta/mimic import openapi.yaml --dry-run  # show what would be created
-```
-
-Or use **Import OpenAPI** on the dashboard (upload or paste, preview, import). Each operation becomes a service (id from `operationId`, e.g. `listPets` → `list-pets`), with:
-
-- a scenario per response, or per named example; bodies come from the spec's examples, or are generated from the schema when there are none
-- the response schemas as `responseSchema`, so every response is validated from the start
-- the first 2xx response as the default scenario
-- `servers[0]` as the upstream (switch a service to proxy mode to hit the real API) and its path as the route prefix (e.g. `/v1`)
-
-Existing services are never overwritten: operations whose id or route already exists are skipped and listed. Options: `--mode static|dynamic|proxy`, `--prefix /api` (instead of the server path), `--tag <tag>` (added to every service). OpenAPI 3.0 and 3.1 are supported; Swagger 2.0 needs converting first. `$ref`s are inlined, recursive schemas are checked to their first level, and OpenAPI 3.0's `nullable` and boolean `exclusiveMinimum` are converted to JSON Schema.
-
-## Recording real responses
-
-Put a service in `proxy` mode, exercise your app, then open a request in **History** and click **Save as scenario**. The form comes prefilled with the status, the response headers worth keeping, the body, and a match rule built from the request's path params and query, so you can review it before saving. Scripts can do the same with `POST /_mimic/api/history/:id/scenario`.
-
-Recorded bodies are kept up to 256 KB; larger responses are marked as truncated and can't be saved as scenarios.
-
-## Behind a corporate proxy
-
-Proxy-mode calls honour the usual `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` variables (lowercase forms too), so if your shell is set up for the company proxy, Mimic is as well. Credentials in the URL (`http://user:pass@proxy.corp:8080`) are sent to the proxy and masked in the startup output. Use `--upstream-proxy <url>` to pick a proxy explicitly (NO_PROXY still applies) or `--no-upstream-proxy` to ignore the variables. Requests *to* Mimic are unaffected; this only concerns the calls Mimic makes upstream.
-
-If the proxy re-signs TLS with a company certificate, point Node at it: `NODE_EXTRA_CA_CERTS=/path/to/corp-ca.pem npx @clafonta/mimic`. When an upstream call fails, the History entry says why (e.g. `Proxy Authentication Required (407)`, `ECONNREFUSED`).
-
-To see where a request would go after `stripPrefix` and `rewrite`, use **Try a path** on the service page, or `GET /_mimic/api/services/:id/upstream?path=/mock/users/7`.
-
-## Checking responses against a schema
-
-Give a service a `responseSchema` and every response it sends — mocked, proxied, or a fallback — is checked against it. Keys are a status (`"404"`), a class (`2xx`) or `default`; the most specific wins, and statuses without a schema aren't checked.
-
-```yaml
-# services/users/service.yaml
-responseSchema:
-  2xx:
-    type: object
-    required: [id, email]
-    properties:
-      email: { type: string, format: email }
-  default:
-    type: object
-    required: [error]
-```
-
-Results show up as **schema ✓ / ✗** in History (filter with **schema failures**, or `GET /_mimic/api/history?validation=fail`), with the reasons on the request page, and in an `x-mimic-validation: pass|fail` response header for tests. The service page also checks each scenario, so mocks that have drifted from the real API stand out. Proxying the real API with a schema in place is a quick way to find out whether the contract still holds. Validation reports; it never changes the response.
-
-Schemas are standard JSON Schema: 2020-12 by default, draft-07 when `$schema` says so. Unknown keywords (e.g. OpenAPI's `example`) are ignored, and formats like `email` and `date-time` are checked.
-
-## Exporting history
-
-**Export HAR** / **Export JSON** on the History page (or a service page, for just that service) downloads what's in history. HAR 1.2 opens in browser devtools, Charles, Fiddler and similar tools; Mimic's details (which service and scenario answered, validation results) are kept in `_mimic` fields. Scripts: `GET /_mimic/api/history/export?format=har|json&service=id&validation=fail`.
-
-History holds the latest 500 requests (`--history-limit`) and keeps bodies up to 256 KB. By default it lives in memory and is gone on restart. With `--persist-history` it is also written to `<dir>/.mimic/history.jsonl` and reloaded on start, so you can stop Mimic, come back, and still replay or save what you recorded. That directory gets its own `.gitignore`, because history can contain credentials from proxied traffic; `--history-file <path>` stores it elsewhere. Clearing history in the dashboard empties the file too.
-
-## Replaying requests
-
-Open any request in **History** and click **Replay** to send it again — same method, path, query, headers and body — through whatever the services are doing *now*. Handy after switching a mode or editing a scenario: the new entry says whether the response matches the original and, if not, what changed (status, body, which scenario answered). Scripts can use `POST /_mimic/api/history/:id/replay`.
-
-## CLI
-
-```
-mimic [start] [options]     start the server
-mimic init [--dir <path>]   write example definitions
-mimic import <spec>         create services from an OpenAPI 3 file or URL
-    --dry-run               show what would be created; write nothing
-    --mode <mode>           starting mode: static (default), dynamic or proxy
-    --prefix <path>         route prefix (default: the path of servers[0])
-    --tag <tag>             add a tag to every imported service (repeatable)
-
-Options for start:
-  -p, --port <n>              port (default 4000; env MIMIC_PORT)
-      --host <addr>           interface to bind (default 127.0.0.1; env MIMIC_HOST)
-  -d, --dir <path>            definitions directory (default ./mimic; env MIMIC_DIR)
-      --read-only             load definitions but never write to disk
-      --profile <id>          apply a profile on start, live only (env MIMIC_PROFILE)
-  -t, --tag <tags>            only serve services with one of these tags; comma-separated
-                              or repeated, live only (env MIMIC_TAGS)
-      --no-watch              don't reload when definition files change
-      --no-hooks              don't run services/<id>/hook.* files
-      --persist-history       keep history across restarts (env MIMIC_PERSIST_HISTORY=1)
-      --history-file <path>   persist history to this file (env MIMIC_HISTORY_FILE)
-      --history-limit <n>     requests kept in history (default 500)
-      --upstream-proxy <url>  send proxy-mode calls through this proxy
-      --no-upstream-proxy     ignore HTTP(S)_PROXY / HTTPS_PROXY for proxy-mode calls
-      --open                  open the dashboard in a browser
-  -h, --help                  show help
-  -v, --version               show the version
-```
-
-## HTTP API
-
-All under `/_mimic/api`, JSON in and out:
-
-| Method | Path | |
-|---|---|---|
-| GET | `/services` | list services (`?tag=a&tag=b` keeps those with any of the tags) |
-| POST | `/services` | create a service |
-| GET / PATCH / DELETE | `/services/:id` | read (live view) / edit the definition / delete |
-| GET | `/services/:id/upstream?path=` | the upstream URL proxy mode would call for a path, after rewrites |
-| PUT / DELETE | `/services/:id/scenarios/:sid` | upsert / delete a scenario |
-| POST | `/services/:id/scenarios/:sid/render` | render a scenario for a sample request; body `{ method?, path?, headers?, body? }` |
-| GET | `/tags` | every tag in use, and the active serving filter |
-| POST | `/import/openapi` | import an OpenAPI spec (request body: JSON or YAML); `?dryRun=1`, `mode`, `prefix`, `tags` |
-| GET | `/hooks` | loaded hooks and load errors |
-| DELETE | `/hooks/state` | clear `ctx.state` (`?service=id` for one service) |
-| GET | `/state` | live mode and default per service, with `modified` and `starting` values |
-| PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) |
-| DELETE | `/state/services/:id`, `/state` | reset one / all services to their starting state |
-| PUT | `/state/tags` | set the serving filter; body `{ "tags": ["checkout"] }`, `[]` serves all |
-| POST | `/state/save` | write the live state back to the YAML |
-| GET | `/profiles` | list, each with `active` and `problems` |
-| POST | `/profiles` | create (`?from=current` fills `services` from the current state) |
-| GET / PUT / DELETE | `/profiles/:id` | read / replace / delete |
-| POST | `/profiles/:id/apply` | apply to live state, all-or-nothing; returns the changed service IDs |
-| GET / DELETE | `/history` | list (`?service=id`, `?validation=pass\|fail`) / clear |
-| GET | `/history/export` | download as `?format=har` (default) or `json`; same filters |
-| GET | `/history/:id` | one request/response |
-| POST | `/history/:id/scenario` | save the recorded response as a scenario; body `{ id?, name?, service?, makeDefault? }` |
-| POST | `/history/:id/replay` | send the recorded request again; returns the new entry (with `replayOf`) |
-| GET / PUT | `/settings` | read / replace `mimic.yaml` settings, e.g. `{ "errorScenario": { "service": "users", "scenario": "server-error" } }` |
-| GET | `/health` | liveness |
-
-Handy in test setup, e.g. `POST /_mimic/api/profiles/outage/apply`, or `PATCH /_mimic/api/state/services/users {"mode":"static","defaultScenario":"server-error"}`, then `DELETE /_mimic/api/state` in teardown. None of these touch your files.
+- [Getting started](docs/help/getting-started.md): run Mimic, point your app at it, make your first service
+- [Services and modes](docs/help/services.md): routes, methods, static / dynamic / proxy, delays, tags
+- [Scenarios and matching](docs/help/scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks
+- [Live state and profiles](docs/help/live-state.md): what changes the files and what doesn't; switching many services at once
+- [Recording, history and replay](docs/help/recording.md): capture real traffic, save it as scenarios, replay, export HAR
+- [Proxying to real services](docs/help/proxying.md): upstreams, path rewrites, corporate proxies
+- [Response templates](docs/help/templates.md): fill responses in from the request
+- [Hooks](docs/help/hooks.md): JavaScript or TypeScript for stateful and unusual cases
+- [Response schemas](docs/help/schemas.md): check every response against a JSON Schema
+- [Importing OpenAPI](docs/help/openapi.md): build services from a spec
+- [Files on disk](docs/help/files.md): the definitions folder, YAML reference, reloading, git tips
+- [Command line](docs/help/cli.md): commands, options and environment variables
+- [HTTP API](docs/help/api.md): control Mimic from scripts and tests
+- [Troubleshooting](docs/help/troubleshooting.md): "why did I get this response?" and other puzzles
 
 ## Development
 
@@ -338,6 +58,8 @@ npm run smoke      # after build: packs, installs the tarball in a scratch proje
 ```
 
 `npm publish` runs typecheck, tests, build and the smoke test first (`prepublishOnly`); see [docs/RELEASING.md](docs/RELEASING.md). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and roadmap.
+
+User documentation lives in `docs/help/*.md` and is what the dashboard's Help shows, so edit it there. Topic order comes from the links in `docs/help/README.md`; link between topics with plain `other.md#section` links, and write examples against `http://localhost:4000` (the dashboard substitutes the real address). `npm test` checks every link, including the **?** links in the UI.
 
 ## License
 

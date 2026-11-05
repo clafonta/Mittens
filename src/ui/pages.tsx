@@ -3,6 +3,7 @@ import { validateResponse, type ValidationResult } from "../core/validate.js";
 import type { Profile, ScenarioRef, Service } from "../core/schema.js";
 import { BASE } from "../http/paths.js";
 import { DeleteButton } from "./forms.js";
+import { HelpLink } from "./help.js";
 import { StatusCode } from "./layout.js";
 
 /** Summary of each profile for display: whether it's in effect and whether it can apply. */
@@ -92,7 +93,9 @@ function ProfileSwitcher({ profiles }: { profiles: ProfileInfo[] }) {
   const active = profiles.filter((p) => p.active);
   return (
     <form method="post" action={`${BASE}/profiles/apply`} class="switcher">
-      <label for="profile-switch">Profile</label>
+      <label for="profile-switch">
+        Profile <HelpLink to="live-state#profiles" label="Help: profiles" />
+      </label>
       <select id="profile-switch" name="id">
         {active.length === 0 && <option value="">— custom —</option>}
         {profiles.map(({ profile, active, problems }) => (
@@ -125,7 +128,7 @@ export function LiveStateBanner({ modified, returnTo }: { modified: string[]; re
   return (
     <div id="live-banner" class="banner live" role="status" {...refresh}>
       <span>
-        {n} service{n === 1 ? "" : "s"} differ{n === 1 ? "s" : ""} from {n === 1 ? "its" : "their"} starting state. Live changes
+        {n} service{n === 1 ? "" : "s"} differ{n === 1 ? "s" : ""} from {n === 1 ? "its" : "their"} starting state. <HelpLink to="live-state#what-changes-your-files-and-what-doesnt" label="Help: live state" /> Live changes
         reset when Mimic restarts.
       </span>
       <form method="post" action={`${BASE}/state/save`} class="inline">
@@ -146,7 +149,7 @@ export function TagFilterBanner({ activeTags, inactive, returnTo }: { activeTags
   return (
     <div class="banner live" role="status">
       <span>
-        Only serving services tagged <strong>{activeTags.join(", ")}</strong>
+        Only serving services tagged <strong>{activeTags.join(", ")}</strong> <HelpLink to="services#tags" label="Help: tag filter" />
         {inactive > 0 && ` · ${inactive} service${inactive === 1 ? " is" : "s are"} not answering requests`}. Live only; resets on
         restart.
       </span>
@@ -165,7 +168,9 @@ function TagBar({ tags, viewTag, activeTags }: { tags: string[]; viewTag?: strin
   const servingThis = viewTag !== undefined && activeTags.length === 1 && activeTags[0] === viewTag;
   return (
     <div class="tagbar">
-      <span class="muted">Tags</span>
+      <span class="muted">
+        Tags <HelpLink to="services#tags" label="Help: tags" />
+      </span>
       <a class={`pill tag${viewTag === undefined ? " current" : ""}`} href={BASE}>
         all
       </a>
@@ -204,7 +209,9 @@ export function ServicesPage(props: {
   return (
     <>
       <div class="title-row">
-        <h1>Services</h1>
+        <h1>
+          Services <HelpLink to="services" label="Help: services and modes" />
+        </h1>
         <ProfileSwitcher profiles={profiles} />
         <a class="button" href={`${BASE}/import`}>
           Import OpenAPI
@@ -223,7 +230,9 @@ export function ServicesPage(props: {
       ) : services.length === 0 ? (
         <div class="empty">
           No services yet. <a href={`${BASE}/services/new`}>Create one</a>, run <code>npx @clafonta/mimic init</code> for
-          an example, or add YAML files under <code>services/</code>.
+          an example, add YAML files under <code>services/</code>, or <a href={`${BASE}/import`}>import an OpenAPI spec</a>.
+          <br />
+          New to Mimic? Start with <a href={`${BASE}/help/getting-started`}>Getting started</a>.
         </div>
       ) : (
         <table>
@@ -231,7 +240,9 @@ export function ServicesPage(props: {
             <tr>
               <th>Name</th>
               <th>Route</th>
-              <th>Mode / default scenario</th>
+              <th>
+                Mode / default scenario <HelpLink to="services#modes" label="Help: modes" />
+              </th>
               <th>Scenarios</th>
             </tr>
           </thead>
@@ -279,7 +290,9 @@ export function ServicePage(props: {
       {service.upstream && <UpstreamInfo service={service} />}
       {hook && <HookPanel serviceId={service.id} hook={hook} />}
       <div class="title-row">
-        <h2>Scenarios</h2>
+        <h2>
+          Scenarios <HelpLink to="scenarios" label="Help: scenarios and matching" />
+        </h2>
         <a class="button" href={`${base}/scenarios/new`}>
           New scenario
         </a>
@@ -329,7 +342,9 @@ export function ServicePage(props: {
       ))}
       {service.responseSchema && (
         <>
-          <h2>Response schema</h2>
+          <h2>
+            Response schema <HelpLink to="schemas" label="Help: response schemas" />
+          </h2>
           <p class="muted">
             Checked against every response this service sends, for{" "}
             {Object.keys(service.responseSchema).map((k, i) => (
@@ -368,7 +383,7 @@ function HookPanel({ serviceId, hook }: { serviceId: string; hook: HookInfo }) {
   return (
     <div class={`panel${hook.error ? " error-banner" : ""}`}>
       <span>
-        <strong>Hook</strong>{" "}
+        <strong>Hook</strong> <HelpLink to="hooks" label="Help: hooks" />{" "}
         {hook.file && (
           <>
             <code>{hook.file}</code> · {hook.exports.join(", ")}
@@ -398,7 +413,7 @@ function UpstreamInfo({ service }: { service: Service }) {
   return (
     <>
       <p>
-        Upstream: <code>{service.upstream}</code>
+        Upstream: <code>{service.upstream}</code> <HelpLink to="proxying" label="Help: proxying" />
         {service.stripPrefix && (
           <>
             {" "}
@@ -547,7 +562,9 @@ export function HistoryPage({ validation, persistedTo, limit }: { validation?: "
   return (
     <>
       <div class="title-row">
-        <h1>History</h1>
+        <h1>
+          History <HelpLink to="recording#history" label="Help: history" />
+        </h1>
         <span class="switcher">
           <a class={`pill tag${validation ? "" : " current"}`} href={`${BASE}/history`}>
             all
@@ -555,6 +572,7 @@ export function HistoryPage({ validation, persistedTo, limit }: { validation?: "
           <a class={`pill tag${validation === "fail" ? " current" : ""}`} href={`${BASE}/history?validation=fail`}>
             schema failures
           </a>
+          <HelpLink to="schemas#where-results-show-up" label="Help: schema checks" />
         </span>
         <ExportLinks validation={validation} />
         <button hx-delete={`${BASE}/api/history`} hx-swap="none" hx-confirm="Clear all history?">
@@ -625,7 +643,7 @@ function ReplayComparison({ entry, original }: { entry: HistoryEntry; original?:
   ].filter(Boolean);
   return (
     <p>
-      Replay of <a href={`${BASE}/history/${original.id}`}>an earlier request</a>.{" "}
+      Replay of <a href={`${BASE}/history/${original.id}`}>an earlier request</a> <HelpLink to="recording#replaying-a-request" label="Help: replay" />.{" "}
       {differences.length === 0 ? (
         <span class="s2">Same response as the original.</span>
       ) : (
@@ -662,6 +680,7 @@ export function HistoryEntryPage({ entry, service, original }: { entry: HistoryE
               Save as scenario
             </a>
           ))}
+        <HelpLink to="recording#recording-real-responses" label="Help: saving responses as scenarios" />
         {entry.request.truncated ? (
           <span class="muted">Request body truncated; can't replay</span>
         ) : (
@@ -706,7 +725,9 @@ export function ProfilesPage({ profiles }: { profiles: ProfileInfo[] }) {
   return (
     <>
       <div class="title-row">
-        <h1>Profiles</h1>
+        <h1>
+          Profiles <HelpLink to="live-state#profiles" label="Help: profiles" />
+        </h1>
         <a class="button primary" href={`${BASE}/profiles/new`}>
           New profile
         </a>
@@ -796,7 +817,9 @@ export function ImportPage(props: { values: Record<string, string>; error?: stri
   const { values, error, summary, imported } = props;
   return (
     <>
-      <h1>Import OpenAPI</h1>
+      <h1>
+        Import OpenAPI <HelpLink to="openapi" label="Help: importing OpenAPI" />
+      </h1>
       <p class="muted">
         Creates a service per operation, with a scenario per response (or per named example) and the response schemas for
         validation. Existing services are never overwritten. Also available as <code>npx @clafonta/mimic import spec.yaml</code>.
@@ -917,7 +940,9 @@ function ImportSummaryView({ summary, imported }: { summary: ImportSummary; impo
 export function SettingsPage({ problems, children }: { problems: string[]; children: unknown }) {
   return (
     <>
-      <h1>Settings</h1>
+      <h1>
+        Settings <HelpLink to="scenarios#the-global-error-scenario" label="Help: settings" />
+      </h1>
       <p class="muted">
         Stored in <code>mimic.yaml</code> next to <code>services/</code>.
       </p>

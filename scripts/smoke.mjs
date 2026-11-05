@@ -38,7 +38,7 @@ try {
   const packed = JSON.parse(run(npm, ["pack", "--json", "--pack-destination", work], root));
   const tarball = path.join(work, packed[0].filename);
   const files = packed[0].files.map((f) => f.path);
-  for (const required of ["dist/cli.js", "dist/index.d.ts", "README.md", "LICENSE", "package.json"]) {
+  for (const required of ["dist/cli.js", "dist/index.d.ts", "docs/help/README.md", "README.md", "LICENSE", "package.json"]) {
     if (!files.includes(required)) fail(`${required} is missing from the package`);
   }
   if (files.some((f) => f.startsWith("src/") || f.startsWith("test/"))) fail("the package includes src/ or test/");
@@ -95,6 +95,8 @@ export const request: RequestHook = (req) => (req.query.smoke ? { body: { smoke:
   const hooked = await fetch(`${origin}/api/users/7?smoke=1`);
   const hookedBody = await hooked.text();
   if (hooked.headers.get("x-mimic-source") !== "hook" || hookedBody !== '{"smoke":"7"}') fail(`hook response: ${hookedBody}`);
+  const helpPage = await (await fetch(`${origin}/_mimic/help/getting-started`)).text();
+  if (!helpPage.includes(`curl ${origin}/api/users/42`)) fail("help pages missing, or examples don't show the live address");
   const dashboard = await (await fetch(`${origin}/_mimic`)).text();
   if (!dashboard.includes("<title>Services · Mimic</title>")) fail("dashboard didn't render");
   const htmx = await fetch(`${origin}/_mimic/assets/htmx.min.js`);

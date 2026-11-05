@@ -32,6 +32,7 @@ src/
   init.ts           example definitions
   index.ts          public types (hook API) exported by the package
   version.ts        package version
+  help.ts           docs/help/*.md → HTML for the in-app help (anchors, links, live origin)
   core/
     schema.ts       Zod schemas + types (Service, Scenario, MatchRule, Profile, Settings)
     path.ts         path templates → regex, specificity ranking
@@ -58,8 +59,10 @@ src/
   ui/
     layout.tsx      page shell and styles
     pages.tsx       list/detail pages
-    forms.tsx       service, scenario, profile and settings forms
+    forms.tsx       service, scenario, profile and settings forms (fields take a `help` section)
+    help.tsx        help pages and the "?" HelpLink
     form-data.ts    form values <-> domain objects, Zod issues -> field errors
+docs/help/          user documentation: shown in the dashboard and readable on GitHub
 test/               vitest suites (+ fixtures/petstore.yaml)
 scripts/smoke.mjs   pack, install the tarball in a scratch project, run the installed CLI
 ```
@@ -82,6 +85,10 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 `watch.ts` watches the definitions directory recursively and, after a short debounce, calls `Store.reload()`. Reloads never overlap; events during a reload queue one more. `reload()` loads everything first and swaps only if every file is valid, so a half-finished edit never takes down a running mock: the last good definitions keep serving and `store.reloadError` is shown in the dashboard. Live overrides survive a reload unless they no longer make sense (service or scenario gone, proxy without upstream).
 
 Mimic's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
+
+### In-app help
+
+User documentation is Markdown in `docs/help/`, shipped in the npm package and rendered once at startup with `marked`. One source serves both places: links between topics are ordinary `other.md#section` links (rewritten to dashboard URLs), heading ids follow GitHub's anchor rules, topic order is taken from the links in `docs/help/README.md`, and examples are written against `http://localhost:4000`, which the dashboard replaces with the address it's running on. Screens link into it with `HelpLink` ("?", opens a new tab so form input isn't lost) or a field's `help` prop. A test scans the source for every help reference and fails if a topic or section doesn't exist, so renaming a heading can't silently break a link.
 
 ### Templates
 

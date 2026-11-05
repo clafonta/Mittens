@@ -27,7 +27,9 @@ import {
   toValues,
   zodToFormErrors,
 } from "../ui/form-data.js";
+import { loadHelp, withOrigin } from "../help.js";
 import { ProfileForm, refValue, ScenarioForm, ServiceForm, SettingsForm } from "../ui/forms.js";
+import { HelpPage } from "../ui/help.js";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
@@ -116,6 +118,20 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     if (c.req.header("hx-request")) return c.text(err.message, status);
     return page(c, "Error", <NotFoundPage message={err.message} />, 404);
   });
+
+  // ----------------------------------------------------------------- help
+
+  const help = loadHelp(BASE);
+  const helpPage = (c: Context, slug: string) => {
+    const topic = help.get(slug);
+    if (!topic) {
+      return page(c, "Not found", <NotFoundPage message={`There's no help topic called '${slug}'.`} />, 404);
+    }
+    const html = withOrigin(topic.html, new URL(c.req.url).origin);
+    return page(c, slug ? `${topic.title} · Help` : "Help", <HelpPage help={help} topic={topic} html={html} />);
+  };
+  ui.get("/help", (c) => helpPage(c, ""));
+  ui.get("/help/:slug", (c) => helpPage(c, c.req.param("slug")));
 
   ui.get("/assets/htmx.min.js", (c) => {
     c.header("content-type", "text/javascript; charset=utf-8");

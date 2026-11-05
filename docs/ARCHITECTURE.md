@@ -61,7 +61,8 @@ src/
     pages.tsx       list/detail pages
     forms.tsx       service, scenario, profile and settings forms (fields take a `help` section)
     help.tsx        help pages and the "?" HelpLink
-    home.tsx        home page: overview cards, flow diagram (layout + animation script)
+    flow.tsx        request-flow diagrams (overview and per service): layout, SVG, animation script
+    home.tsx        home page: overview cards, diagram, recent activity
     form-data.ts    form values <-> domain objects, Zod issues -> field errors
 docs/help/          user documentation: shown in the dashboard and readable on GitHub
 test/               vitest suites (+ fixtures/petstore.yaml)
@@ -91,7 +92,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 
 The dashboard root is an overview: cards (services by mode, requests and errors, schema failures, live state), a flow diagram, and recent activity. The diagram is server-rendered SVG with a deterministic layout (`layoutDiagram` in `ui/home.tsx`): your app → Mimic → up to ten services (the rest share a "+N more" node) → one node per upstream host, plus a "No match" node. Each link is a `<path>` with a known id, so the page's small script can animate along it with `getPointAtLength`.
 
-Motion is driven by real traffic only: `GET /_mimic/api/events` is a server-sent-events stream of request summaries (History emits `entry`; the handler subscribes and unsubscribes on disconnect, with a keep-alive comment every 15 s). For each event a dot travels the request's actual route and returns coloured by status; with `prefers-reduced-motion` the nodes flash instead. Without JavaScript the diagram and counts still render; the recent-activity table polls as elsewhere.
+Motion is driven by real traffic only: `GET /_mimic/api/events` is a server-sent-events stream of request summaries (History emits `entry`; the handler subscribes and unsubscribes on disconnect, with a keep-alive comment every 15 s). A service's page has a focused version (`ServiceFlow`): app → Mimic → that service → each scenario, the real API, the hook and "Mimic error", with answers that can't be used in the current mode drawn faint; it ignores events for other services and is re-rendered (htmx, on `live-changed`) when the live mode changes. Both diagrams live in `ui/flow.tsx` and share one script. For each event a dot travels the request's actual route and returns coloured by status; with `prefers-reduced-motion` the nodes flash instead. Without JavaScript the diagram and counts still render; the recent-activity table polls as elsewhere.
 
 ### In-app help
 

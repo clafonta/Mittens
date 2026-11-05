@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutDiagram, MAX_DIAGRAM_SERVICES } from "../src/ui/home.js";
+import { layoutDiagram, MAX_DIAGRAM_SERVICES } from "../src/ui/flow.js";
 import { Service } from "../src/core/schema.js";
 import { fixtures, setup, type ServiceInput } from "./helpers.js";
 
@@ -120,5 +120,63 @@ describe("events stream", () => {
     const summary = JSON.parse(events[0]!.data!);
     expect(summary).toMatchObject({ id: events[0]!.id, method: "GET", path: "/users/9", status: 200, serviceId: "users", scenarioId: "ok", source: "fallback" });
     expect(summary).not.toHaveProperty("request");
+  });
+});
+
+import { serviceTargets } from "../src/ui/flow.js";
+
+describe("service diagram", () => {
+  const users = () =>
+    Service.parse({
+      id: "users",
+      name: "Users",
+      path: "/users/{id}",
+      mode: "dynamic",
+      defaultScenario: "ok",
+      errorScenario: "boom",
+      upstream: "https://real.test",
+      scenarios: [
+        { id: "ok", name: "OK" },
+        { id: "missing", name: "Missing", status: 404, match: { params: { id: "404" } } },
+        { id: "boom", name: "Boom", status: 500 },
+        { id: "spare", name: "Spare" },
+      ],
+    });
+  const reach = (s: Service, hook = false) =>
+    Object.fromEntries(serviceTargets(s, { requestHook: hook }).map((t) => [t.key, t.reachable]));
+
+  it("lights up what can answer in each mode", () => {
+    const s = users();
+    expect(reach(s)).toEqual({ upstream: false, "sc-ok": true, "sc-missing": true, "sc-boom": true, "sc-spare": false, error: true });
+    expect(reach({ ...s, mode: "static" })).toMatchObject({ upstream: false, "sc-ok": true, "sc-missing": false, "sc-boom": false });
+    expect(reach({ ...s, mode: "proxy" })).toMatchObject({ upstream: true, "sc-ok": false, "sc-boom": true });
+    expect(reach(s, true)).toHaveProperty("hook", true);
+    const missing = serviceTargets(s, { requestHook: false }).find((t) => t.key === "sc-missing")!;
+    expect(missing.sub).toBe("404 · matched by rule");
+  });
+
+  it("is on the service page with per-answer counts, and only for this service", async () => {
+    const { request } = await setup(fixtures());
+    await request("/users/1");
+    await request("/users/1");
+    await request("/orders");
+    const html = await (await request("/_mimic/services/users")).text();
+    expect(html).toContain('data-service="users"');
+    expect(html).toContain('data-scenarios="ok boom"');
+    for (const id of ["p-app", "p-svc", "p-t-sc-ok", "p-t-sc-boom", "p-t-error", "n-svc", "n-t-sc-ok"]) expect(html, id).toContain(`id="${id}"`);
+    expect(html).toMatch(/data-count="service">2</);
+    expect(html).toMatch(/data-count="sc-ok">2</);
+    expect(html).toMatch(/data-count="sc-boom">0</);
+    expect(html).toContain("new EventSource");
+  });
+
+  it("redraws after a live change", async () => {
+    const { request, store } = await setup(fixtures());
+    expect(await (await request("/_mimic/services/users")).text()).toContain('hx-trigger="live-changed from:body"');
+    store.setLiveState("users", { mode: "static" });
+    const fragment = await (await request("/_mimic/ui/services/users/flow")).text();
+    expect(fragment).toMatch(/^<div id="service-flow"/);
+    expect(fragment).toContain("static mode");
+    expect(fragment).toMatch(/class="node target kind-scenario idle" id="n-t-sc-boom"/);
   });
 });

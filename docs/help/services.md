@@ -23,6 +23,12 @@ When several services match, the most specific wins: literal segments beat param
 
 The mode in the service form is the **starting mode**, saved to the YAML. The mode switcher on the Services page changes only the **live** mode, which resets when Mimic restarts; see [Live state](live-state.md).
 
+## Seeing what answers
+
+A service's page shows a diagram of everything that can answer its requests: each scenario (with its status, and whether it's the default, the error scenario, or matched by a rule), the real API if it has an upstream, its hook if it has one, and "Mimic error" for requests nothing could answer. Answers that can't be used in the current mode are greyed out, e.g. every scenario except the default in static mode.
+
+Each request to the service travels across the diagram as a dot to whatever answered it, and back in the colour of its status. The counts show how many requests in History each answer has handled.
+
 ## Default and error scenarios
 
 - The **default scenario** is what static mode sends, and dynamic mode's fallback when no match rule fits.

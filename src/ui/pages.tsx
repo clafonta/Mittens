@@ -3,6 +3,8 @@ import { validateResponse, type ValidationResult } from "../core/validate.js";
 import type { Profile, ScenarioRef, Service } from "../core/schema.js";
 import { BASE, SERVICES } from "../http/paths.js";
 import { DeleteButton } from "./forms.js";
+import { raw } from "hono/html";
+import { FLOW_SCRIPT, ServiceFlow } from "./flow.js";
 import { unjsonTests, unmatchPairs } from "./form-data.js";
 import { HelpLink } from "./help.js";
 import { StatusCode } from "./layout.js";
@@ -128,6 +130,13 @@ export function ServiceBar({ service, modified, inactive = false }: { service: S
     </div>
   );
 }
+
+/** The service diagram, redrawn when the live state changes (mode switch, reset, profile). */
+export const ServiceFlowLive = (props: { service: Service; history: HistoryEntry[]; requestHook: boolean; inactive: boolean }) => (
+  <div id="service-flow" hx-get={`${BASE}/ui/services/${props.service.id}/flow`} hx-trigger="live-changed from:body" hx-swap="outerHTML">
+    <ServiceFlow {...props} />
+  </div>
+);
 
 /** Renders the row or bar variant, for htmx updates. */
 export const ServiceLive = (props: { service: Service; modified: boolean; inactive?: boolean; view: ServiceView }) =>
@@ -340,6 +349,7 @@ export function ServicePage(props: {
   inactive: boolean;
   globalError?: ScenarioRef;
   hook?: HookInfo;
+  history: HistoryEntry[];
 }) {
   const { service, modified, allModified, inactive, globalError, hook } = props;
   const base = `${BASE}/services/${service.id}`;
@@ -355,6 +365,8 @@ export function ServicePage(props: {
       <LiveStateBanner modified={allModified} returnTo={base} />
       {service.description && <p class="muted">{service.description}</p>}
       <ServiceBar service={service} modified={modified} inactive={inactive} />
+      <ServiceFlowLive service={service} history={props.history} requestHook={!!hook?.exports.includes("request")} inactive={inactive} />
+      <script>{raw(FLOW_SCRIPT)}</script>
       {service.upstream && <UpstreamInfo service={service} />}
       {hook && <HookPanel serviceId={service.id} hook={hook} />}
       <div class="title-row">
@@ -475,6 +487,9 @@ function HookPanel({ serviceId, hook }: { serviceId: string; hook: HookInfo }) {
   );
 }
 
+/** A concrete path for a route template, for placeholders: /users/{id} → /users/1, /files/* → /files/example. */
+const examplePath = (template: string) => template.replace(/\{[^}]+\}/g, "1").replace(/\/\*$/, "/example");
+
 /** Upstream URL, rewrite rules, and a box to try a path against them. */
 function UpstreamInfo({ service }: { service: Service }) {
   const rules = service.rewrite ?? [];
@@ -501,7 +516,7 @@ function UpstreamInfo({ service }: { service: Service }) {
         hx-trigger="submit, input changed delay:300ms from:find input"
       >
         <label for={`try-${service.id}`}>Try a path</label>
-        <input id={`try-${service.id}`} name="path" type="text" placeholder="/api/users/7?x=1" />
+        <input id={`try-${service.id}`} name="path" type="text" placeholder={examplePath(service.path)} />
         <span id={`upstream-preview-${service.id}`} class="muted"></span>
       </form>
     </>

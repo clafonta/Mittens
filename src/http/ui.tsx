@@ -42,6 +42,7 @@ import {
   type ProfileInfo,
   ProfilesPage,
   ServicePage,
+  ServiceFlowLive,
   ServiceLive,
   ImportPage,
   ServicesPage,
@@ -232,6 +233,7 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
         inactive={!store.isActive(service)}
         globalError={store.getSettings().errorScenario}
         hook={hookInfo(service.id)}
+        history={history.list({ serviceId: service.id })}
       />,
     );
   });
@@ -538,6 +540,17 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     const scenario = store.getScenario(service.id, c.req.param("sid"));
     const form = toValues(await c.req.parseBody());
     return c.html(<RenderedPreview {...renderScenario(service, scenario, { method: form.method, path: form.path, body: form.body })} />);
+  });
+  ui.get("/ui/services/:id/flow", (c) => {
+    const service = store.getService(c.req.param("id"));
+    return c.html(
+      <ServiceFlowLive
+        service={service}
+        history={history.list({ serviceId: service.id })}
+        requestHook={!!hooks.get(service.id)?.exports.includes("request")}
+        inactive={!store.isActive(service)}
+      />,
+    );
   });
   ui.get("/ui/live-banner", (c) =>
     c.html(<LiveStateBanner modified={store.modifiedServiceIds()} returnTo={safeReturn(c.req.query("return"), SERVICES)} />),

@@ -120,6 +120,10 @@ a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-co
 .flow circle.dot { stroke:var(--surface); stroke-width:1.5; filter:drop-shadow(0 0 3px color-mix(in srgb, currentColor 60%, transparent)); }
 .flow circle.dot.req { fill:var(--accent); color:var(--accent); } .flow circle.dot.s2 { fill:var(--ok); color:var(--ok); } .flow circle.dot.s3 { fill:var(--accent); color:var(--accent); }
 .flow circle.dot.s4 { fill:var(--warn); color:var(--warn); } .flow circle.dot.s5 { fill:var(--bad); color:var(--bad); }
+.flow .node.idle { opacity:.45; }
+.flow .sub.s2 { fill:var(--ok); } .flow .sub.s3 { fill:var(--accent); } .flow .sub.s4 { fill:var(--warn); } .flow .sub.s5 { fill:var(--bad); }
+.flow .kind-upstream rect { fill:var(--bg); stroke-dasharray:3 3; } .flow .kind-hook rect { fill:color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.flow .kind-error rect, .flow .kind-more rect { fill:var(--bg); stroke:var(--line); }
 .legend { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:.5rem; font-size:.8rem; color:var(--muted); }
 .legend span { display:inline-flex; align-items:center; gap:.35rem; } .legend #flow-status { margin-left:auto; }
 .legend i.dot { width:9px; height:9px; border-radius:50%; display:inline-block; } .legend i.dot.req { background:var(--accent); } .legend i.dot.s2 { background:var(--ok); } .legend i.dot.s4 { background:var(--warn); } .legend i.dot.s5 { background:var(--bad); }

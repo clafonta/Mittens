@@ -29,7 +29,7 @@ import {
 } from "../ui/form-data.js";
 import { loadHelp, withOrigin } from "../help.js";
 import { ProfileForm, refValue, ScenarioForm, ServiceForm, SettingsForm } from "../ui/forms.js";
-import { HelpPage } from "../ui/help.js";
+import { HelpPage, SearchDropdown, SearchPage } from "../ui/help.js";
 import { Layout } from "../ui/layout.js";
 import {
   FormPage,
@@ -131,6 +131,15 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
     return page(c, slug ? `${topic.title} · Help` : "Help", <HelpPage help={help} topic={topic} html={html} />);
   };
   ui.get("/help", (c) => helpPage(c, ""));
+  ui.get("/help/search", (c) => {
+    const query = (c.req.query("q") ?? "").slice(0, 200);
+    if (c.req.header("hx-request")) {
+      const results = help.search(query, 50);
+      return c.html(<SearchDropdown query={query} results={results.slice(0, 8)} total={results.length} />);
+    }
+    const title = query.trim() ? `Search: ${query}` : "Search help";
+    return page(c, `${title} · Help`, <SearchPage help={help} query={query} results={help.search(query, 50)} />);
+  });
   ui.get("/help/:slug", (c) => helpPage(c, c.req.param("slug")));
 
   ui.get("/assets/htmx.min.js", (c) => {

@@ -24,6 +24,8 @@ describe("help content", () => {
     const home = readFileSync(path.join(helpDir, "README.md"), "utf8");
     for (const slug of files) expect(home, `README.md should link ${slug}.md`).toContain(`](${slug}.md)`);
     expect(help.topics[0]!.slug).toBe("getting-started");
+    // /help/search is the search page, so no topic may use that name.
+    expect(files).not.toContain("search");
   });
 
   it("has a title on every page and no broken links between pages", () => {
@@ -47,7 +49,7 @@ describe("contextual help links", () => {
       const text = readFileSync(file, "utf8");
       for (const m of text.matchAll(/<HelpLink to="([^"]*)"/g)) refs.push({ file, to: m[1]! });
       for (const m of text.matchAll(/\shelp="([^"]*)"/g)) refs.push({ file, to: m[1]! });
-      for (const m of text.matchAll(/\$\{BASE\}\/help\/([\w-]+(?:#[\w-]+)?)/g)) refs.push({ file, to: m[1]! });
+      for (const m of text.matchAll(/\$\{BASE\}\/help\/([\w-]+(?:#[\w-]+)?)/g)) if (m[1] !== "search") refs.push({ file, to: m[1]! });
     }
     expect(refs.length).toBeGreaterThan(25);
     const broken = refs.filter((r) => !help.targets.has(r.to)).map((r) => `${path.relative(srcDir, r.file)}: ${r.to}`);
@@ -136,3 +138,52 @@ describe("help pages", () => {
   });
 });
 
+
+describe("help search", () => {
+  it("finds sections, best first, requiring every word", () => {
+    expect(help.search("rewrite")[0]).toMatchObject({ slug: "proxying", id: "path-rewrites", heading: "Path rewrites" });
+    expect(help.search("jsonpath")[0]).toMatchObject({ slug: "scenarios", id: "jsonpath" });
+    expect(help.search("port in use")[0]).toMatchObject({ slug: "troubleshooting", id: "port-4000-is-already-in-use" });
+    expect(help.search("corporate proxy certificate")[0]!.id).toBe("behind-a-corporate-proxy");
+    expect(help.search("templ")[0]!.slug).toBe("templates"); // words match at their start
+    expect(help.search("xyzzy")).toEqual([]);
+    expect(help.search("rewrite xyzzy")).toEqual([]);
+    expect(help.search("")).toEqual([]);
+  });
+
+  it("keeps identifiers intact and highlights matches", () => {
+    const [proxy] = help.search("HTTP_PROXY");
+    expect(proxy!.snippet).toContain("<mark>HTTP_PROXY</mark>");
+    expect(help.search("$.user.role")[0]!.snippet).toContain("<mark>$.user.role</mark>");
+  });
+
+  it("escapes the query and the snippets", () => {
+    for (const r of help.search("script <b>")) expect(r.snippet).not.toMatch(/<(?!\/?mark>)/);
+  });
+
+  it("dashboard: dropdown as you type, full page on Enter", async () => {
+    const { request } = await setup([]);
+    const page = await (await request("/_mimic/help/scenarios")).text();
+    expect(page).toContain('action="/_mimic/help/search"');
+    expect(page).toContain('hx-get="/_mimic/help/search"');
+
+    const drop = await (await request("/_mimic/help/search?q=rewrite", { headers: { "hx-request": "true" } })).text();
+    expect(drop).toMatch(/^<ul class="help-results">/);
+    expect(drop).toContain('href="/_mimic/help/proxying#path-rewrites"');
+    expect(await (await request("/_mimic/help/search?q=", { headers: { "hx-request": "true" } })).text()).toBe("");
+    expect(await (await request("/_mimic/help/search?q=xyzzy", { headers: { "hx-request": "true" } })).text()).toContain("No matches for “xyzzy”");
+    const many = await (await request("/_mimic/help/search?q=mimic", { headers: { "hx-request": "true" } })).text();
+    expect(many).toMatch(/All \d+ results/);
+
+    const full = await request("/_mimic/help/search?q=rewrite");
+    expect(full.status).toBe(200);
+    const html = await full.text();
+    expect(html).toContain("<title>Search: rewrite · Help · Mimic</title>");
+    expect(html).toContain("<mark>Rewrite</mark>");
+    expect(html).toContain('value="rewrite"');
+
+    const evil = await (await request(`/_mimic/help/search?q=${encodeURIComponent('<img src=x onerror=alert(1)>')}`)).text();
+    expect(evil).not.toContain("<img src=x");
+    expect(evil).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+});

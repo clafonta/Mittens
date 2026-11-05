@@ -12,6 +12,8 @@ Mimic is a mock server and recording proxy that runs on your machine. Point your
 
 ## Topics
 
+In Mimic, the search box above the topic list finds any section; press `/` to jump to it.
+
 1. [Getting started](getting-started.md): run Mimic, point your app at it, make your first service
 2. [Services and modes](services.md): routes, methods, static / dynamic / proxy, delays, tags
 3. [Scenarios and matching](scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks

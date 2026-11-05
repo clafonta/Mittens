@@ -65,6 +65,15 @@ a.help-link:hover { color:var(--accent); border-color:var(--accent); }
 .prose code { background:color-mix(in srgb, var(--line) 45%, transparent); padding:.05rem .3rem; border-radius:4px; } .prose pre code { background:none; padding:0; }
 .prose pre { position:relative; max-height:none; white-space:pre; word-break:normal; } .prose pre .copy { position:absolute; top:.4rem; right:.4rem; font-size:.75rem; padding:.1rem .45rem; opacity:0; background:var(--bg); } .prose pre:hover .copy, .prose pre .copy:focus { opacity:1; }
 .prose table { margin:.8rem 0; font-size:.92rem; } .prose th { text-transform:none; letter-spacing:0; font-size:.85rem; }
+.help-search { position:relative; margin:0 0 1rem; } .help-search input { width:100%; font:inherit; padding:.4rem 1.8rem .4rem .55rem; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; }
+.help-search input:focus { outline:2px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color:var(--accent); }
+.help-search kbd { position:absolute; right:.45rem; top:.45rem; font:11px ui-monospace, monospace; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 .3rem; pointer-events:none; }
+.help-search input:focus ~ kbd, .help-search input:not(:placeholder-shown) ~ kbd { display:none; }
+#help-results:not(:empty) { margin-top:.35rem; padding:.35rem; border:1px solid var(--line); border-radius:6px; background:var(--bg); }
+.help-results { list-style:none; margin:0; padding:0; } .help-results li a { display:block; padding:.3rem .4rem; border-radius:4px; font-size:.85rem; } .help-results li a:hover, .help-results li a:focus { background:color-mix(in srgb, var(--accent) 12%, transparent); }
+.help-results strong { font-weight:500; } .help-results-empty { margin:.2rem .4rem; font-size:.85rem; color:var(--muted); } .help-results-all { display:block; padding:.3rem .4rem; font-size:.85rem; color:var(--accent); }
+.search-results { padding-left:1.2rem; } .search-results li { margin:0 0 1rem; } .search-results p { margin:.2rem 0 0; color:var(--muted); font-size:.92rem; }
+mark { background:color-mix(in srgb, var(--warn) 30%, transparent); color:inherit; border-radius:2px; padding:0 .1rem; }
 .pager { display:flex; justify-content:space-between; gap:1rem; margin-top:3rem; padding-top:1rem; border-top:1px solid var(--line); }
 .pager a { display:flex; flex-direction:column; text-decoration:none; } .pager a.next { text-align:right; margin-left:auto; } .pager .muted { font-size:.8rem; }
 .actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; }

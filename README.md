@@ -7,8 +7,8 @@ Mimic is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).
 ## Quick start
 
 ```sh
-npx @clafonta/mimic init   # writes example definitions to ./mimic
-npx @clafonta/mimic        # http://127.0.0.1:4000, dashboard at /_mimic
+npx @laboriouslabs/mimic init   # writes example definitions to ./mimic
+npx @laboriouslabs/mimic        # http://127.0.0.1:4000, dashboard at /_mimic
 ```
 
 ```sh
@@ -17,7 +17,7 @@ curl localhost:4000/api/users/404   # 404, matched by path param
 curl localhost:4000/anything/hi     # proxied to httpbin.org
 ```
 
-Requires Node.js 22+. Installed globally (`npm i -g @clafonta/mimic`), the command is just `mimic`.
+Requires Node.js 22+. Installed globally (`npm i -g @laboriouslabs/mimic`), the command is just `mimic`.
 
 ## Concepts
 

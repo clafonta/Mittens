@@ -2,7 +2,7 @@
 
 ## Goals
 
-- **Local-first.** `npx @clafonta/mimic` and go. No database server, no cloud, no build step for users.
+- **Local-first.** `npx @laboriouslabs/mimic` and go. No database server, no cloud, no build step for users.
 - **Definitions are code.** Human-readable YAML in the repo, one file per service/scenario, clean diffs.
 - **One process, one port.** Mock traffic, dashboard and API are served together.
 - **Scriptable from tests.** Everything the UI does is available over a JSON API.

@@ -63,7 +63,7 @@ async function main() {
   if (command === "init") {
     const { created } = await init(dir);
     console.log(created ? `Created example definitions in ${dir}` : `${dir} already has services; left untouched.`);
-    console.log(`Start with: npx @clafonta/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
+    console.log(`Start with: npx @laboriouslabs/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
     return;
   }
   if (command !== "start") fail(`unknown command '${command}'. Run 'mimic --help'.`);
@@ -86,7 +86,7 @@ async function main() {
     console.log(`Mimic ${pkg.version} listening on ${origin}`);
     console.log(`  Dashboard:   ${origin}${BASE}`);
     console.log(`  Definitions: ${dir} (${count} service${count === 1 ? "" : "s"}${store.readOnly ? ", read-only" : ""})`);
-    if (count === 0) console.log(`  No services yet — try 'npx @clafonta/mimic init'.`);
+    if (count === 0) console.log(`  No services yet — try 'npx @laboriouslabs/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });
   server.on("error", (err: NodeJS.ErrnoException) =>

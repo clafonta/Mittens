@@ -54,7 +54,7 @@ export function ServicesPage({ services }: { services: Service[] }) {
       <h1>Services</h1>
       {services.length === 0 ? (
         <div class="empty">
-          No services yet. Run <code>npx @clafonta/mimic init</code> for an example, or add YAML files under{" "}
+          No services yet. Run <code>npx @laboriouslabs/mimic init</code> for an example, or add YAML files under{" "}
           <code>services/</code>.
         </div>
       ) : (

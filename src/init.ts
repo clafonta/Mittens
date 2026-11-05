@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { writeAgentFiles, type Written } from "./agents.js";
 import { FileRepo } from "./core/repo.js";
 import type { Profile, Service } from "./core/schema.js";
 
@@ -86,14 +87,19 @@ export const EXAMPLE_PROFILES: Profile[] = [
   },
 ];
 
-export async function init(dir: string): Promise<{ created: boolean; dir: string }> {
+/**
+ * Writes example definitions (unless the folder already has services) and
+ * AGENTS.md / CLAUDE.md for coding agents (unless they already exist).
+ */
+export async function init(dir: string): Promise<{ created: boolean; dir: string; agents: Written; claude: Written }> {
   const root = path.resolve(dir);
-  if (existsSync(path.join(root, "services"))) return { created: false, dir: root };
+  const files = await writeAgentFiles(root);
+  if (existsSync(path.join(root, "services"))) return { created: false, dir: root, ...files };
   const repo = new FileRepo(root);
   for (const service of EXAMPLE_SERVICES) {
     await repo.saveService(service);
     for (const sc of service.scenarios) await repo.saveScenario(service.id, sc);
   }
   for (const profile of EXAMPLE_PROFILES) await repo.saveProfile(profile);
-  return { created: true, dir: root };
+  return { created: true, dir: root, ...files };
 }

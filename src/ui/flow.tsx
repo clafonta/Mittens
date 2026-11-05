@@ -15,6 +15,12 @@ export interface HomeData {
   historyLimit: number;
   origin: string;
   rateOf: (id: string) => RateSeries;
+  /** Whether an AI assistant has connected, and whether AGENTS.md is in place, for the home page's assistant panel. */
+  assistant?: {
+    client?: { name: string; version?: string };
+    lastSeen?: string;
+    agentsFile?: { path: string; exists: boolean };
+  };
 }
 
 // ------------------------------------------------------------------ layout

@@ -29,7 +29,8 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
     return c.json(body, status);
   });
 
-  api.get("/health", (c) => c.json({ ok: true, readOnly: store.readOnly }));
+  /** reloadError: set when a definition file is invalid; Mimic keeps serving the last good version. */
+  api.get("/health", (c) => c.json({ ok: true, readOnly: store.readOnly, reloadError: store.reloadError ?? null }));
 
   // services & scenarios
   /** ?tag=a&tag=b lists services carrying any of the tags (on the service or a scenario). */

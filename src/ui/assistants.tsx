@@ -2,6 +2,7 @@ import { raw } from "hono/html";
 import { BASE } from "../http/paths.js";
 import type { McpActivity, McpCall } from "../mcp/activity.js";
 import { HelpLink } from "./help.js";
+import { ControlDiagram } from "./trust.js";
 
 export interface AssistantsData {
   /** e.g. http://localhost:4000/_mimic/mcp */
@@ -104,7 +105,32 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
       <p class="lead">
         Let the AI assistant you already use set Mimic up for you: create mocks from a description, switch services into failure
         modes, explain why your app got a response. Mimic speaks the Model Context Protocol (MCP), so Claude, Codex, GitHub Copilot,
-        Cursor and other assistants can connect to it. No API key goes into Mimic; your assistant uses its own.
+        Cursor and other assistants can connect to it.
+      </p>
+      <section class="trust" aria-label="Optional, local and in your control">
+        <div>
+          <strong>Optional</strong>
+          <p>Nothing changes unless you connect an assistant. Everything it can do, you can also do in the dashboard; Help explains how.</p>
+        </div>
+        <div>
+          <strong>Local</strong>
+          <p>
+            Mimic only accepts assistant connections from this computer, refuses requests from web pages, holds no API keys, and never
+            contacts an AI service itself.
+          </p>
+        </div>
+        <div>
+          <strong>In your control</strong>
+          <p>
+            Assistants such as Claude Code ask before using each tool. Experiments change only the live state, which resets on restart,
+            and every call is listed below.
+          </p>
+        </div>
+      </section>
+      <ControlDiagram connected={!!data.activity.client} client={data.activity.client?.name} />
+      <p class="hint">
+        What your assistant reads from Mimic (your mock definitions and recorded requests) is sent to the AI service it uses, as with any
+        other tool it has. If History holds sensitive data from proxied traffic, clear it first or don't connect an assistant.
       </p>
 
       <section class="panel endpoint">
@@ -192,6 +218,13 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
         <p>Assistants that support MCP over HTTP ("Streamable HTTP") can use the endpoint above. Ones that only start local commands can run:</p>
         <Code>{stdio.join(" ")}</Code>
       </details>
+
+      <h2>Coding agents that edit files</h2>
+      <p>
+        Agents working in your repository can also edit the YAML directly. <code>npx @clafonta/mimic init</code> adds an{" "}
+        <code>AGENTS.md</code> to your definitions folder (and a <code>CLAUDE.md</code> pointing Claude Code at it) describing the file
+        formats and how to check an edit worked. It leaves your services alone and never overwrites those files once they exist.
+      </p>
 
       <h2>Things to try</h2>
       <ul class="prompts">

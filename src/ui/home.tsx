@@ -3,6 +3,7 @@ import type { ServiceMode } from "../core/schema.js";
 import { BASE, SERVICES } from "../http/paths.js";
 import { FlowDiagram, type HomeData } from "./flow.js";
 import { LiveScripts } from "./live.js";
+import { ControlDiagram } from "./trust.js";
 import { HelpLink } from "./help.js";
 import { HistoryTable } from "./pages.js";
 
@@ -69,6 +70,99 @@ function Overview({ data }: { data: HomeData }) {
 
 // ------------------------------------------------------------------- page
 
+const ago = (iso: string) => {
+  const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
+};
+
+/**
+ * Tells people they can let an AI assistant do the setup: how to connect one,
+ * or which one is connected, and whether AGENTS.md is there for coding agents.
+ */
+/** localStorage key for the panel's collapsed/expanded choice. */
+export const PANEL_STORAGE_KEY = "mimic.assistantPanel";
+
+/**
+ * Tells people they can let an AI assistant do the setup, shows (with a
+ * diagram) that it's local and in their control, and can be minimised; the
+ * choice is remembered in localStorage. A <details> element, so it works
+ * without JavaScript (open) and is keyboard-accessible.
+ */
+function AssistantPanel({ data }: { data: HomeData }) {
+  const a = data.assistant;
+  const agents = a?.agentsFile;
+  const connected = !!a?.client;
+  return (
+    <>
+      <details class="assistant-panel" id="assistant-panel" open>
+        <summary>
+          <span class="ap-title">Let your AI assistant set this up</span>
+          {connected ? (
+            <span class="ap-status">
+              <span class="pill s2">connected</span> {a!.client!.name}
+            </span>
+          ) : (
+            <span class="ap-status muted">optional · local · in your control</span>
+          )}
+          <span class="ap-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="ap-body">
+          <div class="assistant-copy">
+            {connected ? (
+              <p>
+                {a!.client!.name}
+                {a!.lastSeen && <span class="muted"> was last active {ago(a!.lastSeen)}</span>}. Ask it things like “make the users API
+                fail with a 500” or “why did my app get a 404?”
+              </p>
+            ) : (
+              <p>
+                Claude Code, Codex, GitHub Copilot, Cursor and other assistants can connect to Mimic and create mocks, switch services
+                into failure modes and explain responses for you.
+              </p>
+            )}
+            <p class="muted small">
+              Optional, and you stay in control: everything here still works by hand. Mimic only accepts connections from this
+              computer, holds no API keys and never contacts an AI service itself.
+            </p>
+            {agents && (
+              <p class="muted small">
+                {agents.exists ? (
+                  <>
+                    Coding agents that edit your definitions read <code>{agents.path}</code>.
+                  </>
+                ) : (
+                  <>
+                    Run <code>npx @clafonta/mimic init</code> to add an <code>AGENTS.md</code> that tells coding agents how to edit
+                    your definitions.
+                  </>
+                )}
+              </p>
+            )}
+            <p>
+              <a class={`button${connected ? "" : " primary"}`} href={`${BASE}/assistants`}>
+                {connected ? "Assistant activity" : "Connect your AI assistant"}
+              </a>
+            </p>
+          </div>
+          <ControlDiagram connected={connected} client={a?.client?.name} />
+        </div>
+      </details>
+      {/* Runs as soon as the panel is parsed, so a minimised panel doesn't flash open. */}
+      <script>{raw(PANEL_SCRIPT)}</script>
+    </>
+  );
+}
+
+const PANEL_SCRIPT = `
+(function () {
+  var panel = document.getElementById('assistant-panel'), KEY = '${PANEL_STORAGE_KEY}';
+  if (!panel) return;
+  try { if (localStorage.getItem(KEY) === 'collapsed') panel.open = false; } catch (e) {}
+  panel.addEventListener('toggle', function () {
+    try { localStorage.setItem(KEY, panel.open ? 'expanded' : 'collapsed'); } catch (e) {}
+  });
+})();`;
+
 export function HomePage({ data }: { data: HomeData }) {
   if (data.services.length === 0) {
     return (
@@ -94,6 +188,7 @@ export function HomePage({ data }: { data: HomeData }) {
             Or run <code>npx @clafonta/mimic init</code> for an example.
           </p>
         </div>
+        <AssistantPanel data={data} />
       </>
     );
   }
@@ -108,6 +203,7 @@ export function HomePage({ data }: { data: HomeData }) {
         </span>
       </div>
       <Overview data={data} />
+      <AssistantPanel data={data} />
       <FlowDiagram data={data} />
       <div class="title-row">
         <h2>Recent activity</h2>

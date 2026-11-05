@@ -36,6 +36,7 @@ import { HomePage } from "../ui/home.js";
 import { AssistantActivity, AssistantsPage } from "../ui/assistants.js";
 import { MCP_PATH } from "../mcp/http.js";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { Layout } from "../ui/layout.js";
 import {
@@ -71,7 +72,15 @@ const safeReturn = (v: string | undefined, fallback: string) =>
   v && (v === BASE || v.startsWith(`${BASE}/`) || v.startsWith(`${BASE}?`)) && !v.startsWith("//") ? v : fallback;
 
 /** HTML dashboard, mounted at /_mimic. */
-export function createUi(store: Store, history: History, engine: Engine, hooks: Hooks, rates: Rates, activity: McpActivity) {
+export function createUi(
+  store: Store,
+  history: History,
+  engine: Engine,
+  hooks: Hooks,
+  rates: Rates,
+  activity: McpActivity,
+  definitionsDir?: string,
+) {
   const rateOf = (id: string) => rates.series(id);
   const ui = new Hono();
 
@@ -183,6 +192,11 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
       historyLimit: history.limit,
       origin: new URL(c.req.url).origin,
       rateOf,
+      assistant: {
+        client: activity.client,
+        lastSeen: activity.lastSeen(),
+        agentsFile: definitionsDir ? agentsFile(definitionsDir) : undefined,
+      },
     };
     return page(c, "Home", <HomePage data={data} />);
   });
@@ -564,6 +578,13 @@ export function createUi(store: Store, history: History, engine: Engine, hooks: 
       />,
     );
   });
+  /** AGENTS.md in the definitions folder, shown relative to where Mimic was started when that's shorter (e.g. mimic/AGENTS.md). */
+  const agentsFile = (dir: string) => {
+    const file = path.join(dir, "AGENTS.md");
+    const rel = path.relative(process.cwd(), file);
+    return { path: rel && !rel.startsWith("..") && !path.isAbsolute(rel) ? rel : file, exists: existsSync(file) };
+  };
+
   // ------------------------------------------------------- AI assistants
 
   // Installed from npm, assistants can launch the bridge with npx; from a checkout, with this copy's dist/cli.js.

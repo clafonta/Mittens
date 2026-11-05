@@ -106,8 +106,10 @@ async function main() {
   const dir = path.resolve(values.dir ?? process.env.MIMIC_DIR ?? "mimic");
 
   if (command === "init") {
-    const { created } = await init(dir);
-    console.log(created ? `Created example definitions in ${dir}` : `${dir} already has services; left untouched.`);
+    const { created, agents, claude } = await init(dir);
+    console.log(created ? `Created example definitions in ${dir}` : `${dir} already has services; left them untouched.`);
+    const added = [agents === "created" && "AGENTS.md", claude === "created" && "CLAUDE.md"].filter(Boolean);
+    if (added.length) console.log(`Added ${added.join(" and ")} so coding agents (Codex, Copilot, Cursor, Claude Code…) know how to edit these files.`);
     console.log(`Start with: npx @clafonta/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
     return;
   }
@@ -181,7 +183,7 @@ async function main() {
     }
   }
 
-  const app = createApp({ store, history, hooks, fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
+  const app = createApp({ store, history, hooks, definitionsDir: dir, fetchImpl: usesProxy(upstreamProxy) ? proxiedFetch(upstreamProxy) : undefined });
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     const origin = `http://${host.includes(":") ? `[${host}]` : host}:${info.port}`;
     const count = store.listServices().length;

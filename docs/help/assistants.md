@@ -2,6 +2,8 @@
 
 Instead of working through forms, you can ask the AI assistant you already use to set Mimic up: "make the users API fail with a 500", "mock POST /api/orders with a 422 when quantity is 0", "why did my app get a 404 on /api/users/7?". Mimic speaks the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), which Claude Code, Claude Desktop, Codex, GitHub Copilot in VS Code, Cursor and many other assistants support. Mimic doesn't need an API key: your assistant uses its own.
 
+This is optional: everything an assistant can do, you can also do in the dashboard by hand, and nothing changes unless you connect one. It's also local: Mimic only accepts assistant connections from your own computer, holds no API keys, and never contacts an AI service itself (see [Safety](#safety)).
+
 The **Assistants** page in the dashboard has copy-paste setup for each assistant, shows which one is connected, and lists every tool call it makes.
 
 ## Connect Claude Code
@@ -19,6 +21,12 @@ Then start `claude` and type `/mcp`: **mimic** should be listed as connected. Ad
 - **Assistants that support MCP over HTTP** (VS Code with GitHub Copilot, Cursor and others): use the endpoint `http://localhost:4000/_mimic/mcp`. The Assistants page shows the exact config file for each.
 - **Assistants that start local commands** (Claude Desktop, Codex CLI and others): have them run `npx -y @clafonta/mimic mcp`. That command relays to the Mimic that's already running (use `--url` if it's not on port 4000), so changes apply to the mocks your app is using.
 - **ChatGPT** runs its connectors in OpenAI's cloud, which can't reach a Mimic on your machine without a tunnel.
+
+## Coding agents that edit files
+
+Agents that work in your repository (Codex, GitHub Copilot's coding agent, Cursor, Claude Code) can also edit the YAML in your definitions folder directly. `mimic init` writes an `AGENTS.md` there describing the file formats, match rules and templates, and how to check an edit worked; and a one-line `CLAUDE.md` that points Claude Code at it. Run `npx @clafonta/mimic init` in an existing project to add them; it doesn't touch your services, and never overwrites the two files once they exist, so edit them as you like.
+
+When an assistant has Mimic's tools (above), it should use those instead, since they validate changes and can switch behaviour without touching your files.
 
 ## What your assistant can do
 
@@ -43,5 +51,9 @@ Assistants are told to experiment with the live state (switching modes, applying
 - Turn the real responses I just recorded into scenarios.
 
 ## Safety
+
+You stay in control: assistants such as Claude Code ask before using each tool, experiments change only the live state (which resets when Mimic restarts), and the Assistants page lists every call an assistant makes.
+
+Keep in mind that what your assistant reads from Mimic (your definitions, and recorded requests including any headers or bodies from proxied traffic) is sent to the AI service the assistant uses, just as with any other tool it has. If History holds credentials or personal data, clear it before asking your assistant about it, or don't connect one.
 
 The MCP endpoint only answers local clients. Requests from web pages (another origin) are refused, and so are requests whose host name isn't `localhost` or an IP address, which stops a malicious site from reaching it through DNS tricks. In `--read-only` mode, your assistant's changes stay in memory like any other. As with any tool you give an assistant, review what it proposes before letting it delete things.

@@ -16,6 +16,8 @@ mimic/
   profiles/
     outage.yaml
   mimic.yaml                optional settings (global error scenario)
+  AGENTS.md                 notes for coding agents, written by `mimic init`
+  CLAUDE.md                 points Claude Code at AGENTS.md
   .mimic/                   history, if --persist-history (git-ignored)
 ```
 

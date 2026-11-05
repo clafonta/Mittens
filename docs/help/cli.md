@@ -2,7 +2,8 @@
 
 ```
 mimic [start] [options]     start the server
-mimic init [--dir <path>]   write example definitions
+mimic init [--dir <path>]   write example definitions, plus AGENTS.md for coding agents
+mimic mcp [--url <url>]     connect an assistant that starts local commands (see AI assistants)
 mimic import <spec>         create services from an OpenAPI 3 file or URL
 ```
 

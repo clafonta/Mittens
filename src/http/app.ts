@@ -18,9 +18,11 @@ export interface AppDeps {
   fetchImpl?: typeof fetch;
   /** Service hooks; omit for none. */
   hooks?: Hooks;
+  /** The definitions folder, when there is one on disk (the dashboard checks it for AGENTS.md). */
+  definitionsDir?: string;
 }
 
-export function createApp({ store, history, fetchImpl, hooks = new Hooks(undefined) }: AppDeps) {
+export function createApp({ store, history, fetchImpl, hooks = new Hooks(undefined), definitionsDir }: AppDeps) {
   const app = new Hono();
   const engine = new Engine(store, history, fetchImpl, hooks);
   const activity = new McpActivity();
@@ -28,7 +30,7 @@ export function createApp({ store, history, fetchImpl, hooks = new Hooks(undefin
   // MCP endpoint for AI assistants (Claude Code, Codex, Copilot, Cursor…), before the dashboard's catch-all.
   app.all(`${BASE}${MCP_PATH}`, mcpHandler({ store, history, engine, hooks, help: loadHelp(BASE), activity }));
   const rates = new Rates().attach(history);
-  app.route(BASE, createUi(store, history, engine, hooks, rates, activity));
+  app.route(BASE, createUi(store, history, engine, hooks, rates, activity, definitionsDir));
   app.all("*", mockHandler(engine));
   return app;
 }

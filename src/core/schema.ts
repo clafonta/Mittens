@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { schemaProblem, STATUS_KEY } from "./validate.js";
 
 /** Slugs double as stable IDs and as file/directory names on disk. */
 export const Slug = z
@@ -53,6 +54,20 @@ export const RewriteRule = z
   .strict();
 export type RewriteRule = z.infer<typeof RewriteRule>;
 
+/**
+ * JSON Schemas for response bodies, keyed by status: "200", "2xx" or
+ * "default" (most specific wins). Every response the service sends — mocked
+ * or proxied — is checked and the result shown in history.
+ */
+export const ResponseSchemas = z
+  .record(z.string().regex(STATUS_KEY, 'Keys must be a status ("404"), a class ("2xx") or "default"'), z.unknown())
+  .superRefine((schemas, ctx) => {
+    for (const [key, schema] of Object.entries(schemas)) {
+      const problem = schemaProblem(schema);
+      if (problem) ctx.addIssue({ code: "custom", path: [key], message: `Invalid JSON Schema: ${problem}` });
+    }
+  });
+
 /** A scenario as stored on disk (the id comes from the file name). */
 export const ScenarioFile = z
   .object({
@@ -90,6 +105,7 @@ export const ServiceFile = z
     rewrite: z.array(RewriteRule).optional(),
     delayMs: z.number().int().min(0).default(0),
     tags: z.array(z.string()).default([]),
+    responseSchema: ResponseSchemas.optional(),
   })
   .strict();
 export type ServiceFile = z.infer<typeof ServiceFile>;

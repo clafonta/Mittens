@@ -18,6 +18,7 @@ This is a clean break from Mockey: no XML import, new file format, new URL layou
 | UI | Server-rendered Hono JSX + htmx | No client build or bundler; types shared with the server; partial updates and polling via attributes. Rich widgets (e.g. a JSON editor) can be added later as isolated islands |
 | Upstream proxying | `undici` (`EnvHttpProxyAgent`) | Built-in `fetch` ignores `HTTP(S)_PROXY`; undici's agent honours them and `NO_PROXY`, with tunnelling for HTTPS. Only used when a proxy is configured |
 | Validation | Zod 4 | One schema for files, API input and TS types |
+| Response schemas | Ajv 8 + ajv-formats | The standard JSON Schema validator; compiled once per schema and cached |
 | Storage | YAML files (`yaml`) | Git-friendly; block scalars keep bodies readable |
 | Tests | Vitest | Fast; tests hit the real Hono app in-process |
 | Build | `tsc` → `dist/` | Plain ESM output; no bundler needed |
@@ -76,8 +77,9 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
    - dynamic → highest-scoring `match`; fallback `defaultScenario` → `errorScenario` → 404
    - proxy → `fetch(upstream + rewritten path + query)` (through the outbound proxy if configured); on error `errorScenario` → 502
    - anything that would end in Mimic's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mimic.yaml` instead, if one is set
-4. Apply delay (scenario overrides service).
-5. Record to history; respond with `x-mimic-*` headers.
+4. Validate the full body against the service's `responseSchema` for that status (not for Mimic's own error responses).
+5. Apply delay (scenario overrides service).
+6. Record to history; respond with `x-mimic-*` headers.
 
 ## Mockey → Mimic feature map
 
@@ -98,8 +100,8 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 | File watching (n/a) | Reload when YAML changes on disk; last good version kept on errors | **1 (done)** |
 | Corporate proxy settings | Honour `HTTP(S)_PROXY`/`NO_PROXY` for upstream calls; `--upstream-proxy` / `--no-upstream-proxy` | **2 (done)** |
 | URL twisting | `stripPrefix` + ordered regex `rewrite` rules on proxy; "Try a path" preview | **2 (done)** |
-| Response JSON schema validation | Optional `responseSchema` check, surfaced in history | 2 |
-| Stats / CSV export | History export (JSON/HAR), per-service counts | 2 |
+| Response JSON schema validation | `responseSchema` per status (Ajv, 2020-12 / draft-07); results in history, `x-mimic-validation`, and per-scenario on the service page | **2 (done)** |
+| Stats / CSV export | History export as HAR 1.2 or JSON, filterable by service / validation | **2 (done)**; per-service counts later |
 | Java request-inspector plugins | Optional JS/TS matcher/response functions | 3 |
 | Templated responses (n/a) | Body templating from request (params, query, body) | 3 |
 | HTTPS interception, mobile view, file manager, API doc pages | Dropped unless requested | — |
@@ -108,7 +110,7 @@ Mimic's own writes also trigger the watcher. They are harmless (the reload sees 
 
 - **Phase 0 — foundation (done):** schemas, file store, engine with three modes, history, JSON API, dashboard with mode/default switching, CLI (`start`, `init`), tests.
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
-- **Phase 2 — proxy fidelity & export:** ~~corporate proxy~~, ~~path rewrites~~ (done); remaining: history export (JSON/HAR), response schema validation, match JSONPath/regex, history persistence.
+- **Phase 2 — proxy fidelity & export:** ~~corporate proxy~~, ~~path rewrites~~, ~~history export~~, ~~schema validation~~ (done); remaining: match JSONPath/regex, history persistence.
 
 ### UI conventions
 

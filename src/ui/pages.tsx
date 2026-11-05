@@ -1,4 +1,5 @@
 import type { HistoryEntry } from "../core/history.js";
+import { validateResponse, type ValidationResult } from "../core/validate.js";
 import type { Profile, ScenarioRef, Service } from "../core/schema.js";
 import { BASE } from "../http/paths.js";
 import { DeleteButton } from "./forms.js";
@@ -292,6 +293,15 @@ export function ServicePage(props: {
                 </a>
               )}
               <TagPills tags={sc.tags} />
+              {(() => {
+                const check = validateResponse(service.responseSchema, sc.status, sc.body);
+                return check && (
+                  <>
+                    {" "}
+                    <ValidationPill result={check} />
+                  </>
+                );
+              })()}
             </h3>
             <a class="button" href={`${base}/scenarios/${sc.id}/edit`}>
               Edit
@@ -302,7 +312,29 @@ export function ServicePage(props: {
           <pre>{sc.body}</pre>
         </section>
       ))}
-      <h2>Requests to this service</h2>
+      {service.responseSchema && (
+        <>
+          <h2>Response schema</h2>
+          <p class="muted">
+            Checked against every response this service sends, for{" "}
+            {Object.keys(service.responseSchema).map((k, i) => (
+              <>
+                {i > 0 && ", "}
+                <code>{k}</code>
+              </>
+            ))}{" "}
+            statuses. Scenarios above show whether they match.
+          </p>
+          <details>
+            <summary>Show schema</summary>
+            <pre>{JSON.stringify(service.responseSchema, null, 2)}</pre>
+          </details>
+        </>
+      )}
+      <div class="title-row">
+        <h2>Requests to this service</h2>
+        <ExportLinks service={service.id} />
+      </div>
       <div hx-get={`${BASE}/ui/history?service=${service.id}&limit=25`} hx-trigger="load, every 2s">
         <p class="muted">Loading…</p>
       </div>
@@ -387,6 +419,12 @@ export function HistoryTable({ entries }: { entries: HistoryEntry[] }) {
                   <span class="pill">replay</span>
                 </>
               )}
+              {e.validation && (
+                <>
+                  {" "}
+                  <ValidationPill result={e.validation} />
+                </>
+              )}
             </td>
             <td class="muted">{e.durationMs}</td>
           </tr>
@@ -396,16 +434,55 @@ export function HistoryTable({ entries }: { entries: HistoryEntry[] }) {
   );
 }
 
-export function HistoryPage() {
+/** Pass/fail marker for a schema check; the title lists the problems. */
+export const ValidationPill = ({ result }: { result: ValidationResult }) =>
+  result.ok ? (
+    <span class="pill s2" title={`Matches the ${result.schema} schema`}>
+      schema ✓
+    </span>
+  ) : (
+    <span class="pill s5" title={result.errors.join("\n")}>
+      schema ✗
+    </span>
+  );
+
+const exportHref = (format: "har" | "json", filter: { service?: string; validation?: string }) => {
+  const q = new URLSearchParams({ format, ...(filter.service && { service: filter.service }), ...(filter.validation && { validation: filter.validation }) });
+  return `${BASE}/api/history/export?${q}`;
+};
+
+/** Download links for the current history view. */
+export const ExportLinks = (filter: { service?: string; validation?: string }) => (
+  <span class="switcher">
+    <a class="button" href={exportHref("har", filter)} download>
+      Export HAR
+    </a>
+    <a class="button" href={exportHref("json", filter)} download>
+      Export JSON
+    </a>
+  </span>
+);
+
+export function HistoryPage({ validation }: { validation?: "pass" | "fail" }) {
+  const fragment = `${BASE}/ui/history?limit=200${validation ? `&validation=${validation}` : ""}`;
   return (
     <>
-      <h1>History</h1>
-      <p>
+      <div class="title-row">
+        <h1>History</h1>
+        <span class="switcher">
+          <a class={`pill tag${validation ? "" : " current"}`} href={`${BASE}/history`}>
+            all
+          </a>
+          <a class={`pill tag${validation === "fail" ? " current" : ""}`} href={`${BASE}/history?validation=fail`}>
+            schema failures
+          </a>
+        </span>
+        <ExportLinks validation={validation} />
         <button hx-delete={`${BASE}/api/history`} hx-swap="none" hx-confirm="Clear all history?">
           Clear history
         </button>
-      </p>
-      <div hx-get={`${BASE}/ui/history?limit=200`} hx-trigger="load, every 2s">
+      </div>
+      <div hx-get={fragment} hx-trigger="load, every 2s">
         <p class="muted">Loading…</p>
       </div>
     </>
@@ -419,6 +496,27 @@ const Headers = ({ headers }: { headers: Record<string, string> }) => (
       .join("\n") || "(none)"}
   </pre>
 );
+
+function ValidationDetail({ result }: { result: ValidationResult }) {
+  if (result.ok)
+    return (
+      <p class="s2">
+        Response matches the service's <code>{result.schema}</code> schema.
+      </p>
+    );
+  return (
+    <div class="banner error-banner">
+      Response doesn't match the service's <code>{result.schema}</code> schema:
+      <ul>
+        {result.errors.map((e) => (
+          <li>
+            <code>{e}</code>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** How a replay's response compares with the original's. */
 function ReplayComparison({ entry, original }: { entry: HistoryEntry; original?: HistoryEntry }) {
@@ -495,6 +593,7 @@ export function HistoryEntryPage({ entry, service, original }: { entry: HistoryE
         {entry.scenarioId && <> / {entry.scenarioId}</>}
       </p>
       {entry.note && <p>{entry.note}</p>}
+      {entry.validation && <ValidationDetail result={entry.validation} />}
       <div class="grid">
         <div>
           <h2>Request</h2>

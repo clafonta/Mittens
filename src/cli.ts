@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
@@ -12,8 +12,9 @@ import { watchDefinitions } from "./core/watch.js";
 import { createApp } from "./http/app.js";
 import { BASE } from "./http/paths.js";
 import { init } from "./init.js";
+import { VERSION } from "./version.js";
 
-const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+const pkg = { version: VERSION };
 
 const HELP = `mimic ${pkg.version} — local HTTP mock server and recording proxy
 

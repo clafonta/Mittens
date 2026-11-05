@@ -1,5 +1,6 @@
 import type { History, HistoryEntry, Source } from "./history.js";
 import { upstreamUrl } from "./rewrite.js";
+import { validateResponse, type ValidationResult } from "./validate.js";
 import type { MatchRule, Scenario, Service } from "./schema.js";
 import type { Store } from "./store.js";
 
@@ -84,12 +85,15 @@ export class Engine {
   ) {}
 
   /** Resolve, delay, and record a request. */
-  async handle(req: MockRequest, opts: { replayOf?: string } = {}): Promise<Resolution & { entry: HistoryEntry }> {
+  async handle(req: MockRequest, opts: { replayOf?: string } = {}): Promise<Resolution & { entry: HistoryEntry; validation?: ValidationResult }> {
     const started = performance.now();
     const res = await this.resolve(req);
+    // Mimic's own error responses aren't the service's, so they aren't validated. The full body is checked, even if history truncates it.
+    const validation =
+      res.service && res.source !== "error" ? validateResponse(res.service.responseSchema, res.status, dec.decode(res.body)) : undefined;
     if (res.delayMs > 0) await new Promise((r) => setTimeout(r, res.delayMs));
-    const entry = this.record(req, res, performance.now() - started, opts.replayOf);
-    return { ...res, entry };
+    const entry = this.record(req, res, performance.now() - started, opts.replayOf, validation);
+    return { ...res, entry, validation };
   }
 
   /**
@@ -202,10 +206,11 @@ export class Engine {
     }
   }
 
-  private record(req: MockRequest, res: Resolution, durationMs: number, replayOf?: string): HistoryEntry {
+  private record(req: MockRequest, res: Resolution, durationMs: number, replayOf?: string, validation?: ValidationResult): HistoryEntry {
     const headersOf = (h: Headers) => Object.fromEntries(h.entries());
     return this.history.add({
       ...(replayOf && { replayOf }),
+      ...(validation && { validation }),
       at: new Date().toISOString(),
       durationMs: Math.round(durationMs),
       serviceId: res.service?.id,

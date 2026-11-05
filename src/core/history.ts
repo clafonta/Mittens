@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
+import type { ValidationResult } from "./validate.js";
 
 export type Source = "scenario" | "proxy" | "fallback" | "unmatched" | "error";
 
@@ -14,6 +15,8 @@ export interface HistoryEntry {
   note?: string;
   /** Set when this request was a replay of an earlier history entry. */
   replayOf?: string;
+  /** Result of checking the response against the service's responseSchema, when one applied. */
+  validation?: ValidationResult;
   request: { method: string; url: string; path: string; headers: Record<string, string>; body: string; truncated: boolean };
   response: { status: number; headers: Record<string, string>; body: string; truncated: boolean };
 }
@@ -34,8 +37,12 @@ export class History extends EventEmitter<{ entry: [HistoryEntry]; clear: [] }> 
     return full;
   }
 
-  list(filter: { serviceId?: string } = {}): HistoryEntry[] {
-    return filter.serviceId ? this.entries.filter((e) => e.serviceId === filter.serviceId) : [...this.entries];
+  list(filter: { serviceId?: string; validation?: "pass" | "fail" } = {}): HistoryEntry[] {
+    return this.entries.filter(
+      (e) =>
+        (!filter.serviceId || e.serviceId === filter.serviceId) &&
+        (!filter.validation || (e.validation !== undefined && e.validation.ok === (filter.validation === "pass"))),
+    );
   }
 
   get(id: string): HistoryEntry | undefined {

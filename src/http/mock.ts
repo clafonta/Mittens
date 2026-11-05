@@ -33,6 +33,7 @@ export function mockHandler(engine: Engine) {
     headers.set("x-mimic-source", res.source);
     if (res.service) headers.set("x-mimic-service", res.service.id);
     if (res.scenario) headers.set("x-mimic-scenario", res.scenario.id);
+    if (res.validation) headers.set("x-mimic-validation", res.validation.ok ? "pass" : "fail");
     const noBody = NO_BODY_STATUS.has(res.status) || req.method === "HEAD";
     return new Response(noBody ? null : res.body, { status: res.status, headers });
   };

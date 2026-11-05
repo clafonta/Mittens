@@ -383,7 +383,8 @@ export function createUi(store: Store, history: History, engine: Engine) {
 
   // -------------------------------------------------------------- history
 
-  ui.get("/history", (c) => page(c, "History", <HistoryPage />));
+  const validationFilter = (v: string | undefined) => (v === "pass" || v === "fail" ? v : undefined);
+  ui.get("/history", (c) => page(c, "History", <HistoryPage validation={validationFilter(c.req.query("validation"))} />));
   ui.get("/history/:id", (c) => {
     const entry = history.get(c.req.param("id"));
     if (!entry) return page(c, "Not found", <NotFoundPage message="That request is no longer in history." />, 404);
@@ -403,7 +404,7 @@ export function createUi(store: Store, history: History, engine: Engine) {
 
   ui.get("/ui/history", (c) => {
     const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 500);
-    const entries = history.list({ serviceId: c.req.query("service") }).slice(0, limit);
+    const entries = history.list({ serviceId: c.req.query("service"), validation: validationFilter(c.req.query("validation")) }).slice(0, limit);
     return c.html(<HistoryTable entries={entries} />);
   });
   // Mode/default switcher: changes live state only.

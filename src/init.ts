@@ -19,6 +19,14 @@ export const EXAMPLE_SERVICES: Service[] = [
     errorScenario: "server-error",
     delayMs: 0,
     tags: ["example"],
+    responseSchema: {
+      "2xx": {
+        type: "object",
+        required: ["id", "name", "email"],
+        properties: { id: { type: "string" }, name: { type: "string" }, email: { type: "string", format: "email" } },
+      },
+      default: { type: "object", required: ["error"] },
+    },
     scenarios: [
       {
         id: "found",

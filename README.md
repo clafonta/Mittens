@@ -119,6 +119,33 @@ If the proxy re-signs TLS with a company certificate, point Node at it: `NODE_EX
 
 To see where a request would go after `stripPrefix` and `rewrite`, use **Try a path** on the service page, or `GET /_mimic/api/services/:id/upstream?path=/mock/users/7`.
 
+## Checking responses against a schema
+
+Give a service a `responseSchema` and every response it sends — mocked, proxied, or a fallback — is checked against it. Keys are a status (`"404"`), a class (`2xx`) or `default`; the most specific wins, and statuses without a schema aren't checked.
+
+```yaml
+# services/users/service.yaml
+responseSchema:
+  2xx:
+    type: object
+    required: [id, email]
+    properties:
+      email: { type: string, format: email }
+  default:
+    type: object
+    required: [error]
+```
+
+Results show up as **schema ✓ / ✗** in History (filter with **schema failures**, or `GET /_mimic/api/history?validation=fail`), with the reasons on the request page, and in an `x-mimic-validation: pass|fail` response header for tests. The service page also checks each scenario, so mocks that have drifted from the real API stand out. Proxying the real API with a schema in place is a quick way to find out whether the contract still holds. Validation reports; it never changes the response.
+
+Schemas are standard JSON Schema: 2020-12 by default, draft-07 when `$schema` says so. Unknown keywords (e.g. OpenAPI's `example`) are ignored, and formats like `email` and `date-time` are checked.
+
+## Exporting history
+
+**Export HAR** / **Export JSON** on the History page (or a service page, for just that service) downloads what's in history. HAR 1.2 opens in browser devtools, Charles, Fiddler and similar tools; Mimic's details (which service and scenario answered, validation results) are kept in `_mimic` fields. Scripts: `GET /_mimic/api/history/export?format=har|json&service=id&validation=fail`.
+
+History is in memory, holds the latest 500 requests, and keeps bodies up to 256 KB.
+
 ## Replaying requests
 
 Open any request in **History** and click **Replay** to send it again — same method, path, query, headers and body — through whatever the services are doing *now*. Handy after switching a mode or editing a scenario: the new entry says whether the response matches the original and, if not, what changed (status, body, which scenario answered). Scripts can use `POST /_mimic/api/history/:id/replay`.
@@ -163,7 +190,8 @@ All under `/_mimic/api`, JSON in and out:
 | POST | `/profiles` | create (`?from=current` fills `services` from the current state) |
 | GET / PUT / DELETE | `/profiles/:id` | read / replace / delete |
 | POST | `/profiles/:id/apply` | apply to live state, all-or-nothing; returns the changed service IDs |
-| GET / DELETE | `/history` | list (`?service=id`) / clear |
+| GET / DELETE | `/history` | list (`?service=id`, `?validation=pass\|fail`) / clear |
+| GET | `/history/export` | download as `?format=har` (default) or `json`; same filters |
 | GET | `/history/:id` | one request/response |
 | POST | `/history/:id/scenario` | save the recorded response as a scenario; body `{ id?, name?, service?, makeDefault? }` |
 | POST | `/history/:id/replay` | send the recorded request again; returns the new entry (with `replayOf`) |

@@ -86,6 +86,7 @@ export const SERVICE_FIELDS = [
   "upstream",
   "stripPrefix",
   "rewrite",
+  "responseSchema",
   "delayMs",
   "tags",
   "defaultScenario",
@@ -93,6 +94,20 @@ export const SERVICE_FIELDS = [
 ];
 
 const ARROW = " -> ";
+
+/** Parses a JSON object field; blank means "not set". */
+function jsonObject(values: FormValues, field: string, errors: FormErrors): Record<string, unknown> | undefined {
+  const raw = opt(values[field]);
+  if (raw === undefined) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+    return parsed as Record<string, unknown>;
+  } catch (err) {
+    errors[field] = err instanceof SyntaxError ? `Not valid JSON: ${err.message}` : 'Must be a JSON object like { "2xx": { …schema… } }';
+    return undefined;
+  }
+}
 
 /** Parses `from -> to` lines into rewrite rules. Blank lines are ignored. */
 function rewriteRules(values: FormValues, errors: FormErrors) {
@@ -128,6 +143,7 @@ export function serviceFromForm(values: FormValues) {
     upstream: opt(values.upstream),
     stripPrefix: opt(values.stripPrefix),
     rewrite: rewriteRules(values, errors),
+    responseSchema: jsonObject(values, "responseSchema", errors),
     delayMs: int(values, "delayMs", errors) ?? 0,
     tags: tags(values.tags),
     defaultScenario: opt(values.defaultScenario),
@@ -147,6 +163,7 @@ export function serviceToValues(s: Service): FormValues {
     upstream: s.upstream ?? "",
     stripPrefix: s.stripPrefix ?? "",
     rewrite: (s.rewrite ?? []).map((r) => `${r.from}${ARROW}${r.to}`).join("\n"),
+    responseSchema: s.responseSchema ? JSON.stringify(s.responseSchema, null, 2) : "",
     delayMs: String(s.delayMs),
     tags: s.tags.join(", "),
     defaultScenario: s.defaultScenario ?? "",

@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Engine } from "../core/engine.js";
+import { toHar } from "../core/har.js";
 import type { History } from "../core/history.js";
+import { VERSION } from "../version.js";
 import { scenarioFromHistory } from "../core/record.js";
 import { upstreamUrl } from "../core/rewrite.js";
 import { hasAnyTag, ServiceMode, Slug } from "../core/schema.js";
@@ -128,7 +130,23 @@ export function createApi(store: Store, history: History, engine: Engine) {
   });
 
   // history
-  api.get("/history", (c) => c.json(history.list({ serviceId: c.req.query("service") })));
+  const ValidationFilter = z.enum(["pass", "fail"]).optional();
+  const historyFilter = (c: { req: { query(k: string): string | undefined } }) => ({
+    serviceId: c.req.query("service"),
+    validation: ValidationFilter.parse(c.req.query("validation") || undefined),
+  });
+  /** ?service=id, ?validation=pass|fail */
+  api.get("/history", (c) => c.json(history.list(historyFilter(c))));
+  /** Download history as HAR 1.2 (default) or Mimic's JSON; same filters as /history. */
+  api.get("/history/export", (c) => {
+    const format = z.enum(["har", "json"]).parse(c.req.query("format") ?? "har");
+    const entries = history.list(historyFilter(c));
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const service = Slug.safeParse(c.req.query("service")).data;
+    const name = `mimic-history${service ? `-${service}` : ""}-${stamp}.${format}`;
+    c.header("content-disposition", `attachment; filename="${name}"`);
+    return c.json(format === "har" ? toHar(entries, VERSION) : entries);
+  });
   api.get("/history/:id", (c) => {
     const entry = history.get(c.req.param("id"));
     return entry ? c.json(entry) : c.json({ error: "Not found" }, 404);

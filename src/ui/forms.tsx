@@ -182,6 +182,22 @@ export function ServiceForm(props: { service?: Service; values: FormValues; erro
           />
         </div>
       )}
+      <TextArea
+        name="responseSchema"
+        label="Response schema (JSON)"
+        values={values}
+        errors={errors}
+        rows={6}
+        mono
+        placeholder={'{\n  "2xx": { "type": "object", "required": ["id"] },\n  "default": { "type": "object" }\n}'}
+        hint={
+          <>
+            JSON Schemas keyed by status (<code>"200"</code>, <code>"2xx"</code> or <code>"default"</code>; most specific wins). Every
+            response, mocked or proxied, is checked and the result shown in History. Draft-07 if <code>$schema</code> says so,
+            otherwise 2020-12.
+          </>
+        }
+      />
       <Text name="tags" label="Tags" values={values} errors={errors} hint="Comma-separated." />
       <Actions submit={editing ? "Save service" : "Create service"} cancel={editing ? `${BASE}/services/${service.id}` : BASE} />
     </form>

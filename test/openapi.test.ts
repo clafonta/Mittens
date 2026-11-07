@@ -22,7 +22,7 @@ describe("planImport (OpenAPI 3.0 fixture)", () => {
       ["list-categories", "GET", "/v1/categories"],
     ]);
     const list = byId(plan, "list-pets");
-    expect(list).toMatchObject({ name: "List pets", mode: "static", upstream: "https://api.petstore.test", tags: ["pets", "petstore"], defaultScenario: "200" });
+    expect(list).toMatchObject({ name: "List pets", mode: "static", upstream: "https://petstore.swagger.io", tags: ["pets", "petstore"], defaultScenario: "200-a-page-of-pets" });
   });
 
   it("makes a scenario per response or named example, with deterministic bodies", () => {
@@ -30,16 +30,16 @@ describe("planImport (OpenAPI 3.0 fixture)", () => {
     expect(create.scenarios.map((s) => [s.id, s.status, s.name])).toEqual([
       ["201-cat", 201, "201 Created (A cat)"],
       ["201-dog", 201, "201 Created (A dog)"],
-      ["422", 422, "422 Invalid pet"],
+      ["422-invalid-pet", 422, "422 Invalid pet"],
     ]);
     expect(JSON.parse(create.scenarios[1]!.body)).toEqual({ id: 2, name: "Rex", tag: "dog" }); // $ref'd example
     expect(create.scenarios[2]!.headers).toEqual({ "content-type": "application/problem+json" });
 
     const list = byId(plan, "list-pets");
-    expect(list.scenarios.map((s) => [s.id, s.status])).toEqual([["200", 200], ["default", 500]]);
+    expect(list.scenarios.map((s) => [s.id, s.status])).toEqual([["200-a-page-of-pets", 200], ["default-unexpected-error", 500]]);
     expect(JSON.parse(list.scenarios[0]!.body)).toEqual([{ id: 1, name: "Rex", tag: "dog", owner: "string", born: "2030-01-01", weight: 0.5 }]);
-    expect(byId(plan, "delete-pet").scenarios).toEqual([expect.objectContaining({ id: "204", status: 204, body: "" })]);
-    expect(byId(plan, "show-pet-by-id").scenarios[1]).toMatchObject({ id: "404", body: '{\n  "code": 404,\n  "message": "no such pet"\n}\n' });
+    expect(byId(plan, "delete-pet").scenarios).toEqual([expect.objectContaining({ id: "204-deleted", status: 204, body: "" })]);
+    expect(byId(plan, "show-pet-by-id").scenarios[1]).toMatchObject({ id: "404-not-found", body: '{\n  "code": 404,\n  "message": "no such pet"\n}\n' });
   });
 
   it("turns response schemas into standalone JSON Schema", () => {
@@ -194,5 +194,37 @@ describe("oneOf samples", () => {
     };
     const sample = sampleFor(schema);
     expect(validateResponse({ default: schema }, 200, JSON.stringify(sample))!.ok).toBe(true);
+  });
+});
+
+describe("import papercuts", () => {
+  it("doesn't use placeholder hosts as upstreams, and says why", () => {
+    const spec = (url: string) => ({ openapi: "3.1.0", info: { title: "T" }, servers: [{ url }], paths: { "/a": { get: { responses: { "200": { description: "OK" } } } } } });
+    for (const url of ["https://shop.example.com/api", "https://api.example.org", "http://api.shop.test", "https://x.example", "https://nope.invalid"]) {
+      const plan = planImport(spec(url));
+      expect(plan.services[0]!.upstream, url).toBeUndefined();
+      expect(plan.warnings[0]).toContain("placeholder host");
+    }
+    expect(planImport(spec("https://shop.example.com/api")).services[0]!.path).toBe("/api/a"); // the prefix is still used
+    expect(planImport(spec("https://api.stripe.com/v1")).services[0]!.upstream).toBe("https://api.stripe.com");
+  });
+
+  it("names scenarios after their description, so ids aren't bare status codes", () => {
+    const plan = planImport({
+      openapi: "3.1.0",
+      info: { title: "T" },
+      paths: {
+        "/a": {
+          post: {
+            responses: {
+              "201": { description: "Created" },
+              "409": { description: "Not enough stock for this product, sorry about that" },
+              "500": { description: "" },
+            },
+          },
+        },
+      },
+    });
+    expect(plan.services[0]!.scenarios.map((s) => s.id)).toEqual(["201-created", "409-not-enough-stock-for-this", "500"]);
   });
 });

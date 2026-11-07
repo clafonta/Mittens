@@ -69,7 +69,7 @@ All paths below start with `/_mimic/api`.
 | DELETE | `/hooks/state` | clear hook state: every service's `ctx.state` and `ctx.shared` (`?service=id` for one service) |
 | GET / PUT | `/settings` | read / replace settings, e.g. `{ "errorScenario": { "service": "users", "scenario": "server-error" } }` |
 | GET | `/health` | `{ "ok": true }` while Mimic is running |
-| GET | `/events` | a live stream ([server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)): a `request` event for every request Mimic handles, `clear` when history is cleared |
+| GET | `/events` | a live stream ([server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)): `request` for every request Mimic handles, `clear` when history is cleared, `state` when the live state changes, `definitions` when services, scenarios, profiles or settings change |
 
 ## Watching requests live
 
@@ -85,6 +85,13 @@ data: {"id":"…","method":"GET","path":"/api/users/42","status":200,"source":"s
 ```
 
 Fields: `method`, `path`, `status`, `source` (as in the `x-mimic-source` header), `serviceId` and `scenarioId` when something answered, `durationMs`, and `valid` when a response schema was checked. Fetch `/history/:id` for the full request and response.
+
+The same stream sends `state` (`{"modified": ["users"], "tags": []}`) whenever a mode, default scenario or delay changes, a profile is applied or the tag filter changes, and `definitions` when anything in the definitions folder changes (from the dashboard, the API, or a file edit). A dev panel in your app can listen for them to refresh only when something actually changed:
+
+```js
+const events = new EventSource("http://localhost:4000/_mimic/api/events");
+events.addEventListener("state", () => refetchEverything());
+```
 
 Errors come back as JSON with an `error` message; validation errors (400) also list `issues`.
 

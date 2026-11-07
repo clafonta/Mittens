@@ -94,6 +94,11 @@ textarea { width:100%; font:inherit; padding:.45rem .65rem; color:var(--fg); bac
 .segmented > a:hover { position:relative; z-index:1; border-color:var(--muted); }
 .segmented > a.current { position:relative; z-index:2; background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500; }
 .tagbar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:0 0 1rem; }
+button.changed-reset { height:var(--control-h-sm); padding:0; gap:0; overflow:hidden; border-color:color-mix(in srgb, var(--warn) 55%, var(--line)); font-size:12.5px; }
+button.changed-reset > span { padding:0 .55rem; height:100%; display:inline-flex; align-items:center; }
+button.changed-reset .changed-label { color:var(--warn); background:color-mix(in srgb, var(--warn) 10%, transparent); border-right:1px solid color-mix(in srgb, var(--warn) 35%, var(--line)); font-weight:500; }
+button.changed-reset:hover { border-color:var(--warn); }
+table.services .switcher { flex-wrap:nowrap; } table.services .switcher select[name=defaultScenario] { max-width:13rem; } .switcher .pill { white-space:nowrap; }
 .pill.hook { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); color:var(--accent); }
 a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-color:var(--muted); }
 .switcher { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }

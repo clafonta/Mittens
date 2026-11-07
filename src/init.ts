@@ -91,10 +91,14 @@ export const EXAMPLE_PROFILES: Profile[] = [
  * Writes example definitions (unless the folder already has services) and
  * AGENTS.md / CLAUDE.md for coding agents (unless they already exist).
  */
-export async function init(dir: string): Promise<{ created: boolean; dir: string; agents: Written; claude: Written }> {
+export async function init(
+  dir: string,
+  opts: { examples?: boolean } = {},
+): Promise<{ created: boolean; dir: string; agents: Written; claude: Written }> {
   const root = path.resolve(dir);
   const files = await writeAgentFiles(root);
-  if (existsSync(path.join(root, "services"))) return { created: false, dir: root, ...files };
+  // --no-examples: just the agent notes, e.g. before `mimic import` fills the folder.
+  if (opts.examples === false || existsSync(path.join(root, "services"))) return { created: false, dir: root, ...files };
   const repo = new FileRepo(root);
   for (const service of EXAMPLE_SERVICES) {
     await repo.saveService(service);

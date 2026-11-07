@@ -25,7 +25,8 @@ const HELP = `mimic ${pkg.version} — local HTTP mock server and recording prox
 
 Usage:
   mimic [start] [options]   Start the server
-  mimic init [--dir <path>] Create example definitions
+  mimic init [--dir <path>] Create example definitions, plus AGENTS.md for coding
+                           agents (--no-examples: only AGENTS.md)
   mimic mcp [--url <url>]   Connect an AI assistant that launches local commands
                            (stdio) to the running Mimic; see the Assistants page
   mimic import <spec>       Create services from an OpenAPI 3 file or URL
@@ -66,6 +67,20 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+/** The first port after `port` that can be listened on, within 20 tries. */
+async function freePortAfter(port: number, host: string): Promise<number | undefined> {
+  const { createServer } = await import("node:net");
+  for (let p = port + 1; p <= Math.min(port + 20, 65535); p++) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const probe = createServer();
+      probe.once("error", () => resolve(false));
+      probe.listen(p, host, () => probe.close(() => resolve(true)));
+    });
+    if (ok) return p;
+  }
+  return undefined;
+}
+
 function openBrowser(url: string) {
   const [cmd, args] =
     process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
@@ -93,6 +108,7 @@ async function main() {
       help: { type: "boolean", short: "h", default: false },
       version: { type: "boolean", short: "v", default: false },
       "dry-run": { type: "boolean", default: false },
+      "no-examples": { type: "boolean", default: false },
       mode: { type: "string" },
       prefix: { type: "string" },
       url: { type: "string" },
@@ -106,8 +122,9 @@ async function main() {
   const dir = path.resolve(values.dir ?? process.env.MIMIC_DIR ?? "mimic");
 
   if (command === "init") {
-    const { created, agents, claude } = await init(dir);
-    console.log(created ? `Created example definitions in ${dir}` : `${dir} already has services; left them untouched.`);
+    const { created, agents, claude } = await init(dir, { examples: !values["no-examples"] });
+    if (created) console.log(`Created example definitions in ${dir}`);
+    else if (!values["no-examples"]) console.log(`${dir} already has services; left them untouched.`);
     const added = [agents === "created" && "AGENTS.md", claude === "created" && "CLAUDE.md"].filter(Boolean);
     if (added.length) console.log(`Added ${added.join(" and ")} so coding agents (Codex, Copilot, Cursor, Claude Code…) know how to edit these files.`);
     console.log(`Start with: npx @clafonta/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
@@ -212,9 +229,15 @@ async function main() {
     if (count === 0) console.log(`  No services yet — try 'npx @clafonta/mimic init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });
-  server.on("error", (err: NodeJS.ErrnoException) =>
-    fail(err.code === "EADDRINUSE" ? `port ${port} is already in use (try --port)` : err.message),
-  );
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EADDRINUSE") fail(err.message);
+    void freePortAfter(port, host).then((free) =>
+      fail(
+        `port ${port} is already in use (another Mimic?).` +
+          (free ? ` Port ${free} is free: npx @clafonta/mimic --port ${free}` : " Pick another with --port."),
+      ),
+    );
+  });
 
   const shutdown = () => {
     watcher?.close();
@@ -267,6 +290,11 @@ async function importSpec(
     const result = await applyImport(store, plan);
     console.log(describePlan(result, false));
     console.log(`Definitions: ${dir}`);
+    if (!existsSync(path.join(dir, "AGENTS.md"))) {
+      const rel = path.relative(process.cwd(), dir) || ".";
+      const dirFlag = rel === "mimic" ? "" : ` --dir ${rel}`;
+      console.log(`Tip: npx @clafonta/mimic init --no-examples${dirFlag} adds AGENTS.md, so coding agents know how to edit these files.`);
+    }
   } catch (err) {
     fail(err instanceof ImportError ? err.message : String(err));
   }

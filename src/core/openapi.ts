@@ -225,7 +225,16 @@ function sampleNumber(schema: Obj, integer: boolean): number {
 
 // ------------------------------------------------------------------ servers
 
-function serverParts(doc: Obj): { upstream?: string; prefix: string } {
+/**
+ * Hosts reserved for documentation and testing (RFC 2606/6761): a spec's
+ * servers often use them as placeholders, so they make poor upstreams.
+ */
+export function isPlaceholderHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/:\d+$/, "");
+  return /(^|\.)example\.(com|net|org)$/.test(h) || /\.(example|test|invalid)$/.test(h) || ["example", "test", "invalid"].includes(h);
+}
+
+function serverParts(doc: Obj): { upstream?: string; prefix: string; placeholder?: string } {
   const servers = Array.isArray(doc.servers) ? doc.servers : [];
   const first = servers.find(isObj);
   if (!first || typeof first.url !== "string") return { prefix: "" };
@@ -237,7 +246,9 @@ function serverParts(doc: Obj): { upstream?: string; prefix: string } {
   });
   try {
     const parsed = new URL(url);
-    return { upstream: parsed.origin, prefix: parsed.pathname.replace(/\/+$/, "") };
+    const prefix = parsed.pathname.replace(/\/+$/, "");
+    if (isPlaceholderHost(parsed.host)) return { prefix, placeholder: parsed.host };
+    return { upstream: parsed.origin, prefix };
   } catch {
     return { prefix: url.startsWith("/") ? url.replace(/\/+$/, "") : "" }; // relative server URL
   }
@@ -282,9 +293,11 @@ function scenariosFor(
     const status = statusOf(key);
     const description = typeof response.description === "string" ? response.description.trim().split("\n")[0]! : "";
     const label = `${key}${description ? ` ${description}` : ""}`.slice(0, 80);
+    // "409" + "Not enough stock" → 409-not-enough-stock: readable in the dashboard, and never a bare number in YAML.
+    const describe = description ? slugify(description.split(/\s+/).slice(0, 5).join(" "), "").slice(0, 32).replace(/-+$/, "") : "";
     const media = pickMedia(response.content);
     if (!media) {
-      scenarios.push({ id: uniqueId(slugify(key, "response"), ids), name: label, status, headers: {}, body: "", tags: [] });
+      scenarios.push({ id: uniqueId(slugify(describe ? `${key}-${describe}` : key, "response"), ids), name: label, status, headers: {}, body: "", tags: [] });
       continue;
     }
     const [type, mt] = media;
@@ -310,7 +323,7 @@ function scenariosFor(
     if (named.length) {
       for (const [name, ex] of named) make(name, `${label} (${typeof ex.summary === "string" ? ex.summary : name})`.slice(0, 120), ex.value);
     } else {
-      make("", label, mt.example !== undefined ? mt.example : sampleFor(schema));
+      make(describe, label, mt.example !== undefined ? mt.example : sampleFor(schema));
     }
   }
   return { scenarios, schemas };
@@ -346,6 +359,9 @@ export function planImport(input: unknown, opts: ImportOptions = {}): ImportPlan
 
   let mode: ServiceMode = opts.mode ?? "static";
   const warnings: string[] = [];
+  if (server.placeholder) {
+    warnings.push(`servers[0] uses a placeholder host (${server.placeholder}), so no upstream was set; add one to a service to use proxy mode`);
+  }
   if (mode === "proxy" && !server.upstream) {
     warnings.push("Proxy mode needs an absolute URL in servers[0]; services start in static mode instead");
     mode = "static";

@@ -75,14 +75,17 @@ function LiveSwitcher({ service, modified, view }: { service: Service; modified:
         </span>
       )}
       {modified && (
-        <>
-          <span class="pill s4" title="Differs from the YAML definition. Resets on restart.">
-            changed
-          </span>
-          <button type="button" hx-post={`${BASE}/ui/services/${service.id}/reset`} hx-target={target} hx-swap="outerHTML">
-            Reset
-          </button>
-        </>
+        <button
+          type="button"
+          class="changed-reset"
+          hx-post={`${BASE}/ui/services/${service.id}/reset`}
+          hx-target={target}
+          hx-swap="outerHTML"
+          title="Differs from the YAML definition (it also resets when Mimic restarts). Click to go back to the definition."
+        >
+          <span class="changed-label">changed</span>
+          <span>Reset</span>
+        </button>
       )}
     </form>
   );

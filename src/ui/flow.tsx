@@ -52,7 +52,13 @@ const curve = (x1: number, y1: number, x2: number, y2: number) => {
   return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
 };
 
-const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+/** Shortens text to n characters, at a word boundary when one is close. */
+const clip = (s: string, n: number) => {
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${space > n * 0.6 ? cut.slice(0, space) : cut}…`;
+};
 const hostOf = (url: string) => {
   try {
     return new URL(url).host;
@@ -66,7 +72,7 @@ export interface DiagramLayout {
   app: Box;
   mimic: Box;
   nomatch: Box;
-  services: { service: Service; box: Box; path: string; upstream?: { key: string; path: string; live: boolean } }[];
+  services: { service: Service; box: Box; path: string; upstream?: { key: string; path: string; live: boolean; drawn: boolean } }[];
   more?: { count: number; box: Box; path: string };
   upstreams: { key: string; host: string; box: Box }[];
   appPath: string;
@@ -101,8 +107,15 @@ export function layoutDiagram(all: Service[]): DiagramLayout {
       up = { key, host: key, box: { ...UP, y } };
       upstreams.push(up);
     }
-    return { service, box, path, upstream: { key, path: curve(right(box), midY(box), up.box.x, midY(up.box)), live: service.mode === "proxy" } };
+    return { service, box, path, upstream: { key, path: curve(right(box), midY(box), up.box.x, midY(up.box)), live: service.mode === "proxy", drawn: false } };
   });
+  // Draw a line for every service proxying to an upstream; an upstream nobody uses right now gets one dashed hint line,
+  // not one per service (imported specs give every operation the same upstream).
+  for (const u of upstreams) {
+    const users = services.filter((s) => s.upstream?.key === u.key);
+    const live = users.filter((s) => s.upstream!.live);
+    for (const s of live.length ? live : users.slice(0, 1)) s.upstream!.drawn = true;
+  }
   const moreBox = overflow > 0 ? rowBox(shown.length) : undefined;
   const lowest = Math.max(top + rows * (SVC.h + SVC.gap), nomatch.y + nomatch.h, ...upstreams.map((u) => u.box.y + u.box.h));
 
@@ -163,7 +176,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
         {l.services.map(({ service, path, upstream }) => (
           <>
             <path id={`p-svc-${service.id}`} class={`link${data.inactive.has(service.id) ? " faint" : ""}`} d={path} />
-            {upstream && <path id={`p-up-${service.id}`} class={`link${upstream.live ? "" : " dashed"}`} d={upstream.path} />}
+            {upstream?.drawn && <path id={`p-up-${service.id}`} class={`link${upstream.live ? "" : " dashed"}`} d={upstream.path} />}
           </>
         ))}
         {l.more && <path id="p-more" class="link" d={l.more.path} />}
@@ -204,6 +217,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
             class={`node service mode-${service.mode}${data.inactive.has(service.id) ? " inactive" : ""}`}
             id={`n-svc-${service.id}`}
           >
+            <title>{`${service.name} (${service.id})\n${service.method} ${service.path}`}</title>
             <rect x={box.x} y={box.y} width={box.w} height={box.h} rx="9" />
             <rect class="stripe" x={box.x} y={box.y} width="4" height={box.h} rx="2" />
             <text x={box.x + 16} y={box.y + 22} class="title">
@@ -262,7 +276,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
           <i class="dot s5"></i> 5xx
         </span>
         <span>
-          <i class="line dashed"></i> upstream not in use (service isn't in proxy mode)
+          <i class="line dashed"></i> upstream not in use (no service is proxying to it)
         </span>
         <span id="flow-status" class="muted" aria-live="polite" data-live-status></span>
       </figcaption>
@@ -434,12 +448,15 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
             </>
           );
           const cls = `node target kind-${t.kind}${t.reachable ? "" : " idle"}`;
+          const hint = t.reachable ? t.title : `${t.title}: can't answer in ${service.mode} mode; its count is from earlier requests`;
           return t.href ? (
             <a href={t.href} class={cls} id={`n-t-${t.key}`}>
+              <title>{hint}</title>
               {body}
             </a>
           ) : (
             <g class={cls} id={`n-t-${t.key}`}>
+              <title>{hint}</title>
               {body}
             </g>
           );
@@ -459,7 +476,7 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
           <i class="dot s5"></i> 5xx
         </span>
         <span>
-          <i class="line dashed"></i> can't answer in {service.mode} mode
+          <i class="line dashed"></i> can't answer in {service.mode} mode (counts are from earlier requests)
         </span>
         <span id="flow-status" class="muted" aria-live="polite" data-live-status></span>
       </figcaption>

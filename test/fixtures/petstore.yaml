@@ -3,7 +3,7 @@ info:
   title: Petstore
   version: 1.0.0
 servers:
-  - url: "{scheme}://api.petstore.test/v1"
+  - url: "{scheme}://petstore.swagger.io/v1"
     variables:
       scheme: { default: https }
 paths:

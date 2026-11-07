@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { type CompiledPath, compilePath, matchPath } from "./path.js";
 import type { Repo } from "./repo.js";
 import { hasAnyTag, Profile, ProfileEntry, Scenario, Service, type ServiceMode, Settings, tagsOf } from "./schema.js";
@@ -48,7 +49,20 @@ export interface LiveState {
  * writes it back to the definitions on purpose. Reads (`getService`,
  * `listServices`, `resolve`) return the live view.
  */
+export type StoreEvent = "state" | "definitions";
+
 export class Store {
+  /**
+   * "state": live state changed (modes, default scenarios, delays, profiles,
+   * tag filter). "definitions": services, scenarios, profiles or settings
+   * changed (in the dashboard, the API, or on disk). Used by the live
+   * event stream so apps and dev tools can refresh.
+   */
+  readonly events = new EventEmitter<{ state: []; definitions: [] }>();
+  private notify(...kinds: StoreEvent[]) {
+    for (const k of kinds) this.events.emit(k);
+  }
+
   private entries = new Map<string, Entry>();
   private profiles = new Map<string, Profile>();
   /** Overrides for services whose live state differs from their definition. */
@@ -102,7 +116,9 @@ export class Store {
       const definition = this.entries.get(id)?.service;
       if (definition && this.liveProblems(definition, state).length === 0) this.storeLive(definition, state);
     }
-    return { changed: this.fingerprint() !== before };
+    const changed = this.fingerprint() !== before;
+    if (changed) this.notify("definitions", "state");
+    return { changed };
   }
 
   private async loadFromRepo(): Promise<[Service[], Profile[], Settings]> {
@@ -178,6 +194,7 @@ export class Store {
       for (const sc of service.scenarios) await this.repo.saveScenario(service.id, sc);
     });
     this.entries.set(service.id, { service, compiled: compilePath(service.path) });
+    this.notify("definitions");
     return service;
   }
 
@@ -204,6 +221,7 @@ export class Store {
       if (this.liveProblems(service, next).length) this.live.delete(id);
       else this.storeLive(service, next);
     }
+    this.notify("definitions", "state");
     return this.getService(id);
   }
 
@@ -213,6 +231,7 @@ export class Store {
     this.entries.delete(id);
     this.live.delete(id);
     if (this.settings.errorScenario?.service === id) await this.clearGlobalErrorScenario();
+    this.notify("definitions", "state");
   }
 
   // ------------------------------------------------------------------ tags
@@ -235,6 +254,7 @@ export class Store {
    */
   setActiveTags(tags: string[]): string[] {
     this._activeTags = [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))].sort();
+    this.notify("state");
     return this.activeTags;
   }
 
@@ -256,6 +276,7 @@ export class Store {
     if (problem) throw new NotFoundError(problem, "errorScenario");
     await this.persist(() => this.repo.saveSettings(settings));
     this.settings = settings;
+    this.notify("definitions");
     return this.getSettings();
   }
 
@@ -304,6 +325,7 @@ export class Store {
       throw new ConflictError(first!.message, first!.field);
     }
     this.storeLive(definition, next);
+    this.notify("state");
     return this.getService(id);
   }
 
@@ -333,10 +355,13 @@ export class Store {
   resetLiveState(id?: string): string[] {
     if (id !== undefined) {
       this.getDefinition(id);
-      return this.live.delete(id) ? [id] : [];
+      if (!this.live.delete(id)) return [];
+      this.notify("state");
+      return [id];
     }
     const ids = this.modifiedServiceIds();
     this.live.clear();
+    if (ids.length) this.notify("state");
     return ids;
   }
 
@@ -348,6 +373,7 @@ export class Store {
       await this.updateService(id, { mode: live.mode, defaultScenario: live.defaultScenario, delayMs: live.delayMs });
       this.live.delete(id);
     }
+    if (ids.length) this.notify("state");
     return ids;
   }
 
@@ -362,6 +388,7 @@ export class Store {
     const scenarios = service.scenarios.filter((s) => s.id !== scenario.id).concat(scenario);
     scenarios.sort((a, b) => a.id.localeCompare(b.id));
     this.replace({ ...service, scenarios });
+    this.notify("definitions");
     return scenario;
   }
 
@@ -383,6 +410,7 @@ export class Store {
     if (live?.defaultScenario === scenarioId) this.storeLive(next, { ...live, defaultScenario: undefined });
     const global = this.settings.errorScenario;
     if (global?.service === serviceId && global.scenario === scenarioId) await this.clearGlobalErrorScenario();
+    this.notify("definitions", "state");
   }
 
   // ------------------------------------------------------------- profiles
@@ -404,6 +432,7 @@ export class Store {
     if (opts.create && this.profiles.has(profile.id)) throw new ConflictError(`Profile '${profile.id}' already exists`, "id");
     await this.persist(() => this.repo.saveProfile(profile));
     this.profiles.set(profile.id, profile);
+    this.notify("definitions");
     return profile;
   }
 
@@ -411,6 +440,7 @@ export class Store {
     this.getProfile(id);
     await this.persist(() => this.repo.deleteProfile(id));
     this.profiles.delete(id);
+    this.notify("definitions");
   }
 
   /** Every service's current mode and default scenario, in profile form. */
@@ -477,6 +507,7 @@ export class Store {
         changed.push(serviceId);
       }
     }
+    if (changed.length) this.notify("state");
     return changed.map((sid) => this.getService(sid));
   }
 

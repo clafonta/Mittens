@@ -3,6 +3,7 @@
 ```
 mimic [start] [options]     start the server
 mimic init [--dir <path>]   write example definitions, plus AGENTS.md for coding agents
+                            (--no-examples: only AGENTS.md and CLAUDE.md, e.g. before import)
 mimic mcp [--url <url>]     connect an assistant that starts local commands (see AI assistants)
 mimic import <spec>         create services from an OpenAPI 3 file or URL
 ```
@@ -13,7 +14,7 @@ Run without installing via `npx @clafonta/mimic …`, or install it (`npm i -g @
 
 | Option | Environment | Does |
 |---|---|---|
-| `-p`, `--port <n>` | `MIMIC_PORT` | port to listen on (default 4000) |
+| `-p`, `--port <n>` | `MIMIC_PORT` | port to listen on (default 4000); if it's taken, Mimic suggests a free one |
 | `--host <addr>` | `MIMIC_HOST` | interface (default `127.0.0.1`; `0.0.0.0` for other devices) |
 | `-d`, `--dir <path>` | `MIMIC_DIR` | definitions folder (default `./mimic`) |
 | `--read-only` | | never write to the definitions |

@@ -192,7 +192,8 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
   /**
    * Server-sent events: a `request` event (a RequestSummary as JSON) for each
    * request Mimic handles, `clear` when history is cleared, `state` when the
-   * live state changes ({ modified, tags }), and `definitions` when services,
+   * live state changes ({ modified, tags }), `hooks` when hook state is cleared
+   * ({ service }, null for all), and `definitions` when services,
    * scenarios, profiles or settings change. A comment is sent every 15 s to
    * keep proxies from closing the connection.
    */
@@ -204,16 +205,19 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
       const onState = () =>
         void stream.writeSSE({ event: "state", data: JSON.stringify({ modified: store.modifiedServiceIds(), tags: store.activeTags }) });
       const onDefinitions = () => void stream.writeSSE({ event: "definitions", data: "{}" });
+      const onHooks = (service?: string) => void stream.writeSSE({ event: "hooks", data: JSON.stringify({ service: service ?? null }) });
       history.on("entry", onEntry);
       history.on("clear", onClear);
       store.events.on("state", onState);
       store.events.on("definitions", onDefinitions);
+      hooks.events.on("reset", onHooks);
       stream.onAbort(() => {
         open = false;
         history.off("entry", onEntry);
         history.off("clear", onClear);
         store.events.off("state", onState);
         store.events.off("definitions", onDefinitions);
+        hooks.events.off("reset", onHooks);
       });
       await stream.write(": connected\n\n");
       while (open) {

@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -136,6 +137,8 @@ export class Hooks {
   private errors = new Map<string, string>();
   private states = new Map<string, Record<string, unknown>>();
   private shared: Record<string, unknown> = {};
+  /** "reset" (serviceId or undefined for all) whenever hook state is cleared. */
+  readonly events = new EventEmitter();
 
   constructor(
     private readonly root: string | undefined,
@@ -173,6 +176,7 @@ export class Hooks {
       this.states.clear();
       this.shared = {};
     }
+    this.events.emit("reset", serviceId);
   }
 
   /** All hooks currently loaded, and load errors, by service id. */

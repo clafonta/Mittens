@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { History } from "../src/core/history.js";
 import { Hooks } from "../src/core/hooks.js";
-import { FileRepo } from "../src/core/repo.js";
+import { FileRepo, MemoryRepo } from "../src/core/repo.js";
+import { Service } from "../src/core/schema.js";
 import { Store } from "../src/core/store.js";
 import { createApp } from "../src/http/app.js";
 import { fixtures, form, json, setup } from "./helpers.js";
@@ -100,5 +101,45 @@ describe("Start over on the Settings page", () => {
     const all = await request("/_mimic/reset", form({}));
     expect(decodeURIComponent(all.headers.get("location")!)).toContain("2 requests cleared from history");
     expect(history.list()).toHaveLength(0);
+  });
+});
+
+describe("live stream: hooks events", () => {
+  it("announces every hook-state clear, so open apps can refetch", async () => {
+    const store = new Store(new MemoryRepo([Service.parse({ id: "cart", name: "Cart", path: "/cart" })]));
+    await store.load();
+    const hooks = new Hooks(undefined);
+    const app = createApp({ store, history: new History(), hooks });
+    const request = (p: string, i?: RequestInit) => app.request(`http://localhost${p}`, i);
+    const before = hooks.events.listenerCount("reset");
+
+    const abort = new AbortController();
+    const reader = (await request("/_mimic/api/events", { signal: abort.signal })).body!.getReader();
+    const dec = new TextDecoder();
+    let text = "";
+    const next = async (needle: string) => {
+      while (!text.includes(needle)) text += dec.decode((await reader.read()).value);
+      const at = text.indexOf(needle);
+      const found = text.slice(at, text.indexOf("\n\n", at));
+      text = text.slice(at + needle.length);
+      return found;
+    };
+    await next(": connected");
+
+    await request("/_mimic/api/hooks/state?service=cart", { method: "DELETE" });
+    expect(await next("event: hooks")).toContain('"service":"cart"');
+    await request("/_mimic/api/hooks/state", { method: "DELETE" });
+    expect(await next("event: hooks")).toContain('"service":null');
+    // POST /reset announces it even when nothing else changed
+    await request("/_mimic/api/reset", { method: "POST" });
+    expect(await next("event: hooks")).toContain('"service":null');
+    await request("/_mimic/services/cart/hook/reset", form({}));
+    expect(await next("event: hooks")).toContain('"service":"cart"');
+
+    expect(hooks.events.listenerCount("reset")).toBe(before + 1);
+    abort.abort();
+    await reader.cancel().catch(() => {});
+    await new Promise((r) => setTimeout(r, 20));
+    expect(hooks.events.listenerCount("reset")).toBe(before);
   });
 });

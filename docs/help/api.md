@@ -55,6 +55,7 @@ All paths below start with `/_mimic/api`.
 | GET | `/profiles` | list, each with `active` and `problems` |
 | POST | `/profiles` | create (`?from=current` fills in the current state) |
 | GET / PUT / DELETE | `/profiles/:id` | read / replace / delete |
+| PATCH | `/profiles/:id` | change only what you send: `{ "services": { "reviews": { "scenario": "down" }, "cart": null } }` (`null` removes a service); `name`, `description` |
 | POST | `/profiles/:id/apply` | apply; returns the services that changed |
 
 ### History

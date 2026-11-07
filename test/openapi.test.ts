@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ImportError, parseSpec, planImport, sampleFor } from "../src/core/openapi.js";
+import { describeForId, ImportError, parseSpec, planImport, sampleFor } from "../src/core/openapi.js";
 import { validateResponse } from "../src/core/validate.js";
 import { setup } from "./helpers.js";
 
@@ -22,7 +22,7 @@ describe("planImport (OpenAPI 3.0 fixture)", () => {
       ["list-categories", "GET", "/v1/categories"],
     ]);
     const list = byId(plan, "list-pets");
-    expect(list).toMatchObject({ name: "List pets", mode: "static", upstream: "https://petstore.swagger.io", tags: ["pets", "petstore"], defaultScenario: "200-a-page-of-pets" });
+    expect(list).toMatchObject({ name: "List pets", mode: "static", upstream: "https://petstore.swagger.io", tags: ["pets", "petstore"], defaultScenario: "200-page-of-pets" });
   });
 
   it("makes a scenario per response or named example, with deterministic bodies", () => {
@@ -36,8 +36,8 @@ describe("planImport (OpenAPI 3.0 fixture)", () => {
     expect(create.scenarios[2]!.headers).toEqual({ "content-type": "application/problem+json" });
 
     const list = byId(plan, "list-pets");
-    expect(list.scenarios.map((s) => [s.id, s.status])).toEqual([["200-a-page-of-pets", 200], ["default-unexpected-error", 500]]);
-    expect(JSON.parse(list.scenarios[0]!.body)).toEqual([{ id: 1, name: "Rex", tag: "dog", owner: "string", born: "2030-01-01", weight: 0.5 }]);
+    expect(list.scenarios.map((s) => [s.id, s.status])).toEqual([["200-page-of-pets", 200], ["default-unexpected-error", 500]]);
+    expect(JSON.parse(list.scenarios[0]!.body)).toEqual([{ id: 1, name: "Rex", tag: "dog", owner: "Ada Lovelace", born: "2030-01-01", weight: 0.5 }]);
     expect(byId(plan, "delete-pet").scenarios).toEqual([expect.objectContaining({ id: "204-deleted", status: 204, body: "" })]);
     expect(byId(plan, "show-pet-by-id").scenarios[1]).toMatchObject({ id: "404-not-found", body: '{\n  "code": 404,\n  "message": "no such pet"\n}\n' });
   });
@@ -225,6 +225,81 @@ describe("import papercuts", () => {
         },
       },
     });
-    expect(plan.services[0]!.scenarios.map((s) => s.id)).toEqual(["201-created", "409-not-enough-stock-for-this", "500"]);
+    expect(plan.services[0]!.scenarios.map((s) => s.id)).toEqual(["201-created", "409-not-enough-stock", "500"]);
+  });
+
+  it("keeps ids short and whole: first clause, no filler, contractions intact", () => {
+    expect(describeForId("Reviews, newest first, with the average rating")).toBe("reviews");
+    expect(describeForId("The reviews service is down; the product page still works without it")).toBe("reviews-service-is-down");
+    expect(describeForId("The review isn't valid")).toBe("review-isnt-valid");
+    expect(describeForId("The review as stored")).toBe("review-as-stored");
+    expect(describeForId("A list of the things for a user")).toBe("list-of-things");
+    expect(describeForId("Payments unavailable")).toBe("payments-unavailable");
+    expect(describeForId("Supercalifragilisticexpialidocious and more")).toBe("");
+    expect(describeForId("")).toBe("");
+  });
+
+  it("falls back to the example's error code when the description has no words", () => {
+    const plan = planImport({
+      openapi: "3.1.0",
+      info: { title: "T" },
+      paths: {
+        "/a": {
+          post: {
+            responses: {
+              "422": { description: "—", content: { "application/json": { example: { error: "invalid_review", message: "Say more." } } } },
+            },
+          },
+        },
+      },
+    });
+    expect(plan.services[0]!.scenarios.map((s) => s.id)).toEqual(["422-invalid-review"]);
+  });
+});
+
+describe("generated sample bodies read like data", () => {
+  const review = {
+    type: "object",
+    required: ["id", "author", "rating", "body", "createdAt"],
+    properties: {
+      id: { type: "string" },
+      productId: { type: "string" },
+      author: { type: "string" },
+      email: { type: "string" },
+      rating: { type: "integer", minimum: 1, maximum: 5 },
+      title: { type: "string" },
+      body: { type: "string" },
+      createdAt: { type: "string" },
+      sku: { type: "string", pattern: "^SKU-\\d+$" },
+      misc: { type: "string" },
+    },
+  };
+
+  it("guesses strings from property names, unless a pattern says otherwise", () => {
+    expect(sampleFor(review)).toEqual({
+      id: "id-1001",
+      productId: "id-1001",
+      author: "Ada Lovelace",
+      email: "ada@example.com",
+      rating: 1,
+      title: "Example title",
+      body: "Some example text.",
+      createdAt: "2030-01-01T00:00:00Z",
+      sku: "string",
+      misc: "string",
+    });
+  });
+
+  it("keeps a count consistent with the list beside it", () => {
+    const list = {
+      type: "object",
+      properties: { count: { type: "integer", minimum: 0 }, average: { type: ["number", "null"], minimum: 1 }, items: { type: "array", items: review } },
+    };
+    const sample = sampleFor(list) as { count: number; items: unknown[] };
+    expect(sample.count).toBe(1);
+    expect(sample.items).toHaveLength(1);
+    // a count the schema pins down is left alone
+    const pinned = { type: "object", properties: { total: { type: "integer", maximum: 0 }, items: { type: "array", items: { type: "string" } } } };
+    expect(sampleFor(pinned)).toEqual({ total: 0, items: ["string"] });
   });
 });

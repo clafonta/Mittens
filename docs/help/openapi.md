@@ -8,7 +8,7 @@ If you have an OpenAPI 3.0 or 3.1 spec, Mimic can create the services for you:
 ## What you get
 
 - **One service per operation**, named after its `operationId` (`listPets` becomes `list-pets`).
-- **One scenario per response**, or per named example, named after the response's description (`409` "Not enough stock" becomes `409-not-enough-stock`). Bodies come from the spec's examples; where there are none, Mimic makes one up from the schema.
+- **One scenario per response**, or per named example, named after the response's description: its first few words, without "the" or "a" (`409` "Not enough stock for this product" becomes `409-not-enough-stock`). Bodies come from the spec's examples; where there are none, Mimic makes one up from the schema, guessing values from property names (`author` → "Ada Lovelace", `createdAt` → a date) and keeping counts in step with the list beside them. Rewrite these with real-looking data when you refine the scenarios.
 - **Response schemas** for [validation](schemas.md), so you see straight away if a scenario or the real API doesn't fit the spec.
 - The first 2xx response as each service's **default scenario**.
 - The spec's first server as the **upstream** (switch a service to proxy mode to reach the real API) and its path as a **route prefix**, e.g. `https://api.acme.dev/v1` gives routes starting with `/v1`. Servers on placeholder hosts (`example.com`, `*.example`, `*.test`, `*.invalid`) only give the prefix: Mimic doesn't set an upstream that can't exist, and says so.

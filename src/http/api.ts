@@ -92,6 +92,8 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
     const body = await c.req.json();
     return c.json(withStatus(await store.putProfile({ ...body, id: c.req.param("id") })));
   });
+  /** Body: { name?, description?, services?: { id: entry | null } }. Changes only the services listed; null removes one. */
+  api.patch("/profiles/:id", async (c) => c.json(withStatus(await store.patchProfile(c.req.param("id"), await c.req.json()))));
   api.delete("/profiles/:id", async (c) => {
     await store.deleteProfile(c.req.param("id"));
     return c.body(null, 204);

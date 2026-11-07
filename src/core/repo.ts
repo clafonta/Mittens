@@ -39,6 +39,14 @@ export class LoadError extends Error {
 
 const dump = (value: unknown) => YAML.stringify(value, { lineWidth: 0, blockQuote: "literal" });
 
+/** A profile with one line per service (`users: { mode: static, scenario: down }`), the way people write them by hand. */
+function dumpProfile(value: unknown): string {
+  const doc = new YAML.Document(value);
+  const services = doc.get("services");
+  if (YAML.isMap(services)) for (const item of services.items) if (YAML.isMap(item.value)) item.value.flow = true;
+  return doc.toString({ lineWidth: 0, blockQuote: "literal" });
+}
+
 /**
  * Write via a temp file + rename so readers (including the file watcher) never
  * see a half-written file. Temp names don't end in .yaml, so loaders skip them.
@@ -131,7 +139,7 @@ export class FileRepo implements Repo {
     const { id, ...def } = profile;
     const file = this.profilePath(id);
     await mkdir(path.dirname(file), { recursive: true });
-    await writeAtomic(file, dump(ProfileFile.parse(def)));
+    await writeAtomic(file, dumpProfile(ProfileFile.parse(def)));
   }
 
   async deleteProfile(profileId: string): Promise<void> {

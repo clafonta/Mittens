@@ -193,6 +193,16 @@ export type ProfileFile = z.infer<typeof ProfileFile>;
 export const Profile = ProfileFile.extend({ id: Slug });
 export type Profile = z.infer<typeof Profile>;
 
+/** A partial profile change: only the services listed change; null removes one. */
+export const ProfilePatch = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    services: z.record(Slug, ProfileEntry.nullable()).optional(),
+  })
+  .strict();
+export type ProfilePatch = z.infer<typeof ProfilePatch>;
+
 /** Points at one scenario of one service. */
 export const ScenarioRef = z.object({ service: Slug, scenario: Slug }).strict();
 export type ScenarioRef = z.infer<typeof ScenarioRef>;

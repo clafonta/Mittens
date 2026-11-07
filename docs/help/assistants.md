@@ -34,12 +34,14 @@ When an assistant has Mimic's tools (above), it should use those instead, since 
 |---|---|
 | Look around | `get_overview`, `get_service`, `read_help` |
 | Build mocks | `create_service`, `update_service`, `upsert_scenario`, `import_openapi`, `save_request_as_scenario` |
-| Try things out | `set_live_state`, `reset_live_state`, `apply_profile`, `send_request`, `replay_request` |
+| Try things out | `set_live_state`, `reset_live_state`, `reset_everything`, `apply_profile`, `send_request`, `replay_request` |
 | Debug | `list_requests`, `get_request`, `explain_request` |
-| Keep changes | `save_live_state`, `save_profile` |
+| Keep changes | `save_live_state`, `save_profile` (with `merge: true` to change only some services) |
 | Remove | `delete_service`, `delete_scenario` |
 
 Assistants are told to experiment with the live state (switching modes, applying profiles), which resets when Mimic restarts, and to only change your definition files when you ask them to build or keep something. Deleting tools are marked as destructive, so assistants ask before using them. `send_request` lets your assistant check its own work: the request goes through Mimic like your app's would, and appears in History.
+
+The tools don't write [hooks](hooks.md), since a hook is code you should see and review. For behaviour that needs memory (a cart, records created by POST), your assistant will write `services/<id>/hook.ts` as a file if it can edit files, or suggest it to you. `get_overview` shows which services have a hook, so an assistant knows when code, not a scenario, is answering.
 
 ## Things to try
 

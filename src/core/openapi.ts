@@ -158,8 +158,54 @@ const STRING_FORMATS: Record<string, string> = {
   byte: "",
 };
 
-/** A plausible value for a (dereferenced) schema; deterministic so files diff cleanly. */
-export function sampleFor(schema: unknown, depth = 0, minimal = false): unknown {
+/**
+ * Placeholder strings guessed from a property's name, so generated bodies read
+ * like data ("Ada Lovelace", not "string"). First match wins.
+ */
+const NAMED_STRINGS: [RegExp, string][] = [
+  [/^(id|uuid|key)$|[a-z](Id|_id|ID)$/, "id-1001"],
+  [/^(first_?name|given_?name)$/i, "Ada"],
+  [/^(last_?name|family_?name|surname)$/i, "Lovelace"],
+  [/^(author|user_?name|customer|owner|full_?name|display_?name|contact|reviewer|sender|recipient)$/i, "Ada Lovelace"],
+  [/e_?mail$/i, "ada@example.com"],
+  [/^(url|uri|link|href|website|homepage)$|(Url|_url)$/i, "https://example.com"],
+  [/^(image|avatar|photo|picture|thumbnail)(_?url)?$/i, "https://example.com/image.png"],
+  [/^(phone|mobile|tel|telephone)(_?number)?$/i, "+1 555 0100"],
+  [/(At|_at|Date|_date|^date|^timestamp)$/, "2030-01-01T00:00:00Z"],
+  [/^(title|subject|headline|label)$/i, "Example title"],
+  [/^(name)$/i, "Example name"],
+  [/^(description|summary|body|text|content|comment|message|note|notes|details|bio)$/i, "Some example text."],
+  [/^(city|town)$/i, "Springfield"],
+  [/^(country|country_?code)$/i, "US"],
+  [/^(zip|zip_?code|postal_?code|postcode)$/i, "10001"],
+  [/^(street|address|address_?line_?1)$/i, "1 Main Street"],
+  [/^(currency|currency_?code)$/i, "USD"],
+  [/^(lang|language|locale)$/i, "en"],
+  [/^(status|state)$/i, "active"],
+  [/^(color|colour)$/i, "#0f766e"],
+  [/^(slug|handle)$/i, "example"],
+  [/^(token|secret|password)$/i, "example-token"],
+];
+
+function namedString(name: string | undefined, schema: Obj): string | undefined {
+  if (!name) return undefined;
+  const hit = NAMED_STRINGS.find(([re]) => re.test(name))?.[1];
+  if (hit === undefined) return undefined;
+  if (typeof schema.pattern === "string") {
+    try {
+      if (!new RegExp(schema.pattern, "u").test(hit)) return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return hit;
+}
+
+/** count/total-like properties that describe a sibling array, so a sample says "count: 1" next to one item. */
+const COUNT_NAMES = /^(count|total|total_?count|size|length|num_?items|item_?count|results?_?count)$/i;
+
+/** A plausible value for a (dereferenced) schema; deterministic so files diff cleanly. `name` is the property's name, if any. */
+export function sampleFor(schema: unknown, depth = 0, minimal = false, name?: string): unknown {
   if (!isObj(schema) || depth > MAX_DEPTH) return isObj(schema) ? {} : null;
   if (schema.example !== undefined) return schema.example;
   if (Array.isArray(schema.examples) && schema.examples.length) return schema.examples[0];
@@ -167,19 +213,19 @@ export function sampleFor(schema: unknown, depth = 0, minimal = false): unknown 
   if (schema.default !== undefined) return schema.default;
   if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
   if (Array.isArray(schema.allOf)) {
-    const parts = schema.allOf.map((s) => sampleFor(s, depth + 1, minimal));
+    const parts = schema.allOf.map((s) => sampleFor(s, depth + 1, minimal, name));
     return parts.every(isObj) ? Object.assign({}, ...parts) : parts.find((p) => p !== null) ?? null;
   }
   for (const k of ["oneOf", "anyOf"] as const) {
     const options = schema[k];
     if (Array.isArray(options) && options.length) {
       const candidates = [...options.filter((o) => !(isObj(o) && o.type === "null")), ...options.filter((o) => isObj(o) && o.type === "null")];
-      const samples = candidates.map((o) => sampleFor(o, depth + 1, minimal));
+      const samples = candidates.map((o) => sampleFor(o, depth + 1, minimal, name));
       // For oneOf, a sample can accidentally fit several options; prefer one that fits exactly one,
       // falling back to required-properties-only samples, which overlap less.
       if (k === "oneOf" && depth <= 2) {
         const fits = (v: unknown) => matchesSchema(schema, v);
-        return samples.find(fits) ?? candidates.map((o) => sampleFor(o, depth + 1, true)).find(fits) ?? samples[0];
+        return samples.find(fits) ?? candidates.map((o) => sampleFor(o, depth + 1, true, name)).find(fits) ?? samples[0];
       }
       return samples[0];
     }
@@ -188,9 +234,18 @@ export function sampleFor(schema: unknown, depth = 0, minimal = false): unknown 
   if (type === "object" || (type === undefined && isObj(schema.properties))) {
     const out: Obj = {};
     const required = new Set(Array.isArray(schema.required) ? schema.required : []);
-    for (const [name, prop] of Object.entries(isObj(schema.properties) ? schema.properties : {})) {
-      if ((isObj(prop) && prop.writeOnly === true) || (minimal && !required.has(name))) continue;
-      out[name] = sampleFor(prop, depth + 1, minimal);
+    for (const [key, prop] of Object.entries(isObj(schema.properties) ? schema.properties : {})) {
+      if ((isObj(prop) && prop.writeOnly === true) || (minimal && !required.has(key))) continue;
+      out[key] = sampleFor(prop, depth + 1, minimal, key);
+    }
+    // Keep counts consistent with the list they describe ({count: 1, items: [one]}), when the schema allows it.
+    const lists = Object.values(out).filter(Array.isArray);
+    if (lists.length === 1) {
+      const n = lists[0]!.length;
+      for (const [key, value] of Object.entries(out)) {
+        const prop = isObj(schema.properties) ? schema.properties[key] : undefined;
+        if (typeof value === "number" && COUNT_NAMES.test(key) && isObj(prop) && !("example" in prop) && matchesSchema(prop, n)) out[key] = n;
+      }
     }
     return out;
   }
@@ -201,7 +256,7 @@ export function sampleFor(schema: unknown, depth = 0, minimal = false): unknown 
     return Array.from({ length: count }, () => structuredClone(item));
   }
   if (type === "string") {
-    let text = STRING_FORMATS[String(schema.format)] ?? "string";
+    let text = STRING_FORMATS[String(schema.format)] ?? namedString(name, schema) ?? "string";
     if (typeof schema.minLength === "number" && text.length < schema.minLength) text = text.padEnd(schema.minLength, "x");
     if (typeof schema.maxLength === "number" && text.length > schema.maxLength) text = text.slice(0, schema.maxLength);
     return text;
@@ -272,6 +327,39 @@ const statusOf = (key: string) => (/^\d{3}$/.test(key) ? Number(key) : /^[1-5]XX
 const schemaKey = (key: string) => (/^[1-5]XX$/i.test(key) ? key.toLowerCase() : key);
 const bodyText = (v: unknown, json: boolean) => (typeof v === "string" && !json ? v : `${JSON.stringify(v, null, 2)}\n`);
 
+const ARTICLES = new Set(["a", "an", "the"]);
+const FILLER = new Set(["a", "an", "the", "and", "or", "of", "to", "for", "with", "in", "on", "at", "by", "as", "is", "are", "was", "be", "its", "it", "this", "that", "when", "if", "but", "so"]);
+
+/**
+ * A short id part from a response description: the first clause, at most four
+ * words, without leading or trailing filler, contractions kept whole.
+ * "The reviews service is down; …" → reviews-service-is-down,
+ * "Reviews, newest first, with the average rating" → reviews,
+ * "The review isn't valid" → review-isnt-valid.
+ */
+export function describeForId(description: string): string {
+  const clause = description.split(/[;,:.()\u2013\u2014]|\s-\s/)[0] ?? "";
+  const words = clause
+    .toLowerCase()
+    .replace(/['\u2019]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !ARTICLES.has(w));
+  while (words.length && FILLER.has(words[0]!)) words.shift();
+  const picked: string[] = [];
+  for (const w of words) {
+    if (picked.length === 4 || [...picked, w].join("-").length > 32) break;
+    picked.push(w);
+  }
+  while (picked.length && FILLER.has(picked[picked.length - 1]!)) picked.pop();
+  return picked.join("-");
+}
+
+/** An example's machine-readable error code ({"error": "invalid_review"}), a good id when the description says nothing. */
+function errorCode(value: unknown): string {
+  const code = isObj(value) ? (value.error ?? value.code) : undefined;
+  return typeof code === "string" ? slugify(code, "").slice(0, 32).replace(/-+$/, "") : "";
+}
+
 function uniqueId(base: string, taken: Set<string>): string {
   let id = base;
   for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
@@ -294,7 +382,7 @@ function scenariosFor(
     const description = typeof response.description === "string" ? response.description.trim().split("\n")[0]! : "";
     const label = `${key}${description ? ` ${description}` : ""}`.slice(0, 80);
     // "409" + "Not enough stock" → 409-not-enough-stock: readable in the dashboard, and never a bare number in YAML.
-    const describe = description ? slugify(description.split(/\s+/).slice(0, 5).join(" "), "").slice(0, 32).replace(/-+$/, "") : "";
+    const describe = describeForId(description);
     const media = pickMedia(response.content);
     if (!media) {
       scenarios.push({ id: uniqueId(slugify(describe ? `${key}-${describe}` : key, "response"), ids), name: label, status, headers: {}, body: "", tags: [] });
@@ -323,7 +411,8 @@ function scenariosFor(
     if (named.length) {
       for (const [name, ex] of named) make(name, `${label} (${typeof ex.summary === "string" ? ex.summary : name})`.slice(0, 120), ex.value);
     } else {
-      make(describe, label, mt.example !== undefined ? mt.example : sampleFor(schema));
+      const value = mt.example !== undefined ? mt.example : sampleFor(schema);
+      make(describe || errorCode(value), label, value);
     }
   }
   return { scenarios, schemas };

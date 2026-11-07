@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { type CompiledPath, compilePath, matchPath } from "./path.js";
 import type { Repo } from "./repo.js";
-import { hasAnyTag, Profile, ProfileEntry, Scenario, Service, type ServiceMode, Settings, tagsOf } from "./schema.js";
+import { hasAnyTag, Profile, ProfileEntry, ProfilePatch, Scenario, Service, type ServiceMode, Settings, tagsOf } from "./schema.js";
 
 /** Store errors may name the input field at fault so forms can show the message in place. */
 export class StoreError extends Error {
@@ -434,6 +434,22 @@ export class Store {
     this.profiles.set(profile.id, profile);
     this.notify("definitions");
     return profile;
+  }
+
+  /**
+   * Changes part of a profile: name and description if given, and only the
+   * services listed (null removes a service from the profile). Others stay as
+   * they are.
+   */
+  async patchProfile(id: string, patch: ProfilePatch): Promise<Profile> {
+    const current = this.getProfile(id);
+    const { name, description, services = {} } = ProfilePatch.parse(patch);
+    const merged: Record<string, ProfileEntry> = { ...current.services };
+    for (const [serviceId, entry] of Object.entries(services)) {
+      if (entry === null) delete merged[serviceId];
+      else merged[serviceId] = entry;
+    }
+    return this.putProfile({ ...current, ...(name !== undefined && { name }), ...(description !== undefined && { description }), services: merged });
   }
 
   async deleteProfile(id: string): Promise<void> {

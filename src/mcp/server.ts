@@ -31,6 +31,7 @@ export const INSTRUCTIONS = `Mimic is a local HTTP mock server and recording pro
 Model:
 - A service is a route (method + path template like /api/users/{id}) with a mode: static (always its default scenario), dynamic (the scenario whose match rule fits the request best), or proxy (forward to its upstream URL and record).
 - A scenario is a canned response (status, headers, body), optionally with a match rule (params, query, headers, body text, JSONPath) and template: true to fill {{params.id}} etc. from the request.
+- A hook (services/<id>/hook.ts) is code that can answer or change requests and remember state (a cart, created records). get_overview shows which services have one. These tools don't write hooks: for stateful behaviour, write the file if you can edit files (read_help "hooks"), or suggest it to the user.
 - Definitions (services, scenarios, profiles) are YAML files the user commits. Live state (each service's current mode and default scenario, the tag filter) is in memory and resets on restart.
 
 How to work:
@@ -107,6 +108,14 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     };
   };
 
+  /** For the overview: whether code answers this service, so scenario changes aren't a mystery. */
+  const hookNote = (id: string) => {
+    const h = hooks.get(id);
+    if (h) return `${h.name}: code that may answer before any scenario (exports ${h.exports.join(", ")})`;
+    const error = hooks.error(id);
+    return error ? `failed to load: ${error}` : null;
+  };
+
   // ------------------------------------------------------------ overview
 
   tool(
@@ -114,7 +123,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     {
       title: "Get overview",
       description:
-        "Start here. Lists every service (route, live mode, default scenario, scenario ids, whether its live state differs from its files), profiles, the tag filter, the global error scenario, and request counts. Use get_service for one service's full details.",
+        "Start here. Lists every service (route, live mode, default scenario, scenario ids, whether a code hook answers it, whether its live state differs from its files), profiles, the tag filter, the global error scenario, and request counts. Use get_service for one service's full details.",
       input: {},
       annotations: READ,
     },
@@ -131,6 +140,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
           errorScenario: s.errorScenario ?? null,
           upstream: s.upstream ?? null,
           scenarios: s.scenarios.map((sc) => `${sc.id} (${sc.status}${sc.match ? ", has match rule" : ""})`),
+          hook: hookNote(s.id),
           modified: store.isModified(s.id),
           serving: store.isActive(s),
           tags: s.tags,
@@ -224,7 +234,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     {
       title: "Create or replace scenario",
       description:
-        "Creates or replaces a scenario of a service (written to its YAML file). body may be text or a JSON value; JSON gets content-type application/json unless you set headers. In dynamic mode, 'match' picks this scenario when every criterion fits: {method, params:{id:'404'}, query:{...}, headers:{...}, bodyContains, bodyMatches:{regex,flags}, json:{'$.user.role':'admin'}}; values can also be {regex:'^9\\\\d+$'}. Set template:true to use {{params.id}}, {{query.x}}, {{body.field | json}}, {{uuid}}, {{now}} in the body and headers.",
+        "Creates or replaces a scenario of a service (written to its YAML file). body may be text or a JSON value; JSON gets content-type application/json unless you set headers. In dynamic mode, 'match' picks this scenario when every criterion fits: {method, params:{id:'404'}, query:{...}, headers:{...}, bodyContains, bodyMatches:{regex,flags}, json:{'$.user.role':'admin'}}; values can also be {regex:'^9\\\\d+$'}. Set template:true to use {{params.id}}, {{query.x}}, {{body.field | json}}, {{uuid}}, {{now}} in the body and headers. Scenarios can't remember anything between requests; for that, the user needs a hook (code in services/<id>/hook.ts, which you can't create with these tools: write the file if you can edit files, or suggest it). If the service has a hook (see get_overview), the hook may answer before any scenario, so a scenario change can seem to do nothing; check with send_request.",
       input: {
         service: Slug.describe("Service id"),
         id: Slug.describe("Scenario id (file name)"),
@@ -377,19 +387,28 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
   tool(
     "save_profile",
     {
-      title: "Create or replace profile",
+      title: "Create, replace or update a profile",
       description:
-        "Saves a profile (written to profiles/<id>.yaml). Without 'services' it captures the current live state of every service, which is the easy way to save 'what I have now'.",
+        "Saves a profile (written to profiles/<id>.yaml). By default it replaces the whole profile: 'services' lists every service it sets, and without 'services' it captures the current live state of every service (the easy way to save 'what I have now'). To change an existing profile, pass merge: true: only the services you list change (null removes one), and name and description are kept unless given.",
       input: {
         id: Slug,
-        name: z.string().min(1),
+        name: z.string().min(1).optional().describe("Required unless merge is true"),
         description: z.string().optional(),
-        services: z.record(Slug, ProfileEntry).optional().describe('e.g. {"users": {"mode": "static", "scenario": "server-error"}, "orders": {"delayMs": 1500}}'),
+        services: z
+          .record(Slug, ProfileEntry.nullable())
+          .optional()
+          .describe('e.g. {"users": {"mode": "static", "scenario": "server-error"}, "orders": {"delayMs": 1500}}; with merge, null removes a service'),
+        merge: z.boolean().optional().describe("Update an existing profile instead of replacing it"),
       },
       annotations: OVERWRITE,
     },
-    async ({ id, name, description, services }) => {
-      const profile = await store.putProfile({ id, name, description: description ?? "", services: services ?? store.currentSettings() });
+    async ({ id, name, description, services, merge }) => {
+      if (merge) return { saved: await store.patchProfile(id, { name, description, services }) };
+      if (!name) throw new Error("name is required when creating or replacing a profile (or pass merge: true to update one).");
+      const nulls = Object.entries(services ?? {}).filter(([, e]) => e === null).map(([s]) => s);
+      if (nulls.length) throw new Error(`null entries (${nulls.join(", ")}) only make sense with merge: true; to replace the profile, leave those services out.`);
+      const entries = services as Record<string, z.infer<typeof ProfileEntry>> | undefined;
+      const profile = await store.putProfile({ id, name, description: description ?? "", services: entries ?? store.currentSettings() });
       return { saved: profile };
     },
   );

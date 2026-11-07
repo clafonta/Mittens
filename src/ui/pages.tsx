@@ -1081,7 +1081,28 @@ export function SettingsPage({ problems, children }: { problems: string[]; child
         <div class="banner error-banner">{p} — it is ignored until fixed.</div>
       ))}
       {children as never}
+      <StartOver />
     </>
+  );
+}
+
+/** One button back to a clean slate (POST /reset); files are not touched. */
+function StartOver() {
+  return (
+    <section class="start-over">
+      <h2>
+        Start over <HelpLink to="live-state#what-changes-your-files-and-what-doesnt" label="Help: live state" />
+      </h2>
+      <p class="muted">
+        Puts every service back to what its files say, clears the tag filter, empties hook state and clears request history. Your files aren't changed.
+      </p>
+      <form method="post" action={`${BASE}/reset`} class="inline start-over-form" onsubmit="return confirm('Start over? Live changes and hook state will be cleared.')">
+        <label class="check">
+          <input type="checkbox" name="keepHistory" value="1" /> Keep request history
+        </label>
+        <button type="submit">Start over</button>
+      </form>
+    </section>
   );
 }
 

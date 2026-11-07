@@ -32,7 +32,7 @@ describe("MCP endpoint", () => {
     expect(names).toEqual(
       [
         "apply_profile", "create_service", "delete_scenario", "delete_service", "explain_request", "get_overview", "get_request", "get_service",
-        "import_openapi", "list_requests", "read_help", "replay_request", "reset_live_state", "save_live_state", "save_profile",
+        "import_openapi", "list_requests", "read_help", "replay_request", "reset_everything", "reset_live_state", "save_live_state", "save_profile",
         "save_request_as_scenario", "send_request", "set_live_state", "update_service", "upsert_scenario",
       ].sort(),
     );
@@ -82,6 +82,8 @@ describe("MCP endpoint", () => {
     expect((await call("explain_request", { id: unmatched.id })).why).toBe("No service's path matches this request.");
 
     expect((await call("reset_live_state", {})).reset).toEqual(["users"]);
+    expect(await call("reset_everything", { keep: ["state"] })).toMatchObject({ reset: ["tags", "hooks", "history"], services: [] });
+    expect(await call("list_requests", {})).toMatchObject({ requests: [] });
   });
 
   it("returns readable errors instead of failing", async () => {

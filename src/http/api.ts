@@ -11,6 +11,7 @@ import { scenarioFromHistory } from "../core/record.js";
 import { upstreamUrl } from "../core/rewrite.js";
 import { hasAnyTag, ServiceMode, Slug } from "../core/schema.js";
 import type { Store } from "../core/store.js";
+import { ResetPart, resetAll } from "../core/reset.js";
 import { errorStatus } from "./errors.js";
 
 /** JSON management API, mounted at /_mimic/api. */
@@ -101,6 +102,7 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
   });
 
   // live state (in memory; resets on restart)
+  const ResetBody = z.object({ keep: z.array(ResetPart).optional() }).strict();
   const LivePatch = z
     .object({ mode: ServiceMode.optional(), defaultScenario: Slug.nullable().optional(), delayMs: z.number().int().min(0).optional() })
     .strict();
@@ -140,6 +142,18 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
   });
   /** Writes the live state back to the YAML definitions. */
   api.post("/state/save", async (c) => c.json({ saved: await store.saveLiveState() }));
+
+  /**
+   * One-call clean slate: live state, tag filter, hook state and history.
+   * Body (optional): { keep?: ("state"|"tags"|"hooks"|"history")[] }; or ?keep=history,hooks.
+   */
+  api.post("/reset", async (c) => {
+    const text = await c.req.text();
+    const body = ResetBody.parse(text.trim() ? JSON.parse(text) : {});
+    const fromQuery = (c.req.query("keep") ?? "").split(",").map((k) => k.trim()).filter(Boolean);
+    const keep = [...(body.keep ?? []), ...z.array(ResetPart).parse(fromQuery)];
+    return c.json(resetAll({ store, history, hooks }, keep));
+  });
 
   // OpenAPI import
   /** Body: the spec (JSON or YAML). Query: dryRun, mode, prefix, tags (comma-separated). */

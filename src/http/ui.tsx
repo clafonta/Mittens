@@ -13,6 +13,7 @@ import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, sum
 import { upstreamUrl } from "../core/rewrite.js";
 import { hasAnyTag, ServiceMode } from "../core/schema.js";
 import { StoreError, type Store } from "../core/store.js";
+import { resetAll } from "../core/reset.js";
 import {
   FormError,
   type FormErrors,
@@ -442,6 +443,18 @@ export function createUi(
     const body = toValues(await c.req.parseBody());
     const reset = store.resetLiveState();
     return c.redirect(withFlash(safeReturn(body.return, SERVICES), `Reset ${reset.length} service${reset.length === 1 ? "" : "s"} to starting state`), 303);
+  });
+
+  ui.post("/reset", async (c) => {
+    const body = toValues(await c.req.parseBody());
+    const r = resetAll({ store, history, hooks }, body.keepHistory ? ["history"] : []);
+    const parts = [
+      `${r.services.length} service${r.services.length === 1 ? "" : "s"} reset`,
+      ...(r.tags.length ? ["tag filter cleared"] : []),
+      "hook state cleared",
+      ...(r.reset.includes("history") ? [`${r.history} request${r.history === 1 ? "" : "s"} cleared from history`] : []),
+    ];
+    return c.redirect(withFlash(safeReturn(body.return, `${BASE}/settings`), `Started over: ${parts.join(", ")}`), 303);
   });
 
   ui.post("/services/:id/hook/reset", async (c) => {

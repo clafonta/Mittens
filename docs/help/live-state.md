@@ -24,6 +24,8 @@ This way, flipping a service to "outage" to test something never leaves your wor
 
 If you edit a starting value in the service form, that value also becomes live straight away.
 
+To start over completely, use **Start over** on the Settings page (or `POST /_mimic/api/reset`): it resets the live state, clears the tag filter, empties hook state and clears request history, all without touching your files.
+
 ## Profiles
 
 A profile is a named set of settings for several services, like "happy path", "new user", or "payments down". Applying it switches all of them at once; services the profile doesn't list are left alone.

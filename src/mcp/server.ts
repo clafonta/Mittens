@@ -8,6 +8,7 @@ import { MatchInput, scoreMatch } from "../core/match.js";
 import { applyImport, ImportError, importOptionsFrom, parseSpec, planImport, summarize as summarizeImport } from "../core/openapi.js";
 import { compilePath, matchPath } from "../core/path.js";
 import { scenarioFromHistory } from "../core/record.js";
+import { ResetPart, resetAll } from "../core/reset.js";
 import { HttpMethod, MatchRule, ProfileEntry, ServiceMode, Slug } from "../core/schema.js";
 import type { Store } from "../core/store.js";
 import type { Help } from "../help.js";
@@ -337,6 +338,18 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
       annotations: LIVE,
     },
     ({ service }) => ({ reset: store.resetLiveState(service) }),
+  );
+
+  tool(
+    "reset_everything",
+    {
+      title: "Reset Mimic to a clean slate",
+      description:
+        "Puts Mimic back the way it started: every service's live mode, scenario and delay, the tag filter, hook state (ctx.state and ctx.shared) and request history. Files are not touched. Pass keep to leave parts alone, e.g. [\"history\"].",
+      input: { keep: z.array(ResetPart).optional() },
+      annotations: OVERWRITE,
+    },
+    ({ keep }) => resetAll({ store, history, hooks }, keep ?? []),
   );
 
   tool(

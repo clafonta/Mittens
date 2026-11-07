@@ -13,9 +13,14 @@ curl -X PATCH http://localhost:4000/_mimic/api/state/services/users \
   -H 'content-type: application/json' \
   -d '{"mode":"static","defaultScenario":"server-error"}'
 
-# after it: back to what the files say, and clear history
-curl -X DELETE http://localhost:4000/_mimic/api/state
-curl -X DELETE http://localhost:4000/_mimic/api/history
+# between tests: a clean slate in one call
+curl -X POST http://localhost:4000/_mimic/api/reset
+```
+
+`POST /reset` puts every service back to what its files say (mode, default scenario, delay), clears the tag filter, empties hook state (`ctx.state` and `ctx.shared`) and clears history. To leave parts alone, name them in `keep`: `{"keep": ["history"]}`, or `?keep=history,hooks`. The parts are `state`, `tags`, `hooks` and `history`. It replies with what it did:
+
+```json
+{ "reset": ["state", "tags", "hooks", "history"], "services": ["payments"], "tags": [], "history": 12 }
 ```
 
 None of these touch your files. To assert on what your app sent, read `GET /_mimic/api/history?service=users`. To assert on contracts, check the `x-mimic-validation` header or `GET /_mimic/api/history?validation=fail`.
@@ -46,6 +51,7 @@ All paths below start with `/_mimic/api`.
 | DELETE | `/state/services/:id`, `/state` | reset one / every service to its starting state |
 | PUT | `/state/tags` | set the serving filter: `{ "tags": ["checkout"] }`; `[]` serves all |
 | POST | `/state/save` | write the live state into the files |
+| POST | `/reset` | clean slate: live state, tag filter, hook state and history; `{ "keep": ["history"] }` leaves parts alone |
 | GET | `/profiles` | list, each with `active` and `problems` |
 | POST | `/profiles` | create (`?from=current` fills in the current state) |
 | GET / PUT / DELETE | `/profiles/:id` | read / replace / delete |

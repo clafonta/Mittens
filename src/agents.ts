@@ -111,7 +111,7 @@ errorScenario: { service: users, scenario: server-error }   # used when nothing 
 
 ## Good to know
 
-- To change behaviour temporarily (make a service fail while testing), don't edit these files: \`curl -X PATCH http://localhost:4000/_mimic/api/state/services/users -H 'content-type: application/json' -d '{"mode":"static","defaultScenario":"server-error"}'\`, and \`curl -X DELETE http://localhost:4000/_mimic/api/state\` to undo. That live state resets when Mimic restarts.
+- To change behaviour temporarily (make a service fail while testing), don't edit these files: \`curl -X PATCH http://localhost:4000/_mimic/api/state/services/users -H 'content-type: application/json' -d '{"mode":"static","defaultScenario":"server-error"}'\`, and \`curl -X DELETE http://localhost:4000/_mimic/api/state\` to undo. That live state resets when Mimic restarts. For a clean slate between tests (live state, tag filter, hook state and history), \`curl -X POST http://localhost:4000/_mimic/api/reset\`.
 - Hooks (\`hook.ts\`) export \`request(req, ctx)\` and/or \`response(req, res, ctx)\`. Keep state that several services share in \`ctx.shared\` (modules you import aren't reloaded until Mimic restarts), and start a hook that always answers with \`if (ctx.live.modified) return;\` so profiles can still choose a scenario. See the help below.
 - Profiles can set \`delayMs\` per service, e.g. a "Slow network" profile.
 - Full documentation: http://localhost:4000/_mimic/help, or \`read_help\` if you have Mimic's tools.

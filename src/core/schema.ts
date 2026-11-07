@@ -170,6 +170,8 @@ export const ProfileEntry = z
     mode: ServiceMode.optional(),
     /** Becomes the service's defaultScenario. */
     scenario: Slug.optional(),
+    /** Service-level delay while the profile is applied, e.g. for a "Slow network" profile. */
+    delayMs: z.number().int().min(0).optional(),
   })
   .strict();
 export type ProfileEntry = z.infer<typeof ProfileEntry>;

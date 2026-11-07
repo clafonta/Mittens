@@ -75,6 +75,7 @@ tags: [errors]
 name: Outage
 services:
   users: { mode: static, scenario: server-error }
+  orders: { delayMs: 1500 }   # any of mode, scenario, delayMs
 ```
 
 ```yaml

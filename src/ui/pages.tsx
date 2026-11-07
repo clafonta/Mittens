@@ -69,6 +69,11 @@ function LiveSwitcher({ service, modified, view }: { service: Service; modified:
           </option>
         ))}
       </select>
+      {service.delayMs > 0 && (
+        <span class="pill" title={`Every response from this service waits ${service.delayMs} ms (scenario delays win)`}>
+          ⏱ {service.delayMs} ms
+        </span>
+      )}
       {modified && (
         <>
           <span class="pill s4" title="Differs from the YAML definition. Resets on restart.">
@@ -90,7 +95,19 @@ const Route = ({ service }: { service: Service }) => (
 );
 
 /** One row of the services table; re-rendered in place by htmx after a change. */
-export function ServiceRow({ service, modified, inactive = false, rate }: { service: Service; modified: boolean; inactive?: boolean; rate: RateSeries }) {
+export function ServiceRow({
+  service,
+  modified,
+  inactive = false,
+  rate,
+  hooked = false,
+}: {
+  service: Service;
+  modified: boolean;
+  inactive?: boolean;
+  rate: RateSeries;
+  hooked?: boolean;
+}) {
   const n = service.scenarios.length;
   return (
     <tr id={`svc-${service.id}`} class={inactive ? "inactive" : undefined}>
@@ -100,6 +117,14 @@ export function ServiceRow({ service, modified, inactive = false, rate }: { serv
             {service.name}
           </a>
           <TagPills tags={service.tags} />
+          {hooked && (
+            <>
+              {" "}
+              <span class="pill hook" title="A request hook answers before the mode applies; see the service page">
+                hook
+              </span>
+            </>
+          )}
           {inactive && (
             <>
               {" "}
@@ -148,7 +173,7 @@ export const ServiceFlowLive = (props: { service: Service; history: HistoryEntry
 );
 
 /** Renders the row or bar variant, for htmx updates. */
-export const ServiceLive = (props: { service: Service; modified: boolean; inactive?: boolean; view: ServiceView; rate: RateSeries }) =>
+export const ServiceLive = (props: { service: Service; modified: boolean; inactive?: boolean; view: ServiceView; rate: RateSeries; hooked?: boolean }) =>
   props.view === "bar" ? <ServiceBar {...props} /> : <ServiceRow {...props} />;
 
 /** A scenario's match rule as readable chips, in the same syntax as the form. */
@@ -294,6 +319,7 @@ export function ServicesPage(props: {
   inactive: string[];
   totalServices: number;
   rateOf: (id: string) => RateSeries;
+  hooked?: Set<string>;
 }) {
   const { services, profiles, modified, viewTag } = props;
   const changed = new Set(modified);
@@ -340,7 +366,7 @@ export function ServicesPage(props: {
           </thead>
           <tbody>
             {services.map((s) => (
-              <ServiceRow service={s} modified={changed.has(s.id)} inactive={inactive.has(s.id)} rate={props.rateOf(s.id)} />
+              <ServiceRow service={s} modified={changed.has(s.id)} inactive={inactive.has(s.id)} rate={props.rateOf(s.id)} hooked={props.hooked?.has(s.id)} />
             ))}
           </tbody>
         </table>
@@ -862,7 +888,7 @@ export function ProfilesPage({ profiles }: { profiles: ProfileInfo[] }) {
                       <code>{id}</code>
                       <span class="muted">
                         {" "}
-                        → {[e.mode, e.scenario].filter(Boolean).join(" / ") || "unchanged"}
+                        → {[e.mode, e.scenario, e.delayMs !== undefined && `${e.delayMs} ms`].filter(Boolean).join(" / ") || "unchanged"}
                       </span>
                     </div>
                   ))}

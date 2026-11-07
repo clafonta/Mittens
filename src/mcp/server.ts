@@ -99,8 +99,8 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     const def = store.getDefinition(id);
     return {
       ...s,
-      live: { mode: s.mode, defaultScenario: s.defaultScenario ?? null, modified: store.isModified(id), serving: store.isActive(s) },
-      starting: { mode: def.mode, defaultScenario: def.defaultScenario ?? null },
+      live: { mode: s.mode, defaultScenario: s.defaultScenario ?? null, delayMs: s.delayMs, modified: store.isModified(id), serving: store.isActive(s) },
+      starting: { mode: def.mode, defaultScenario: def.defaultScenario ?? null, delayMs: def.delayMs },
       hook: hooks.get(id)?.exports ?? null,
       dashboard: `${origin}${SERVICES}/${id}`,
     };
@@ -309,18 +309,20 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     {
       title: "Switch mode or default scenario (live)",
       description:
-        "Changes what a service does right now, without touching the files (resets on restart): its mode and/or default scenario. Use this to try things, e.g. make an endpoint return its error scenario.",
+        "Changes what a service does right now, without touching the files (resets on restart): its mode, default scenario and/or delay. Use this to try things, e.g. make an endpoint return its error scenario, or slow it down to test loading states.",
       input: {
         service: Slug,
         mode: ServiceMode.optional(),
         defaultScenario: Slug.nullable().optional().describe("null clears it"),
+        delayMs: z.number().int().min(0).optional().describe("Service-level delay in ms (scenario delays still win)"),
       },
       annotations: LIVE,
     },
-    ({ service, mode, defaultScenario }) => {
+    ({ service, mode, defaultScenario, delayMs }) => {
       store.setLiveState(service, {
         ...(mode !== undefined && { mode }),
         ...(defaultScenario !== undefined && { defaultScenario: defaultScenario ?? undefined }),
+        ...(delayMs !== undefined && { delayMs }),
       });
       return { live: serviceView(service).live };
     },
@@ -369,7 +371,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
         id: Slug,
         name: z.string().min(1),
         description: z.string().optional(),
-        services: z.record(Slug, ProfileEntry).optional().describe('e.g. {"users": {"mode": "static", "scenario": "server-error"}}'),
+        services: z.record(Slug, ProfileEntry).optional().describe('e.g. {"users": {"mode": "static", "scenario": "server-error"}, "orders": {"delayMs": 1500}}'),
       },
       annotations: OVERWRITE,
     },

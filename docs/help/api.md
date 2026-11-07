@@ -42,7 +42,7 @@ All paths below start with `/_mimic/api`.
 | Method | Path | Does |
 |---|---|---|
 | GET | `/state` | each service's live mode and default, with its starting values |
-| PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) |
+| PATCH | `/state/services/:id` | change live `mode` / `defaultScenario` (`null` clears) / `delayMs` |
 | DELETE | `/state/services/:id`, `/state` | reset one / every service to its starting state |
 | PUT | `/state/tags` | set the serving filter: `{ "tags": ["checkout"] }`; `[]` serves all |
 | POST | `/state/save` | write the live state into the files |
@@ -66,7 +66,7 @@ All paths below start with `/_mimic/api`.
 | Method | Path | Does |
 |---|---|---|
 | GET | `/hooks` | loaded hooks and load errors |
-| DELETE | `/hooks/state` | clear hook state (`?service=id` for one) |
+| DELETE | `/hooks/state` | clear hook state: every service's `ctx.state` and `ctx.shared` (`?service=id` for one service) |
 | GET / PUT | `/settings` | read / replace settings, e.g. `{ "errorScenario": { "service": "users", "scenario": "server-error" } }` |
 | GET | `/health` | `{ "ok": true }` while Mimic is running |
 | GET | `/events` | a live stream ([server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)): a `request` event for every request Mimic handles, `clear` when history is cleared |
@@ -87,3 +87,14 @@ data: {"id":"…","method":"GET","path":"/api/users/42","status":200,"source":"s
 Fields: `method`, `path`, `status`, `source` (as in the `x-mimic-source` header), `serviceId` and `scenarioId` when something answered, `durationMs`, and `valid` when a response schema was checked. Fetch `/history/:id` for the full request and response.
 
 Errors come back as JSON with an `error` message; validation errors (400) also list `issues`.
+
+## Calling from a browser
+
+Pages served from `localhost` (on any port), such as a dev panel inside the app you're building, can call these endpoints directly: Mimic answers their cross-origin (CORS) requests. Pages from anywhere else can't read them.
+
+Everything under `/_mimic` is meant for your own computer, so Mimic refuses:
+
+- requests that change something (POST, PUT, PATCH, DELETE) from other websites, which a browser would otherwise send on a page's behalf;
+- requests addressed to a host name other than `localhost`, an IP address, or this computer's name, which blocks DNS-rebinding tricks.
+
+Scripts and tools that don't run in a browser (curl, tests, CI) aren't affected. Mock traffic isn't either: your mocks answer any origin.

@@ -360,17 +360,24 @@ export const PROFILE_FIELDS = ["id", "name", "description", "services"];
 
 export function profileFromForm(values: FormValues) {
   const services: Record<string, ProfileEntry> = {};
+  const errors: FormErrors = {};
   for (const [key, v] of Object.entries(values)) {
     const m = /^svc\.([^.]+)\.include$/.exec(key);
     if (!m || !v) continue;
     const id = m[1]!;
     const mode = opt(values[`svc.${id}.mode`]);
     const scenario = opt(values[`svc.${id}.scenario`]);
-    services[id] = { ...(mode && { mode: mode as ProfileEntry["mode"] }), ...(scenario && { scenario }) };
+    const delay = opt(values[`svc.${id}.delayMs`]);
+    if (delay !== undefined && !/^\d+$/.test(delay)) errors.services = `Delay for '${id}' must be a whole number of milliseconds`;
+    services[id] = {
+      ...(mode && { mode: mode as ProfileEntry["mode"] }),
+      ...(scenario && { scenario }),
+      ...(delay !== undefined && /^\d+$/.test(delay) && { delayMs: Number(delay) }),
+    };
   }
   return done(
     { id: opt(values.id), name: opt(values.name), description: values.description?.trim() ?? "", services },
-    {},
+    errors,
   );
 }
 
@@ -380,6 +387,7 @@ export function profileToValues(p: Profile): FormValues {
     values[`svc.${id}.include`] = "on";
     values[`svc.${id}.mode`] = entry.mode ?? "";
     values[`svc.${id}.scenario`] = entry.scenario ?? "";
+    values[`svc.${id}.delayMs`] = entry.delayMs === undefined ? "" : String(entry.delayMs);
   }
   return values;
 }

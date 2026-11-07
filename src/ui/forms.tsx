@@ -338,7 +338,10 @@ export function ProfileForm(props: { services: Service[]; profileId?: string; va
       <h2>
         Services <HelpLink to="live-state#profiles" label="Help: profiles" />
       </h2>
-      <p class="hint">Tick the services this profile controls. “Leave as is” keeps whatever the service has when the profile is applied.</p>
+      <p class="hint">
+        Tick the services this profile controls. “Leave as is” (or an empty delay) keeps whatever the service has when the profile is
+        applied. A delay slows the service down, e.g. for a “Slow network” profile.
+      </p>
       {errors.services && <div class="error">{errors.services}</div>}
       <table>
         <thead>
@@ -347,6 +350,7 @@ export function ProfileForm(props: { services: Service[]; profileId?: string; va
             <th>Service</th>
             <th>Mode</th>
             <th>Default scenario</th>
+            <th>Delay (ms)</th>
           </tr>
         </thead>
         <tbody>
@@ -381,6 +385,18 @@ export function ProfileForm(props: { services: Service[]; profileId?: string; va
                       </option>
                     ))}
                   </select>
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    class="narrow"
+                    name={`${key}.delayMs`}
+                    value={values[`${key}.delayMs`] ?? ""}
+                    placeholder="leave"
+                    aria-label={`Delay for ${s.name}`}
+                  />
                 </td>
               </tr>
             );

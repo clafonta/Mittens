@@ -44,7 +44,36 @@ Runs on every response the service sends, whether it came from a scenario, a hoo
 - `ctx.service`: the service, in its live state
 - `ctx.scenario(id)`: see above
 - `ctx.state`: an object for this service that keeps its contents between requests until Mimic restarts; clear it with **Clear hook state** on the service page
+- `ctx.shared`: one object for every hook in the project, for state that spans services (a cart that "add to cart", "view cart" and "checkout" all use); cleared with `DELETE /_mimic/api/hooks/state`
+- `ctx.live`: the service's live `mode`, `defaultScenario` and `delayMs`, and `modified`, which is true when a profile or the dashboard chose a different mode or default scenario than the files
 - `ctx.log(...)`: print to Mimic's terminal, prefixed with the service id
+
+## Hooks and profiles
+
+A request hook runs before the service's mode and scenarios, so if it always answers, switching the service's default scenario or applying a profile has no visible effect. To let those choices win, start the hook with:
+
+```js
+if (ctx.live.modified) return; // a profile or the dashboard picked something: let that scenario answer
+```
+
+`modified` only looks at the mode and default scenario; a profile that just slows the service down doesn't count, so the hook keeps answering, slowly.
+
+## State across services
+
+Put state that several services need in `ctx.shared`, not in a module of your own: Mimic can't reload a module once hooks have imported it, so edits to a shared helper file need a restart (Mimic logs a reminder when such a file changes). Helpers without state, like a list of products, are fine in a shared file.
+
+```ts
+// services/add-cart-item/hook.ts
+export const request: RequestHook = (req, ctx) => {
+  const { productId } = req.json as { productId: string };
+  const cart = (ctx.shared.cart ??= {}) as Record<string, number>;
+  cart[productId] = (cart[productId] ?? 0) + 1;
+  return { status: 201, body: cart };
+};
+
+// services/get-cart/hook.ts
+export const request: RequestHook = (req, ctx) => ({ body: ctx.shared.cart ?? {} });
+```
 
 ## When something goes wrong
 

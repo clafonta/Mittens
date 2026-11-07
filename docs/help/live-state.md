@@ -44,6 +44,20 @@ services:
     scenario: server-error
 ```
 
+## Slowing services down
+
+A profile entry can also set `delayMs`, the delay before each response from that service, which is how you make a "Slow network" profile for testing loading states:
+
+```yaml
+# profiles/slow-network.yaml
+name: Slow network
+services:
+  products: { delayMs: 1500 }
+  cart: { delayMs: 1500 }
+```
+
+The delay is live state like the rest: it resets on restart, and **Save as starting state** writes it to the service. A scenario's own delay still wins over the service's. You can also set it with `PATCH /_mimic/api/state/services/<id>` and `{"delayMs": 1500}`. Services with a delay show **⏱ 1500 ms** on the Services page.
+
 ## Read-only mode
 
 `--read-only` loads the definitions but never writes to disk: edits made in the dashboard last until Mimic stops. Useful for shared or generated definitions, and for CI.

@@ -8,6 +8,7 @@ import { loadHelp } from "../help.js";
 import { McpActivity } from "../mcp/activity.js";
 import { MCP_PATH, mcpHandler } from "../mcp/http.js";
 import { createApi } from "./api.js";
+import { localCors, localOnly } from "./local.js";
 import { mockHandler } from "./mock.js";
 import { BASE } from "./paths.js";
 import { createUi } from "./ui.js";
@@ -26,6 +27,10 @@ export function createApp({ store, history, fetchImpl, hooks = new Hooks(undefin
   const app = new Hono();
   const engine = new Engine(store, history, fetchImpl, hooks);
   const activity = new McpActivity();
+  // Everything under /_mimic is for this computer only (see local.ts); the API also answers local dev tools on other ports.
+  app.use(BASE, localOnly);
+  app.use(`${BASE}/*`, localOnly);
+  app.use(`${BASE}/api/*`, localCors);
   app.route(`${BASE}/api`, createApi(store, history, engine, hooks));
   // MCP endpoint for AI assistants (Claude Code, Codex, Copilot, Cursor…), before the dashboard's catch-all.
   app.all(`${BASE}${MCP_PATH}`, mcpHandler({ store, history, engine, hooks, help: loadHelp(BASE), activity }));

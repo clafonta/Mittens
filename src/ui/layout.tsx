@@ -94,10 +94,11 @@ textarea { width:100%; font:inherit; padding:.45rem .65rem; color:var(--fg); bac
 .segmented > a:hover { position:relative; z-index:1; border-color:var(--muted); }
 .segmented > a.current { position:relative; z-index:2; background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500; }
 .tagbar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:0 0 1rem; }
+.pill.hook { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); color:var(--accent); }
 a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-color:var(--muted); }
 .switcher { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .actions { display:flex; align-items:center; gap:.5rem; margin-top:1.25rem; }
-.field input:not([type=checkbox]), .field select { width:100%; }
+.field input:not([type=checkbox]), .field select { width:100%; } input.narrow { width:6.5rem; }
 /* ---- home: overview cards */
 .cards { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:.75rem; margin:0 0 1.25rem; } @media (max-width: 900px) { .cards { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 .card { display:flex; flex-direction:column; gap:.15rem; padding:.85rem 1rem; background:var(--surface); border:1px solid var(--line); border-radius:10px; color:var(--fg); text-decoration:none; }

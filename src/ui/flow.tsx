@@ -15,6 +15,8 @@ export interface HomeData {
   historyLimit: number;
   origin: string;
   rateOf: (id: string) => RateSeries;
+  /** Services whose request hook can answer before the mode applies. */
+  hooked?: Set<string>;
   /** Whether an AI assistant has connected, and whether AGENTS.md is in place, for the home page's assistant panel. */
   assistant?: {
     client?: { name: string; version?: string };
@@ -121,7 +123,9 @@ export function layoutDiagram(all: Service[]): DiagramLayout {
 
 const MODE_LABEL: Record<ServiceMode, string> = { static: "static", dynamic: "dynamic", proxy: "proxy" };
 
-function subtitle(s: Service): string {
+function subtitle(s: Service, hooked = false): string {
+  // A request hook answers before the mode applies, so say so rather than suggest a scenario answers.
+  if (hooked) return `hook answers · ${MODE_LABEL[s.mode]}`;
   if (s.mode === "proxy") return `proxy → ${s.upstream ? hostOf(s.upstream) : "no upstream"}`;
   const def = s.scenarios.find((sc) => sc.id === s.defaultScenario);
   return `${MODE_LABEL[s.mode]}${def ? ` · ${def.name}` : s.mode === "static" ? " · no default" : ""}`;
@@ -206,7 +210,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
               {clip(service.name, 18)}
             </text>
             <text x={box.x + 16} y={box.y + 40} class="sub">
-              {clip(subtitle(service), 22)}
+              {clip(subtitle(service, data.hooked?.has(service.id)), 22)}
             </text>
             <Sparkline id={service.id} series={data.rateOf(service.id)} x={right(box) - 14 - SPARK_WIDTH} y={box.y + 9} label={false} />
             {data.modified.has(service.id) && (

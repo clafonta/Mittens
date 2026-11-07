@@ -35,6 +35,8 @@ interface Entry {
 export interface LiveState {
   mode: ServiceMode;
   defaultScenario: string | undefined;
+  /** Service-level delay, e.g. a "Slow network" profile. Scenario delays still take precedence. */
+  delayMs: number;
 }
 
 /**
@@ -196,6 +198,7 @@ export class Store {
       const next: LiveState = {
         mode: service.mode !== before.mode ? service.mode : live.mode,
         defaultScenario: service.defaultScenario !== before.defaultScenario ? service.defaultScenario : live.defaultScenario,
+        delayMs: service.delayMs !== before.delayMs ? service.delayMs : live.delayMs,
       };
       // If the edit made the override impossible (e.g. upstream removed while live in proxy), drop it.
       if (this.liveProblems(service, next).length) this.live.delete(id);
@@ -293,6 +296,7 @@ export class Store {
     const next: LiveState = {
       mode: patch.mode ?? current.mode,
       defaultScenario: "defaultScenario" in patch ? patch.defaultScenario : current.defaultScenario,
+      delayMs: patch.delayMs ?? current.delayMs,
     };
     const problems = this.liveProblems(definition, next);
     if (problems.length) {
@@ -312,6 +316,19 @@ export class Store {
     return this.live.has(id);
   }
 
+  /**
+   * Whether the live mode or default scenario differs from the definition
+   * (a profile or the dashboard chose something else). Hooks use this to
+   * step aside and let the chosen scenario answer. A changed delay alone
+   * doesn't count.
+   */
+  isChoiceModified(id: string): boolean {
+    const live = this.live.get(id);
+    if (!live) return false;
+    const def = this.getDefinition(id);
+    return live.mode !== def.mode || live.defaultScenario !== def.defaultScenario;
+  }
+
   /** Discards live changes for one service, or all services, returning to the definitions. */
   resetLiveState(id?: string): string[] {
     if (id !== undefined) {
@@ -328,7 +345,7 @@ export class Store {
     const ids = this.modifiedServiceIds();
     for (const id of ids) {
       const live = this.live.get(id)!;
-      await this.updateService(id, { mode: live.mode, defaultScenario: live.defaultScenario });
+      await this.updateService(id, { mode: live.mode, defaultScenario: live.defaultScenario, delayMs: live.delayMs });
       this.live.delete(id);
     }
     return ids;
@@ -400,7 +417,7 @@ export class Store {
   currentSettings(): Record<string, ProfileEntry> {
     const services: Record<string, ProfileEntry> = {};
     for (const s of this.listServices()) {
-      services[s.id] = s.defaultScenario ? { mode: s.mode, scenario: s.defaultScenario } : { mode: s.mode };
+      services[s.id] = { mode: s.mode, ...(s.defaultScenario && { scenario: s.defaultScenario }), ...(s.delayMs > 0 && { delayMs: s.delayMs }) };
     }
     return services;
   }
@@ -431,7 +448,8 @@ export class Store {
       return (
         !!service &&
         (entry.mode === undefined || service.mode === entry.mode) &&
-        (entry.scenario === undefined || service.defaultScenario === entry.scenario)
+        (entry.scenario === undefined || service.defaultScenario === entry.scenario) &&
+        (entry.delayMs === undefined || service.delayMs === entry.delayMs)
       );
     });
   }
@@ -449,8 +467,12 @@ export class Store {
     for (const [serviceId, entry] of Object.entries(profile.services)) {
       const definition = this.getDefinition(serviceId);
       const current = this.liveOf(definition);
-      const next: LiveState = { mode: entry.mode ?? current.mode, defaultScenario: entry.scenario ?? current.defaultScenario };
-      if (next.mode !== current.mode || next.defaultScenario !== current.defaultScenario) {
+      const next: LiveState = {
+        mode: entry.mode ?? current.mode,
+        defaultScenario: entry.scenario ?? current.defaultScenario,
+        delayMs: entry.delayMs ?? current.delayMs,
+      };
+      if (next.mode !== current.mode || next.defaultScenario !== current.defaultScenario || next.delayMs !== current.delayMs) {
         this.storeLive(definition, next);
         changed.push(serviceId);
       }
@@ -461,17 +483,17 @@ export class Store {
   // ------------------------------------------------------------- internals
 
   private liveOf(definition: Service): LiveState {
-    return this.live.get(definition.id) ?? { mode: definition.mode, defaultScenario: definition.defaultScenario };
+    return this.live.get(definition.id) ?? { mode: definition.mode, defaultScenario: definition.defaultScenario, delayMs: definition.delayMs };
   }
 
   private withLive(definition: Service): Service {
     const live = this.live.get(definition.id);
-    return live ? { ...definition, mode: live.mode, defaultScenario: live.defaultScenario } : definition;
+    return live ? { ...definition, mode: live.mode, defaultScenario: live.defaultScenario, delayMs: live.delayMs } : definition;
   }
 
   /** Records a live state, dropping the override when it matches the definition. */
   private storeLive(definition: Service, state: LiveState) {
-    if (state.mode === definition.mode && state.defaultScenario === definition.defaultScenario) this.live.delete(definition.id);
+    if (state.mode === definition.mode && state.defaultScenario === definition.defaultScenario && state.delayMs === definition.delayMs) this.live.delete(definition.id);
     else this.live.set(definition.id, state);
   }
 

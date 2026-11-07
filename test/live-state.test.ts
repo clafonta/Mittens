@@ -85,8 +85,9 @@ describe("live state (API)", () => {
       active: true,
       mode: "static",
       defaultScenario: "boom",
+      delayMs: 0,
       modified: true,
-      starting: { mode: "dynamic", defaultScenario: "ok" },
+      starting: { mode: "dynamic", defaultScenario: "ok", delayMs: 0 },
     });
 
     // null clears the live default scenario

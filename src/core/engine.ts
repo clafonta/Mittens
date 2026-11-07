@@ -182,6 +182,8 @@ export class Engine {
       service,
       scenario: scenarioPick,
       state: this.hooks!.state(service.id),
+      shared: this.hooks!.sharedState(),
+      live: { mode: service.mode, defaultScenario: service.defaultScenario, delayMs: service.delayMs, modified: this.store.isChoiceModified(service.id) },
       log: (...args: unknown[]) => console.log(`[${service.id}]`, ...args),
     };
   }

@@ -92,6 +92,9 @@ export function createUi(
       status,
     );
 
+  /** Services with a request hook, which answers before the mode applies. */
+  const hookedIds = () => new Set(hooks.summary().filter((h) => h.exports.includes("request")).map((h) => h.serviceId));
+
   const hookInfo = (id: string) => {
     const loaded = hooks.get(id);
     const error = hooks.error(id);
@@ -192,6 +195,7 @@ export function createUi(
       historyLimit: history.limit,
       origin: new URL(c.req.url).origin,
       rateOf,
+      hooked: hookedIds(),
       assistant: {
         client: activity.client,
         lastSeen: activity.lastSeen(),
@@ -218,6 +222,7 @@ export function createUi(
         inactive={all.filter((s) => !store.isActive(s)).map((s) => s.id)}
         totalServices={all.length}
         rateOf={rateOf}
+        hooked={hookedIds()}
       />,
     );
   });
@@ -539,7 +544,14 @@ export function createUi(
     });
     c.header("HX-Trigger", "live-changed");
     return c.html(
-      <ServiceLive service={service} modified={store.isModified(service.id)} inactive={!store.isActive(service)} view={viewOf(form.view)} rate={rateOf(service.id)} />,
+      <ServiceLive
+        service={service}
+        modified={store.isModified(service.id)}
+        inactive={!store.isActive(service)}
+        view={viewOf(form.view)}
+        rate={rateOf(service.id)}
+        hooked={hookedIds().has(service.id)}
+      />,
     );
   });
   ui.post("/ui/services/:id/reset", async (c) => {
@@ -548,7 +560,9 @@ export function createUi(
     store.resetLiveState(id);
     c.header("HX-Trigger", "live-changed");
     const service = store.getService(id);
-    return c.html(<ServiceLive service={service} modified={false} inactive={!store.isActive(service)} view={viewOf(form.view)} rate={rateOf(service.id)} />);
+    return c.html(
+      <ServiceLive service={service} modified={false} inactive={!store.isActive(service)} view={viewOf(form.view)} rate={rateOf(service.id)} hooked={hookedIds().has(service.id)} />,
+    );
   });
   ui.get("/ui/services/:id/upstream", (c) => {
     const service = store.getService(c.req.param("id"));

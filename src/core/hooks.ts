@@ -36,6 +36,19 @@ export interface HookContext {
   scenario(id: string): HookResult;
   /** Per-service storage that lasts across requests until Mimic restarts. */
   state: Record<string, unknown>;
+  /**
+   * Storage shared by every hook in the project, for state that spans
+   * services (a cart that add-to-cart, view-cart and checkout all use).
+   * Lasts until Mimic restarts or hook state is cleared.
+   */
+  shared: Record<string, unknown>;
+  /**
+   * The service's live state. `modified` is true when a profile or the
+   * dashboard chose a different mode or default scenario than the files:
+   * a hook that normally answers can return nothing to let that choice
+   * answer instead (`if (ctx.live.modified) return;`).
+   */
+  live: { mode: Service["mode"]; defaultScenario?: string; delayMs: number; modified: boolean };
   /** Write to Mimic's terminal output, prefixed with the service id. */
   log(...args: unknown[]): void;
 }
@@ -122,6 +135,7 @@ export class Hooks {
   private loaded = new Map<string, LoadedHook>();
   private errors = new Map<string, string>();
   private states = new Map<string, Record<string, unknown>>();
+  private shared: Record<string, unknown> = {};
 
   constructor(
     private readonly root: string | undefined,
@@ -147,9 +161,18 @@ export class Hooks {
     return s;
   }
 
+  /** State shared by every hook (ctx.shared). */
+  sharedState(): Record<string, unknown> {
+    return this.shared;
+  }
+
+  /** Clears one service's ctx.state, or every service's plus ctx.shared. */
   resetState(serviceId?: string) {
     if (serviceId) this.states.delete(serviceId);
-    else this.states.clear();
+    else {
+      this.states.clear();
+      this.shared = {};
+    }
   }
 
   /** All hooks currently loaded, and load errors, by service id. */

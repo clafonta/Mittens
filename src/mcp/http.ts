@@ -1,30 +1,23 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { Context } from "hono";
+import { isAllowedHost, isSameOrigin, requestHost } from "../http/local.js";
 import { createMcpServer, type McpDeps } from "./server.js";
 
 /** Where the endpoint lives under the dashboard prefix. */
 export const MCP_PATH = "/mcp";
 
-const isIp = (h: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(":");
-
 /**
  * Only local clients get in. A web page could otherwise reach this endpoint
  * through the user's browser: requests from other origins are refused, and
- * the Host must be localhost or an IP address, which defeats DNS rebinding
- * (where an attacker's domain name is made to resolve to 127.0.0.1).
+ * the Host must be local (localhost, an IP address, or this machine's name),
+ * which defeats DNS rebinding. Stricter than the rest of /_mimic: even pages
+ * on localhost can't call it, since assistants don't run in a browser.
  */
 export function refuse(req: Request): string | undefined {
-  const url = new URL(req.url);
-  const host = (req.headers.get("host") ?? url.host).replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
-  if (host !== "localhost" && !host.endsWith(".localhost") && !isIp(host)) {
-    return `Host '${host}' isn't allowed; connect to Mimic as localhost or by IP address.`;
-  }
+  const host = requestHost(req);
+  if (!isAllowedHost(host)) return `Host '${host}' isn't allowed; connect to Mimic as localhost or by IP address.`;
   const origin = req.headers.get("origin");
-  if (origin && origin !== "null") {
-    const o = new URL(origin);
-    const sameHost = o.hostname.replace(/^\[|\]$/g, "").toLowerCase() === host && (o.port || "80") === (url.port || "80");
-    if (!sameHost) return `Requests from ${origin} aren't allowed.`;
-  }
+  if (origin && origin !== "null" && !isSameOrigin(origin, req)) return `Requests from ${origin} aren't allowed.`;
   return undefined;
 }
 

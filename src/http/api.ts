@@ -102,7 +102,7 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
 
   // live state (in memory; resets on restart)
   const LivePatch = z
-    .object({ mode: ServiceMode.optional(), defaultScenario: Slug.nullable().optional() })
+    .object({ mode: ServiceMode.optional(), defaultScenario: Slug.nullable().optional(), delayMs: z.number().int().min(0).optional() })
     .strict();
   const liveView = () => {
     const services: Record<string, unknown> = {};
@@ -112,8 +112,9 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
         active: store.isActive(s),
         mode: s.mode,
         defaultScenario: s.defaultScenario ?? null,
+        delayMs: s.delayMs,
         modified: store.isModified(s.id),
-        starting: { mode: def.mode, defaultScenario: def.defaultScenario ?? null },
+        starting: { mode: def.mode, defaultScenario: def.defaultScenario ?? null, delayMs: def.delayMs },
       };
     }
     return { modified: store.modifiedServiceIds(), tags: store.activeTags, services };
@@ -121,10 +122,11 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
   api.get("/state", (c) => c.json(liveView()));
   /** Body: { mode?, defaultScenario? } — null clears the default scenario. */
   api.patch("/state/services/:id", async (c) => {
-    const { mode, defaultScenario } = LivePatch.parse(await c.req.json());
+    const { mode, defaultScenario, delayMs } = LivePatch.parse(await c.req.json());
     const patch = {
       ...(mode !== undefined && { mode }),
       ...(defaultScenario !== undefined && { defaultScenario: defaultScenario ?? undefined }),
+      ...(delayMs !== undefined && { delayMs }),
     };
     return c.json(store.setLiveState(c.req.param("id"), patch));
   });

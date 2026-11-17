@@ -2,7 +2,7 @@
 
 Instead of working through forms, you can ask the AI assistant you already use to set Mittens up: "make the users API fail with a 500", "mock POST /api/orders with a 422 when quantity is 0", "why did my app get a 404 on /api/users/7?". Mittens speaks the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), which Claude Code, Claude Desktop, Codex, GitHub Copilot in VS Code, Cursor and many other assistants support. Mittens doesn't need an API key: your assistant uses its own.
 
-This is optional: everything an assistant can do, you can also do in the dashboard by hand, and nothing changes unless you connect one. Mittens holds no API keys and never contacts an AI service itself. By default it only listens on your own computer, so only assistants running there can connect (see [Safety](#safety) for sharing it with a team).
+This is optional: everything an assistant can do, you can also do in the dashboard by hand, and nothing changes unless you connect one. Mittens holds no API keys and never contacts an AI service itself. By default it only listens on your own computer, so only assistants running there can connect (see [Sharing Mittens with a team](sharing.md) to let others connect).
 
 The **Assistants** page in the dashboard has copy-paste setup for each assistant, shows which one is connected, and lists every tool call it makes.
 

@@ -52,4 +52,4 @@ Another program (or another Mittens) is using it. Start with `--port 4001`, or s
 
 ## My phone or another computer can't reach Mittens
 
-Mittens only listens on `127.0.0.1` by default. Start it with `--host 0.0.0.0` and use your computer's network address.
+Mittens only listens on `127.0.0.1` by default. Start it with `--host 0.0.0.0` and use your computer's network address. To open the dashboard from another machine, use the IP address or the machine's own name; see [Sharing Mittens with a team](sharing.md).

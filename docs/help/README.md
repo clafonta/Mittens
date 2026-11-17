@@ -26,6 +26,7 @@ In Mittens, the search box above the topic list finds any section; press `/` to 
 10. [Response schemas](schemas.md): check every response against a JSON Schema
 11. [Importing OpenAPI](openapi.md): build services from a spec
 12. [Files on disk](files.md): the definitions folder, YAML reference, reloading, git tips
-13. [Command line](cli.md): commands, options and environment variables
-14. [HTTP API](api.md): control Mittens from scripts and tests
-15. [Troubleshooting](troubleshooting.md): "why did I get this response?" and other puzzles
+13. [Sharing Mittens with a team](sharing.md): run it on a shared server; what everyone shares; security
+14. [Command line](cli.md): commands, options and environment variables
+15. [HTTP API](api.md): control Mittens from scripts and tests
+16. [Troubleshooting](troubleshooting.md): "why did I get this response?" and other puzzles

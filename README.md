@@ -1,5 +1,7 @@
 # Mittens
 
+[![npm](https://img.shields.io/npm/v/@clafonta/mittens)](https://www.npmjs.com/package/@clafonta/mittens)
+
 A local-first HTTP mock server and recording proxy for developers. Point your app at Mittens instead of a real backend, then switch each endpoint between canned responses, request-matched responses, or the real service — and see every request in a live history.
 
 Mittens is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).

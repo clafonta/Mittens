@@ -1,15 +1,15 @@
 # Getting started
 
-## Run Mimic
+## Run Mittens
 
 You need Node.js 22.19 or newer. In your project folder:
 
 ```sh
-npx @clafonta/mimic init   # writes example definitions to ./mimic
-npx @clafonta/mimic        # starts on http://localhost:4000
+npx @clafonta/mittens init   # writes example definitions to ./mittens
+npx @clafonta/mittens        # starts on http://localhost:4000
 ```
 
-The dashboard is at [http://localhost:4000/_mimic](http://localhost:4000/_mimic); your services are under **Services** ([/_mimic/services](http://localhost:4000/_mimic/services)). Everything under `/_mimic` belongs to Mimic itself; every other path is mock traffic.
+The dashboard is at [http://localhost:4000/_mittens](http://localhost:4000/_mittens); your services are under **Services** ([/_mittens/services](http://localhost:4000/_mittens/services)). Everything under `/_mittens` belongs to Mittens itself; every other path is mock traffic.
 
 Try the examples:
 
@@ -19,17 +19,17 @@ curl http://localhost:4000/api/users/404   # 404: matched on the path param
 curl http://localhost:4000/anything/hi     # proxied to httpbin.org
 ```
 
-The dashboard's home page shows how requests flow through Mimic: your app, Mimic, each service and, for proxied services, the real API. Every request travels across it as a dot that comes back green, amber or red with its status, and the page also shows how many requests each service has answered. If you've turned on "reduce motion", nodes flash instead.
+The dashboard's home page shows how requests flow through Mittens: your app, Mittens, each service and, for proxied services, the real API. Every request travels across it as a dot that comes back green, amber or red with its status, and the page also shows how many requests each service has answered. If you've turned on "reduce motion", nodes flash instead.
 
-Each response carries headers saying what answered it: `x-mimic-service`, `x-mimic-scenario` and `x-mimic-source` (`scenario`, `fallback`, `proxy`, `hook`, `unmatched` or `error`).
+Each response carries headers saying what answered it: `x-mittens-service`, `x-mittens-scenario` and `x-mittens-source` (`scenario`, `fallback`, `proxy`, `hook`, `unmatched` or `error`).
 
-## Point your app at Mimic
+## Point your app at Mittens
 
-Change your app's API base URL to Mimic, keeping the path. If your app calls `https://api.example.com/v1/users/7`, point it at `http://localhost:4000` and give Mimic a service for `/v1/users/{id}`.
+Change your app's API base URL to Mittens, keeping the path. If your app calls `https://api.example.com/v1/users/7`, point it at `http://localhost:4000` and give Mittens a service for `/v1/users/{id}`.
 
-- **Browser apps:** Mimic answers CORS preflight requests and allows any origin, so a front end on another port can call it directly.
-- **Several backends:** one Mimic can mock them all, as long as their paths don't collide. If they do, give each its own path prefix and strip it when proxying (see [path rewrites](proxying.md#path-rewrites)).
-- **Mobile devices and other machines:** Mimic listens on `127.0.0.1` by default. Start it with `--host 0.0.0.0` to accept connections from elsewhere on your network.
+- **Browser apps:** Mittens answers CORS preflight requests and allows any origin, so a front end on another port can call it directly.
+- **Several backends:** one Mittens can mock them all, as long as their paths don't collide. If they do, give each its own path prefix and strip it when proxying (see [path rewrites](proxying.md#path-rewrites)).
+- **Mobile devices and other machines:** Mittens listens on `127.0.0.1` by default. Start it with `--host 0.0.0.0` to accept connections from elsewhere on your network.
 
 ## Make your first service
 
@@ -42,4 +42,4 @@ Already have a running API? Put a service in `proxy` mode with the real URL as i
 
 ## Where things are saved
 
-Services, scenarios and profiles are YAML files in the definitions folder (`./mimic` unless you pass `--dir`). Commit it with your code so the whole team shares the same mocks. Edits in your editor are picked up immediately. See [Files on disk](files.md).
+Services, scenarios and profiles are YAML files in the definitions folder (`./mittens` unless you pass `--dir`). Commit it with your code so the whole team shares the same mocks. Edits in your editor are picked up immediately. See [Files on disk](files.md).

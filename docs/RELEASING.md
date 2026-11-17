@@ -1,6 +1,6 @@
 # Releasing
 
-Mimic is published to npm as `@clafonta/mimic`, from a local checkout. There is no CI, so `npm publish` does the checking: its `prepublishOnly` script runs typecheck, tests, a fresh build, and the smoke test (`scripts/smoke.mjs`), which packs the tarball, installs it into a scratch project and runs the installed CLI. If any of these fail, nothing is published.
+Mittens is published to npm as `@clafonta/mittens`, from a local checkout. There is no CI, so `npm publish` does the checking: its `prepublishOnly` script runs typecheck, tests, a fresh build, and the smoke test (`scripts/smoke.mjs`), which packs the tarball, installs it into a scratch project and runs the installed CLI. If any of these fail, nothing is published.
 
 ## One-time setup
 
@@ -23,7 +23,7 @@ If your npm account uses two-factor authentication for publishing, npm asks for 
 Then check it:
 
 ```sh
-npx @clafonta/mimic@latest --version
+npx @clafonta/mittens@latest --version
 ```
 
 `npm version` creates a local git tag; there's no remote to push it to, but it marks what was released.

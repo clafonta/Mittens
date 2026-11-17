@@ -113,7 +113,7 @@ export const SPARK_SCRIPT = `
     var id = el.getAttribute('data-spark');
     document.querySelectorAll('[data-spark-total="' + id + '"]').forEach(function (t) { t.textContent = total; t.title = text; });
   }
-  document.addEventListener('mimic:request', function (ev) {
+  document.addEventListener('mittens:request', function (ev) {
     var r = ev.detail, key = r.serviceId || '';
     document.querySelectorAll('svg.spark[data-spark="' + key + '"]').forEach(function (el) {
       var s = slide(el); s.c[N - 1]++; if (r.status >= 400) s.e[N - 1]++; draw(el, s.c, s.e);

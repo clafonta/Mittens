@@ -52,24 +52,24 @@ describe("proxy mode with rewrites", () => {
 
   it("API previews the upstream URL", async () => {
     const { request } = await setup([service], fetchImpl);
-    const res = await request("/_mimic/api/services/users/upstream?path=" + encodeURIComponent("/mock/u/9?a=b"));
+    const res = await request("/_mittens/api/services/users/upstream?path=" + encodeURIComponent("/mock/u/9?a=b"));
     expect(await res.json()).toEqual({ url: "https://real.test/base/users/9?a=b" });
   });
 
   it("dashboard shows the rules and previews paths", async () => {
     const { request } = await setup([service], fetchImpl);
-    const page = await (await request("/_mimic/services/users")).text();
+    const page = await (await request("/_mittens/services/users")).text();
     expect(page).toContain("strip prefix <code>/mock</code>");
     expect(page).toContain("^/u/(.+)  -&gt;  /users/$1");
-    const preview = await (await request("/_mimic/ui/services/users/upstream?path=/mock/u/1")).text();
+    const preview = await (await request("/_mittens/ui/services/users/upstream?path=/mock/u/1")).text();
     expect(preview).toContain("https://real.test/base/users/1");
     expect(preview).not.toContain("don&#39;t reach");
-    expect(await (await request("/_mimic/ui/services/users/upstream?path=/elsewhere")).text()).toContain("don&#39;t reach this service");
+    expect(await (await request("/_mittens/ui/services/users/upstream?path=/elsewhere")).text()).toContain("don&#39;t reach this service");
   });
 
   it("rejects invalid regexes through the API", async () => {
     const { request } = await setup([service], fetchImpl);
-    const res = await request("/_mimic/api/services/users", {
+    const res = await request("/_mittens/api/services/users", {
       method: "PATCH",
       headers: json,
       body: JSON.stringify({ rewrite: [{ from: "(", to: "x" }] }),
@@ -80,17 +80,17 @@ describe("proxy mode with rewrites", () => {
 
   it("form round-trips rules and reports bad lines", async () => {
     const { request, store } = await setup([service], fetchImpl);
-    const edit = await (await request("/_mimic/services/users/edit")).text();
+    const edit = await (await request("/_mittens/services/users/edit")).text();
     expect(edit).toContain("^/u/(.+) -&gt; /users/$1</textarea>");
 
     const base = { name: "Users", path: "/mock/*", method: "ANY", mode: "proxy", upstream: "https://real.test", delayMs: "0" };
-    let res = await request("/_mimic/services/users", form({ ...base, rewrite: "no arrow here" }));
+    let res = await request("/_mittens/services/users", form({ ...base, rewrite: "no arrow here" }));
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("Line 1: expected &quot;pattern -&gt; replacement&quot;");
-    res = await request("/_mimic/services/users", form({ ...base, rewrite: "^/a -> /b\n([ -> /c" }));
+    res = await request("/_mittens/services/users", form({ ...base, rewrite: "^/a -> /b\n([ -> /c" }));
     expect(await res.text()).toContain("Line 2: &quot;([&quot; is not a valid regular expression");
 
-    res = await request("/_mimic/services/users", form({ ...base, stripPrefix: "/mock", rewrite: "^/a -> /b\n\n^/c/(.*) -> /d/$1" }));
+    res = await request("/_mittens/services/users", form({ ...base, stripPrefix: "/mock", rewrite: "^/a -> /b\n\n^/c/(.*) -> /d/$1" }));
     expect(res.status).toBe(303);
     expect(store.getDefinition("users")).toMatchObject({
       stripPrefix: "/mock",
@@ -101,7 +101,7 @@ describe("proxy mode with rewrites", () => {
     });
 
     // Clearing the fields removes them.
-    await request("/_mimic/services/users", form(base));
+    await request("/_mittens/services/users", form(base));
     expect(store.getDefinition("users").rewrite).toBeUndefined();
     expect(store.getDefinition("users").stripPrefix).toBeUndefined();
   });

@@ -1,8 +1,8 @@
-# Mimic
+# Mittens
 
-A local-first HTTP mock server and recording proxy for developers. Point your app at Mimic instead of a real backend, then switch each endpoint between canned responses, request-matched responses, or the real service — and see every request in a live history.
+A local-first HTTP mock server and recording proxy for developers. Point your app at Mittens instead of a real backend, then switch each endpoint between canned responses, request-matched responses, or the real service — and see every request in a live history.
 
-Mimic is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).
+Mittens is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).
 
 - **Mock, match or proxy, per endpoint**, switchable live from the dashboard or the API; profiles flip many at once ("happy path", "outage").
 - **Definitions are YAML files** you commit next to your code, reloaded as you edit them.
@@ -16,8 +16,8 @@ Mimic is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).
 ## Quick start
 
 ```sh
-npx @clafonta/mimic init   # writes example definitions to ./mimic
-npx @clafonta/mimic        # http://127.0.0.1:4000, dashboard at /_mimic
+npx @clafonta/mittens init   # writes example definitions to ./mittens
+npx @clafonta/mittens        # http://127.0.0.1:4000, dashboard at /_mittens
 ```
 
 ```sh
@@ -26,14 +26,14 @@ curl localhost:4000/api/users/404   # 404, matched by path param
 curl localhost:4000/anything/hi     # proxied to httpbin.org
 ```
 
-Requires Node.js 22.19+. Installed globally (`npm i -g @clafonta/mimic`), the command is just `mimic`.
+Requires Node.js 22.19+. Installed globally (`npm i -g @clafonta/mittens`), the command is just `mittens`.
 
 ## Documentation
 
-Mimic's help is built in: open **Help** in the dashboard ([/_mimic/help](http://localhost:4000/_mimic/help)), or follow the **?** next to any setting. The same pages are in [`docs/help`](docs/help/README.md):
+Mittens's help is built in: open **Help** in the dashboard ([/_mittens/help](http://localhost:4000/_mittens/help)), or follow the **?** next to any setting. The same pages are in [`docs/help`](docs/help/README.md):
 
-- [Getting started](docs/help/getting-started.md): run Mimic, point your app at it, make your first service
-- [AI assistants](docs/help/assistants.md): let Claude, Codex, Copilot or Cursor set Mimic up for you
+- [Getting started](docs/help/getting-started.md): run Mittens, point your app at it, make your first service
+- [AI assistants](docs/help/assistants.md): let Claude, Codex, Copilot or Cursor set Mittens up for you
 - [Services and modes](docs/help/services.md): routes, methods, static / dynamic / proxy, delays, tags
 - [Scenarios and matching](docs/help/scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks
 - [Live state and profiles](docs/help/live-state.md): what changes the files and what doesn't; switching many services at once
@@ -45,14 +45,14 @@ Mimic's help is built in: open **Help** in the dashboard ([/_mimic/help](http://
 - [Importing OpenAPI](docs/help/openapi.md): build services from a spec
 - [Files on disk](docs/help/files.md): the definitions folder, YAML reference, reloading, git tips
 - [Command line](docs/help/cli.md): commands, options and environment variables
-- [HTTP API](docs/help/api.md): control Mimic from scripts and tests
+- [HTTP API](docs/help/api.md): control Mittens from scripts and tests
 - [Troubleshooting](docs/help/troubleshooting.md): "why did I get this response?" and other puzzles
 
 ## Development
 
 ```sh
 npm install
-npm run dev        # tsx watch, serves examples/mimic
+npm run dev        # tsx watch, serves examples/mittens
 npm test           # vitest
 npm run typecheck
 npm run build      # emits dist/

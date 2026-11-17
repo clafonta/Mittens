@@ -6,7 +6,7 @@ import { Marked, type Tokens } from "marked";
  * GitHub: links between topics are plain `other.md#anchor` links (rewritten
  * to dashboard URLs here), heading anchors follow GitHub's rules, and
  * examples use http://localhost:4000, which is replaced with the address
- * Mimic is actually running on.
+ * Mittens is actually running on.
  */
 
 export interface HelpHeading {
@@ -167,7 +167,7 @@ function snippet(text: string, terms: string[], width = 180): string {
   return `${start > 0 ? "… " : ""}${marked}${start + width < text.length ? " …" : ""}`;
 }
 
-/** Loads and renders every topic. `base` is the dashboard path, e.g. /_mimic. */
+/** Loads and renders every topic. `base` is the dashboard path, e.g. /_mittens. */
 export function loadHelp(base: string, dir: URL | string = DEFAULT_DIR): Help {
   const folder = typeof dir === "string" ? dir : dir.pathname;
   const read = (name: string) => readFileSync(new URL(name, typeof dir === "string" ? `file://${dir.replace(/\/?$/, "/")}` : dir), "utf8");
@@ -223,5 +223,5 @@ export function loadHelp(base: string, dir: URL | string = DEFAULT_DIR): Help {
   return { home, topics, get: (slug) => (slug === "" ? home : bySlug.get(slug)), targets, search };
 }
 
-/** Shows examples with the address Mimic is really on. */
+/** Shows examples with the address Mittens is really on. */
 export const withOrigin = (html: string, origin: string) => (origin === EXAMPLE_ORIGIN ? html : html.split(EXAMPLE_ORIGIN).join(origin));

@@ -2,7 +2,7 @@ import { hostname } from "node:os";
 import type { Context, Next } from "hono";
 
 /**
- * Mimic's own pages and APIs (everything under /_mimic) are for the developer
+ * Mittens's own pages and APIs (everything under /_mittens) are for the developer
  * on this computer. Two browser-borne attacks would otherwise reach them:
  *
  * - Cross-site requests: any web page can make the browser POST a form or a
@@ -10,7 +10,7 @@ import type { Context, Next } from "hono";
  *   requests that change something are refused unless they come from the same
  *   origin or from a page on localhost (dev tools in your own app).
  * - DNS rebinding: a page on evil.example re-points its domain at 127.0.0.1
- *   to read or change Mimic as "same origin". So the Host header must be
+ *   to read or change Mittens as "same origin". So the Host header must be
  *   localhost, an IP address, or this machine's own name.
  *
  * Mock traffic (every other path) is not affected.
@@ -29,7 +29,7 @@ export function requestHost(req: Request): string {
   return bare(host.replace(/:\d+$/, "").replace(/^\[(.*)\]$/, "$1"));
 }
 
-/** Host names Mimic answers to: loopback, IP addresses (LAN use with --host), and this machine's name. */
+/** Host names Mittens answers to: loopback, IP addresses (LAN use with --host), and this machine's name. */
 export const isAllowedHost = (h: string) => isLoopbackName(h) || isIpLiteral(h) || machineNames.has(h);
 
 /** Is this Origin a page on this computer's loopback address (any port)? */
@@ -55,23 +55,23 @@ export function isSameOrigin(origin: string, req: Request): boolean {
 
 const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
 
-/** Why a request to /_mimic must be refused, or undefined to let it through. */
+/** Why a request to /_mittens must be refused, or undefined to let it through. */
 export function refuseNonLocal(req: Request): string | undefined {
   const host = requestHost(req);
-  if (!isAllowedHost(host)) return `Host '${host}' isn't allowed; open Mimic as localhost or by IP address.`;
+  if (!isAllowedHost(host)) return `Host '${host}' isn't allowed; open Mittens as localhost or by IP address.`;
   if (SAFE.has(req.method)) return undefined;
   const origin = req.headers.get("origin");
   if (origin) {
     if (origin === "null" || !(isSameOrigin(origin, req) || isLoopbackOrigin(origin))) {
-      return `Requests from ${origin} can't change Mimic; only pages on this computer can.`;
+      return `Requests from ${origin} can't change Mittens; only pages on this computer can.`;
     }
   } else if (req.headers.get("sec-fetch-site") === "cross-site") {
-    return "Cross-site requests can't change Mimic.";
+    return "Cross-site requests can't change Mittens.";
   }
   return undefined;
 }
 
-/** Middleware for everything under /_mimic. */
+/** Middleware for everything under /_mittens. */
 export async function localOnly(c: Context, next: Next) {
   const refused = refuseNonLocal(c.req.raw);
   if (refused) return c.json({ error: refused }, 403);
@@ -79,7 +79,7 @@ export async function localOnly(c: Context, next: Next) {
 }
 
 /**
- * CORS for Mimic's management API, for pages on localhost (e.g. a dev panel
+ * CORS for Mittens's management API, for pages on localhost (e.g. a dev panel
  * in the app under development, on another port). Other origins get no CORS
  * headers, so browsers won't let them read anything.
  */

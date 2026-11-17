@@ -5,9 +5,9 @@ import { HelpLink } from "./help.js";
 import { ControlDiagram } from "./trust.js";
 
 export interface AssistantsData {
-  /** e.g. http://localhost:4000/_mimic/mcp */
+  /** e.g. http://localhost:4000/_mittens/mcp */
   endpoint: string;
-  /** Command that starts the stdio bridge: npx, or this checkout's dist/cli.js until Mimic is published. */
+  /** Command that starts the stdio bridge: npx, or this checkout's dist/cli.js until Mittens is published. */
   stdioCommand: { command: string; args: string[] };
   activity: McpActivity;
 }
@@ -79,21 +79,21 @@ function ActivityTable({ calls }: { calls: McpCall[] }) {
 }
 
 const PROMPTS = [
-  "What's mocked in Mimic right now?",
+  "What's mocked in Mittens right now?",
   "Make the users API fail with a 500 for every request, then put it back.",
-  "Add POST /api/orders to Mimic: 201 with an order id taken from the request, and 422 when quantity is 0. Then test both.",
+  "Add POST /api/orders to Mittens: 201 with an order id taken from the request, and 422 when quantity is 0. Then test both.",
   "My app got a 404 for /api/users/7. Why?",
-  "Import ./openapi.yaml into Mimic. Show me what you'd create before doing it.",
+  "Import ./openapi.yaml into Mittens. Show me what you'd create before doing it.",
   "Turn the real responses I just recorded into scenarios.",
 ];
 
 export function AssistantsPage({ data }: { data: AssistantsData }) {
   const { endpoint } = data;
   const stdio = [data.stdioCommand.command, ...data.stdioCommand.args, "mcp", "--url", endpoint];
-  const desktop = JSON.stringify({ mcpServers: { mimic: { command: stdio[0], args: stdio.slice(1) } } }, null, 2);
-  const vscode = JSON.stringify({ servers: { mimic: { type: "http", url: endpoint } } }, null, 2);
-  const cursor = JSON.stringify({ mcpServers: { mimic: { url: endpoint } } }, null, 2);
-  const codex = `[mcp_servers.mimic]\ncommand = ${JSON.stringify(stdio[0])}\nargs = ${JSON.stringify(stdio.slice(1))}`;
+  const desktop = JSON.stringify({ mcpServers: { mittens: { command: stdio[0], args: stdio.slice(1) } } }, null, 2);
+  const vscode = JSON.stringify({ servers: { mittens: { type: "http", url: endpoint } } }, null, 2);
+  const cursor = JSON.stringify({ mcpServers: { mittens: { url: endpoint } } }, null, 2);
+  const codex = `[mcp_servers.mittens]\ncommand = ${JSON.stringify(stdio[0])}\nargs = ${JSON.stringify(stdio.slice(1))}`;
 
   return (
     <div class="assistants">
@@ -103,8 +103,8 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
         </h1>
       </div>
       <p class="lead">
-        Let the AI assistant you already use set Mimic up for you: create mocks from a description, switch services into failure
-        modes, explain why your app got a response. Mimic speaks the Model Context Protocol (MCP), so Claude, Codex, GitHub Copilot,
+        Let the AI assistant you already use set Mittens up for you: create mocks from a description, switch services into failure
+        modes, explain why your app got a response. Mittens speaks the Model Context Protocol (MCP), so Claude, Codex, GitHub Copilot,
         Cursor and other assistants can connect to it.
       </p>
       <section class="trust" aria-label="Optional, local and in your control">
@@ -115,7 +115,7 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
         <div>
           <strong>Local</strong>
           <p>
-            Mimic only accepts assistant connections from this computer, refuses requests from web pages, holds no API keys, and never
+            Mittens only accepts assistant connections from this computer, refuses requests from web pages, holds no API keys, and never
             contacts an AI service itself.
           </p>
         </div>
@@ -129,7 +129,7 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
       </section>
       <ControlDiagram connected={!!data.activity.client} client={data.activity.client?.name} />
       <p class="hint">
-        What your assistant reads from Mimic (your mock definitions and recorded requests) is sent to the AI service it uses, as with any
+        What your assistant reads from Mittens (your mock definitions and recorded requests) is sent to the AI service it uses, as with any
         other tool it has. If History holds sensitive data from proxied traffic, clear it first or don't connect an assistant.
       </p>
 
@@ -151,15 +151,15 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
         </summary>
         <ol>
           <li>
-            In your project folder, add Mimic:
-            <Code>{`claude mcp add --transport http mimic ${endpoint}`}</Code>
+            In your project folder, add Mittens:
+            <Code>{`claude mcp add --transport http mittens ${endpoint}`}</Code>
             <span class="hint">
               To share it with your team instead, add <code>--scope project</code>: Claude Code writes it to <code>.mcp.json</code>,
               which you can commit.
             </span>
           </li>
           <li>
-            Start <code>claude</code> and type <code>/mcp</code>. You should see <strong>mimic</strong> listed as connected.
+            Start <code>claude</code> and type <code>/mcp</code>. You should see <strong>mittens</strong> listed as connected.
           </li>
           <li>Ask it something from the list below. Each tool it uses shows up in the activity list above.</li>
         </ol>
@@ -172,14 +172,14 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
           Settings → Developer → <em>Edit Config</em>, add this to <code>claude_desktop_config.json</code>, and restart Claude:
         </p>
         <Code lang="json">{desktop}</Code>
-        <p class="hint">Claude Desktop starts local commands, so this uses Mimic's small bridge, which forwards to the running Mimic.</p>
+        <p class="hint">Claude Desktop starts local commands, so this uses Mittens's small bridge, which forwards to the running Mittens.</p>
       </details>
       <details class="setup">
         <summary>
           <strong>VS Code</strong> <span class="muted">· GitHub Copilot agent mode</span>
         </summary>
         <p>
-          Create <code>.vscode/mcp.json</code> in your project, then open Copilot Chat in <em>Agent</em> mode and check that Mimic's
+          Create <code>.vscode/mcp.json</code> in your project, then open Copilot Chat in <em>Agent</em> mode and check that Mittens's
           tools are enabled:
         </p>
         <Code lang="json">{vscode}</Code>
@@ -207,8 +207,8 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
           <strong>ChatGPT</strong>
         </summary>
         <p>
-          ChatGPT's connectors run in OpenAI's cloud, so they can't reach a Mimic running on your machine. To use ChatGPT you'd
-          need to expose Mimic through a tunnel, which also exposes your mocks; the local assistants above don't need that.
+          ChatGPT's connectors run in OpenAI's cloud, so they can't reach a Mittens running on your machine. To use ChatGPT you'd
+          need to expose Mittens through a tunnel, which also exposes your mocks; the local assistants above don't need that.
         </p>
       </details>
       <details class="setup">
@@ -221,7 +221,7 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
 
       <h2>Coding agents that edit files</h2>
       <p>
-        Agents working in your repository can also edit the YAML directly. <code>npx @clafonta/mimic init</code> adds an{" "}
+        Agents working in your repository can also edit the YAML directly. <code>npx @clafonta/mittens init</code> adds an{" "}
         <code>AGENTS.md</code> to your definitions folder (and a <code>CLAUDE.md</code> pointing Claude Code at it) describing the file
         formats and how to check an edit worked. It leaves your services alone and never overwrites those files once they exist.
       </p>
@@ -238,7 +238,7 @@ export function AssistantsPage({ data }: { data: AssistantsData }) {
         ))}
       </ul>
       <p class="hint">
-        Assistants change the live state for experiments (it resets when Mimic restarts) and only write your definition files when
+        Assistants change the live state for experiments (it resets when Mittens restarts) and only write your definition files when
         you ask them to create or save something. Deletions are marked so your assistant asks first.
       </p>
       <script>{raw(COPY_SCRIPT)}</script>

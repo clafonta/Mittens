@@ -39,33 +39,33 @@ describe("profiles can set delays", () => {
 
   it("the live-state API and 'new profile from current' include delays", async () => {
     const { request, store } = await setup(fixtures());
-    const res = await request("/_mimic/api/state/services/users", { method: "PATCH", headers: json, body: JSON.stringify({ delayMs: 300 }) });
+    const res = await request("/_mittens/api/state/services/users", { method: "PATCH", headers: json, body: JSON.stringify({ delayMs: 300 }) });
     expect(((await res.json()) as { delayMs: number }).delayMs).toBe(300);
     expect(store.currentSettings().users).toMatchObject({ delayMs: 300 });
     expect(store.currentSettings().orders).not.toHaveProperty("delayMs");
-    const state = (await (await request("/_mimic/api/state")).json()) as { services: Record<string, { delayMs: number; starting: { delayMs: number } }> };
+    const state = (await (await request("/_mittens/api/state")).json()) as { services: Record<string, { delayMs: number; starting: { delayMs: number } }> };
     expect(state.services.users).toMatchObject({ delayMs: 300, starting: { delayMs: 0 } });
-    expect(await (await request("/_mimic/services")).text()).toContain("⏱ 300 ms");
+    expect(await (await request("/_mittens/services")).text()).toContain("⏱ 300 ms");
   });
 
   it("the profile form has a delay per service", async () => {
     const { request, store } = await setup(fixtures());
     const res = await request(
-      "/_mimic/profiles",
+      "/_mittens/profiles",
       form({ id: "slow", name: "Slow", "svc.users.include": "on", "svc.users.delayMs": "1500", "svc.orders.include": "on", "svc.orders.delayMs": "" }),
     );
     expect(res.status).toBe(303);
     expect(store.getProfile("slow").services).toEqual({ users: { delayMs: 1500 }, orders: {} });
-    expect(await (await request("/_mimic/profiles/slow/edit")).text()).toContain('name="svc.users.delayMs" value="1500"');
-    expect(await (await request("/_mimic/profiles")).text()).toContain("1500 ms");
-    const bad = await request("/_mimic/profiles", form({ id: "bad", name: "Bad", "svc.users.include": "on", "svc.users.delayMs": "soon" }));
+    expect(await (await request("/_mittens/profiles/slow/edit")).text()).toContain('name="svc.users.delayMs" value="1500"');
+    expect(await (await request("/_mittens/profiles")).text()).toContain("1500 ms");
+    const bad = await request("/_mittens/profiles", form({ id: "bad", name: "Bad", "svc.users.include": "on", "svc.users.delayMs": "soon" }));
     expect(bad.status).toBe(422);
   });
 });
 
 describe("hooks: shared state and the live state", () => {
   async function project(hooks: Record<string, string>) {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-shared-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-shared-"));
     const store = new Store(new FileRepo(dir));
     await store.load();
     for (const id of Object.keys(hooks)) {
@@ -86,7 +86,7 @@ describe("hooks: shared state and the live state", () => {
     await request("/add");
     await request("/add");
     expect(await request("/count")).toBe("2");
-    await request("/_mimic/api/hooks/state", { method: "DELETE" });
+    await request("/_mittens/api/hooks/state", { method: "DELETE" });
     expect(await request("/count")).toBe("0");
   });
 
@@ -102,7 +102,7 @@ describe("hooks: shared state and the live state", () => {
   });
 
   it("warns that files hooks import need a restart", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-imports-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-imports-"));
     const store = new Store(new FileRepo(dir));
     await store.load();
     const logs: string[] = [];
@@ -112,12 +112,12 @@ describe("hooks: shared state and the live state", () => {
     await writeFile(path.join(dir, "shop", "state.ts"), "export const x = 1;\n");
     const start = Date.now();
     while (!logs.some((l) => l.includes("shop/state.ts")) && Date.now() - start < 4000) await new Promise((r) => setTimeout(r, 20));
-    expect(logs.find((l) => l.includes("shop/state.ts"))).toContain("Restart Mimic to pick it up");
+    expect(logs.find((l) => l.includes("shop/state.ts"))).toContain("Restart Mittens to pick it up");
     void utimes;
   });
 });
 
-describe("/_mimic is for this computer only", () => {
+describe("/_mittens is for this computer only", () => {
   const post = (origin?: string, extra: Record<string, string> = {}) => ({
     ...form({}),
     headers: { "content-type": "application/x-www-form-urlencoded", ...(origin && { origin }), ...extra },
@@ -125,49 +125,49 @@ describe("/_mimic is for this computer only", () => {
 
   it("refuses cross-site changes, e.g. a form on another website deleting a service", async () => {
     const { request, store } = await setup(fixtures());
-    const res = await request("/_mimic/services/orders/delete", post("https://evil.example"));
+    const res = await request("/_mittens/services/orders/delete", post("https://evil.example"));
     expect(res.status).toBe(403);
     expect(store.listServices().map((s) => s.id)).toContain("orders");
-    expect((await request("/_mimic/api/profiles", { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" })).status).toBe(403);
-    expect((await request("/_mimic/api/state", { method: "DELETE", headers: { "sec-fetch-site": "cross-site" } })).status).toBe(403);
-    expect((await request("/_mimic/services/orders/delete", post("null"))).status).toBe(403);
+    expect((await request("/_mittens/api/profiles", { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" })).status).toBe(403);
+    expect((await request("/_mittens/api/state", { method: "DELETE", headers: { "sec-fetch-site": "cross-site" } })).status).toBe(403);
+    expect((await request("/_mittens/services/orders/delete", post("null"))).status).toBe(403);
   });
 
   it("allows the dashboard itself, local dev tools and scripts", async () => {
     const { request } = await setup(fixtures());
-    expect((await request("/_mimic/ui/services/users", post("http://localhost", { "content-type": "application/x-www-form-urlencoded" }))).status).not.toBe(403);
-    expect((await request("/_mimic/api/state", { method: "DELETE", headers: { origin: "http://localhost:5173" } })).status).toBe(200);
-    expect((await request("/_mimic/api/state", { method: "DELETE" })).status).toBe(200); // curl, no Origin
-    expect((await request("/_mimic/api/state", { method: "DELETE", headers: { origin: "http://127.0.0.1:3000" } })).status).toBe(200);
+    expect((await request("/_mittens/ui/services/users", post("http://localhost", { "content-type": "application/x-www-form-urlencoded" }))).status).not.toBe(403);
+    expect((await request("/_mittens/api/state", { method: "DELETE", headers: { origin: "http://localhost:5173" } })).status).toBe(200);
+    expect((await request("/_mittens/api/state", { method: "DELETE" })).status).toBe(200); // curl, no Origin
+    expect((await request("/_mittens/api/state", { method: "DELETE", headers: { origin: "http://127.0.0.1:3000" } })).status).toBe(200);
   });
 
   it("refuses unknown host names (DNS rebinding), but not mock traffic", async () => {
     const { request } = await setup(fixtures());
-    expect((await request("/_mimic/api/services", { headers: { host: "evil.example:4000" } })).status).toBe(403);
-    expect((await request("/_mimic", { headers: { host: "evil.example" } })).status).toBe(403);
-    expect((await request("/_mimic/api/services", { headers: { host: "192.168.1.20:4000" } })).status).toBe(200);
+    expect((await request("/_mittens/api/services", { headers: { host: "evil.example:4000" } })).status).toBe(403);
+    expect((await request("/_mittens", { headers: { host: "evil.example" } })).status).toBe(403);
+    expect((await request("/_mittens/api/services", { headers: { host: "192.168.1.20:4000" } })).status).toBe(200);
     expect((await request("/users/1", { headers: { host: "evil.example" } })).status).toBe(200);
   });
 
   it("answers CORS for pages on localhost, and only those", async () => {
     const { request } = await setup(fixtures());
-    const pre = await request("/_mimic/api/profiles/x/apply", {
+    const pre = await request("/_mittens/api/profiles/x/apply", {
       method: "OPTIONS",
       headers: { origin: "http://localhost:5173", "access-control-request-method": "POST", "access-control-request-headers": "content-type" },
     });
     expect(pre.status).toBe(204);
     expect(pre.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
     expect(pre.headers.get("access-control-allow-methods")).toContain("POST");
-    const get = await request("/_mimic/api/profiles", { headers: { origin: "http://localhost:5173" } });
+    const get = await request("/_mittens/api/profiles", { headers: { origin: "http://localhost:5173" } });
     expect(get.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
-    const evil = await request("/_mimic/api/profiles", { headers: { origin: "https://evil.example" } });
+    const evil = await request("/_mittens/api/profiles", { headers: { origin: "https://evil.example" } });
     expect(evil.headers.get("access-control-allow-origin")).toBeNull();
   });
 });
 
 describe("hooked services are marked", () => {
   it("in the services table and the overview diagram", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-hooked-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-hooked-"));
     const store = new Store(new FileRepo(dir));
     await store.load();
     await store.createService({ id: "cart", name: "Cart", path: "/cart", defaultScenario: "ok", scenarios: [{ id: "ok", name: "OK" }] });
@@ -176,7 +176,7 @@ describe("hooked services are marked", () => {
     await hooks.load(["cart"]);
     const app = createApp({ store, history: new History(), hooks });
     const text = async (p: string) => (await app.request(`http://localhost${p}`)).text();
-    expect(await text("/_mimic/services")).toContain('<span class="pill hook"');
-    expect(await text("/_mimic")).toContain("hook answers · static");
+    expect(await text("/_mittens/services")).toContain('<span class="pill hook"');
+    expect(await text("/_mittens")).toContain("hook answers · static");
   });
 });

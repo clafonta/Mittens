@@ -207,11 +207,11 @@ export type ProfilePatch = z.infer<typeof ProfilePatch>;
 export const ScenarioRef = z.object({ service: Slug, scenario: Slug }).strict();
 export type ScenarioRef = z.infer<typeof ScenarioRef>;
 
-/** Project-wide settings, stored in <root>/mimic.yaml. */
+/** Project-wide settings, stored in <root>/mittens.yaml. */
 export const Settings = z
   .object({
     /**
-     * Returned whenever Mimic would otherwise answer with its own error: no
+     * Returned whenever Mittens would otherwise answer with its own error: no
      * service matches, no scenario matches and the service has no fallback,
      * a proxy fails without an errorScenario, and so on.
      */

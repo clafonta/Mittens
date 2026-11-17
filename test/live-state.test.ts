@@ -75,11 +75,11 @@ describe("live state (API)", () => {
 
   it("patches, reports, saves and resets live state", async () => {
     const { request, store } = await setup(fixtures());
-    const patched = await request("/_mimic/api/state/services/users", send("PATCH", { mode: "static", defaultScenario: "boom" }));
+    const patched = await request("/_mittens/api/state/services/users", send("PATCH", { mode: "static", defaultScenario: "boom" }));
     expect(patched.status).toBe(200);
     expect(await patched.json()).toMatchObject({ mode: "static", defaultScenario: "boom" });
 
-    const state = (await (await request("/_mimic/api/state")).json()) as { modified: string[]; services: Record<string, unknown> };
+    const state = (await (await request("/_mittens/api/state")).json()) as { modified: string[]; services: Record<string, unknown> };
     expect(state.modified).toEqual(["users"]);
     expect(state.services.users).toEqual({
       active: true,
@@ -91,27 +91,27 @@ describe("live state (API)", () => {
     });
 
     // null clears the live default scenario
-    await request("/_mimic/api/state/services/users", send("PATCH", { defaultScenario: null }));
+    await request("/_mittens/api/state/services/users", send("PATCH", { defaultScenario: null }));
     expect(store.getService("users").defaultScenario).toBeUndefined();
 
-    expect(await (await request("/_mimic/api/state/services/users", send("DELETE"))).json()).toEqual({ reset: ["users"] });
-    await request("/_mimic/api/state/services/orders", send("PATCH", { defaultScenario: "down" }));
-    expect(await (await request("/_mimic/api/state/save", send("POST"))).json()).toEqual({ saved: ["orders"] });
+    expect(await (await request("/_mittens/api/state/services/users", send("DELETE"))).json()).toEqual({ reset: ["users"] });
+    await request("/_mittens/api/state/services/orders", send("PATCH", { defaultScenario: "down" }));
+    expect(await (await request("/_mittens/api/state/save", send("POST"))).json()).toEqual({ saved: ["orders"] });
     expect(store.getDefinition("orders").defaultScenario).toBe("down");
-    expect(await (await request("/_mimic/api/state", send("DELETE"))).json()).toEqual({ reset: [] });
+    expect(await (await request("/_mittens/api/state", send("DELETE"))).json()).toEqual({ reset: [] });
   });
 
   it("validates live patches", async () => {
     const { request } = await setup(fixtures());
-    expect((await request("/_mimic/api/state/services/users", send("PATCH", { mode: "sideways" }))).status).toBe(400);
-    expect((await request("/_mimic/api/state/services/users", send("PATCH", { path: "/x" }))).status).toBe(400);
-    expect((await request("/_mimic/api/state/services/users", send("PATCH", { mode: "proxy" }))).status).toBe(409);
-    expect((await request("/_mimic/api/state/services/ghost", send("PATCH", { mode: "static" }))).status).toBe(404);
+    expect((await request("/_mittens/api/state/services/users", send("PATCH", { mode: "sideways" }))).status).toBe(400);
+    expect((await request("/_mittens/api/state/services/users", send("PATCH", { path: "/x" }))).status).toBe(400);
+    expect((await request("/_mittens/api/state/services/users", send("PATCH", { mode: "proxy" }))).status).toBe(409);
+    expect((await request("/_mittens/api/state/services/ghost", send("PATCH", { mode: "static" }))).status).toBe(404);
   });
 
   it("keeps PATCH /services as a definition edit", async () => {
     const { request, store } = await setup(fixtures());
-    await request("/_mimic/api/services/users", send("PATCH", { mode: "static" }));
+    await request("/_mittens/api/services/users", send("PATCH", { mode: "static" }));
     expect(store.getDefinition("users").mode).toBe("static");
     expect(store.isModified("users")).toBe(false);
   });
@@ -120,40 +120,40 @@ describe("live state (API)", () => {
 describe("live state (UI)", () => {
   it("row switcher changes live state, marks the row and signals the banner", async () => {
     const { request, store } = await setup(fixtures());
-    const res = await request("/_mimic/ui/services/users", form({ mode: "static", defaultScenario: "boom" }));
+    const res = await request("/_mittens/ui/services/users", form({ mode: "static", defaultScenario: "boom" }));
     expect(res.headers.get("hx-trigger")).toBe("live-changed");
     expect(await res.text()).toContain("changed");
     expect(store.getDefinition("users").mode).toBe("dynamic");
 
-    const banner = await (await request("/_mimic/ui/live-banner?return=/_mimic")).text();
+    const banner = await (await request("/_mittens/ui/live-banner?return=/_mittens")).text();
     expect(banner).toContain("1 service differs from its starting state");
 
-    const dashboard = await (await request("/_mimic/services")).text();
+    const dashboard = await (await request("/_mittens/services")).text();
     expect(dashboard).toContain("Save as starting state");
 
-    const reset = await request("/_mimic/ui/services/users/reset", form({}));
+    const reset = await request("/_mittens/ui/services/users/reset", form({}));
     expect(await reset.text()).not.toContain(">changed<");
     expect(store.isModified("users")).toBe(false);
-    expect(await (await request("/_mimic/ui/live-banner")).text()).not.toContain("differs");
+    expect(await (await request("/_mittens/ui/live-banner")).text()).not.toContain("differs");
   });
 
   it("save and reset buttons redirect back with a message", async () => {
     const { request, store } = await setup(fixtures());
     store.setLiveState("users", { mode: "static" });
-    const saved = await request("/_mimic/state/save", form({ return: "/_mimic/services/users" }));
-    expect(decodeURIComponent(saved.headers.get("location")!)).toBe("/_mimic/services/users?flash=Saved 1 service as starting state");
+    const saved = await request("/_mittens/state/save", form({ return: "/_mittens/services/users" }));
+    expect(decodeURIComponent(saved.headers.get("location")!)).toBe("/_mittens/services/users?flash=Saved 1 service as starting state");
     expect(store.getDefinition("users").mode).toBe("static");
 
     store.setLiveState("users", { mode: "dynamic" });
-    const reset = await request("/_mimic/state/reset", form({ return: "https://evil.test" }));
-    expect(decodeURIComponent(reset.headers.get("location")!)).toBe("/_mimic/services?flash=Reset 1 service to starting state");
+    const reset = await request("/_mittens/state/reset", form({ return: "https://evil.test" }));
+    expect(decodeURIComponent(reset.headers.get("location")!)).toBe("/_mittens/services?flash=Reset 1 service to starting state");
     expect(store.getService("users").mode).toBe("static");
   });
 
   it("edit form shows starting values, not live ones", async () => {
     const { request, store } = await setup(fixtures());
     store.setLiveState("users", { mode: "static" });
-    const html = await (await request("/_mimic/services/users/edit")).text();
+    const html = await (await request("/_mittens/services/users/edit")).text();
     expect(html).toContain("Starting mode");
     expect(html).toMatch(/<option value="dynamic" selected/);
   });

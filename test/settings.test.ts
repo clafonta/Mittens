@@ -19,9 +19,9 @@ describe("global error scenario", () => {
     const res = await request("/nowhere");
     expect(res.status).toBe(503);
     expect(await res.text()).toBe("down");
-    expect(res.headers.get("x-mimic-source")).toBe("fallback");
-    expect(res.headers.get("x-mimic-scenario")).toBe("down");
-    expect(res.headers.get("x-mimic-service")).toBeNull();
+    expect(res.headers.get("x-mittens-source")).toBe("fallback");
+    expect(res.headers.get("x-mittens-scenario")).toBe("down");
+    expect(res.headers.get("x-mittens-service")).toBeNull();
   });
 
   it("is used after a service's own fallbacks, never before", async () => {
@@ -32,7 +32,7 @@ describe("global error scenario", () => {
 
     const res = await request("/users/1");
     expect(res.status).toBe(503);
-    expect(res.headers.get("x-mimic-service")).toBe("users");
+    expect(res.headers.get("x-mittens-service")).toBe("users");
     expect(history.list()[0]!.note).toContain("used global error scenario orders/down");
 
     // A service error scenario wins over the global one.
@@ -56,11 +56,11 @@ describe("global error scenario", () => {
 
   it("API validates references and reports problems", async () => {
     const { request } = await setup(fixtures());
-    const bad = await request("/_mimic/api/settings", put({ errorScenario: { service: "orders", scenario: "nope" } }));
+    const bad = await request("/_mittens/api/settings", put({ errorScenario: { service: "orders", scenario: "nope" } }));
     expect(bad.status).toBe(404);
-    const ok = await request("/_mimic/api/settings", put(useGlobal));
+    const ok = await request("/_mittens/api/settings", put(useGlobal));
     expect(await ok.json()).toEqual({ ...useGlobal, problems: [] });
-    expect(await (await request("/_mimic/api/settings")).json()).toEqual({ ...useGlobal, problems: [] });
+    expect(await (await request("/_mittens/api/settings")).json()).toEqual({ ...useGlobal, problems: [] });
   });
 
   it("is cleared when its scenario or service is deleted", async () => {
@@ -78,31 +78,31 @@ describe("global error scenario", () => {
 
   it("dashboard settings page saves and clears the selection", async () => {
     const { request, store } = await setup(fixtures());
-    const html = await (await request("/_mimic/settings")).text();
+    const html = await (await request("/_mittens/settings")).text();
     expect(html).toContain('<optgroup label="Orders">');
     expect(html).toContain('value="orders/down"');
 
-    let res = await request("/_mimic/settings", form({ errorScenario: "orders/down" }));
+    let res = await request("/_mittens/settings", form({ errorScenario: "orders/down" }));
     expect(res.status).toBe(303);
     expect(store.getSettings()).toEqual(useGlobal);
-    expect(await (await request("/_mimic/services/orders")).text()).toContain("global error");
+    expect(await (await request("/_mittens/services/orders")).text()).toContain("global error");
 
-    res = await request("/_mimic/settings", form({ errorScenario: "orders/ghost" }));
+    res = await request("/_mittens/settings", form({ errorScenario: "orders/ghost" }));
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("&#39;ghost&#39; is not a scenario of &#39;orders&#39;");
 
-    await request("/_mimic/settings", form({ errorScenario: "" }));
+    await request("/_mittens/settings", form({ errorScenario: "" }));
     expect(store.getSettings()).toEqual({});
   });
 
-  it("is stored in mimic.yaml, removed when empty, and a dangling reference is ignored", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "mimic-settings-"));
+  it("is stored in mittens.yaml, removed when empty, and a dangling reference is ignored", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "mittens-settings-"));
     try {
       const store = new Store(new FileRepo(dir));
       await store.load();
       await store.createService({ id: "errs", name: "Errors", path: "/errs", scenarios: [{ id: "e500", name: "500", status: 500 }] });
       await store.putSettings({ errorScenario: { service: "errs", scenario: "e500" } });
-      const file = path.join(dir, "mimic.yaml");
+      const file = path.join(dir, "mittens.yaml");
       expect(await readFile(file, "utf8")).toBe("errorScenario:\n  service: errs\n  scenario: e500\n");
 
       await writeFile(file, "errorScenario:\n  service: errs\n  scenario: gone\n");

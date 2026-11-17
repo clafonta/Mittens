@@ -2,10 +2,10 @@
 
 ## The definitions folder
 
-Everything you define is plain YAML in the definitions folder (`./mimic`, or `--dir <path>`), one file per service and per scenario, so changes are easy to review in git:
+Everything you define is plain YAML in the definitions folder (`./mittens`, or `--dir <path>`), one file per service and per scenario, so changes are easy to review in git:
 
 ```
-mimic/
+mittens/
   services/
     users/
       service.yaml          the service
@@ -15,17 +15,17 @@ mimic/
         not-found.yaml
   profiles/
     outage.yaml
-  mimic.yaml                optional settings (global error scenario)
-  AGENTS.md                 notes for coding agents, written by `mimic init`
+  mittens.yaml              optional settings (global error scenario)
+  AGENTS.md                 notes for coding agents, written by `mittens init`
   CLAUDE.md                 points Claude Code at AGENTS.md
-  .mimic/                   history, if --persist-history (git-ignored)
+  .mittens/                 history, if --persist-history (git-ignored)
 ```
 
 Folder and file names are the ids: lowercase letters, digits and dashes. `new` and `apply` are reserved.
 
 ## Reloading
 
-Mimic watches the folder. Save a file in your editor and Mimic picks it up within a moment, keeping any live state that still makes sense. If a file is invalid, Mimic keeps serving the last good version and shows the error at the top of every dashboard page (and in the terminal) until you fix it. `--no-watch` turns watching off.
+Mittens watches the folder. Save a file in your editor and Mittens picks it up within a moment, keeping any live state that still makes sense. If a file is invalid, Mittens keeps serving the last good version and shows the error at the top of every dashboard page (and in the terminal) until you fix it. `--no-watch` turns watching off.
 
 Changes made in the dashboard are written straight to these files.
 
@@ -79,7 +79,7 @@ services:
 ```
 
 ```yaml
-# mimic.yaml
+# mittens.yaml
 errorScenario:
   service: users
   scenario: server-error
@@ -89,5 +89,5 @@ errorScenario:
 
 - Commit the definitions folder; teammates get the same mocks.
 - Switching modes and applying profiles in the dashboard doesn't touch the files (see [Live state](live-state.md)), so day-to-day use keeps your working tree clean.
-- `.mimic/` (saved history) is git-ignored automatically because it may contain credentials.
+- `.mittens/` (saved history) is git-ignored automatically because it may contain credentials.
 - `--read-only` loads definitions without ever writing to them.

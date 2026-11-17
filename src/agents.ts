@@ -4,16 +4,16 @@ import path from "node:path";
 
 /**
  * AGENTS.md for the definitions folder: how a coding agent (Codex, Copilot,
- * Cursor, Claude Code…) should read and edit Mimic's YAML. The YAML examples
+ * Cursor, Claude Code…) should read and edit Mittens's YAML. The YAML examples
  * here are checked against the real schemas by the tests, so keep them valid.
  */
-export const AGENTS_MD = `# Mimic definitions: notes for coding agents
+export const AGENTS_MD = `# Mittens definitions: notes for coding agents
 
-This folder holds the definitions for [Mimic](https://www.npmjs.com/package/@clafonta/mimic), a local HTTP mock server. The app under development calls Mimic (by default \`http://localhost:4000\`) instead of a real backend, and Mimic answers from these files.
+This folder holds the definitions for [Mittens](https://www.npmjs.com/package/@clafonta/mittens), a local HTTP mock server. The app under development calls Mittens (by default \`http://localhost:4000\`) instead of a real backend, and Mittens answers from these files.
 
-## Prefer Mimic's tools when you have them
+## Prefer Mittens's tools when you have them
 
-If Mimic is connected to you as an MCP server (tools like \`get_overview\`, \`upsert_scenario\`, \`send_request\`), use those tools rather than editing files: they validate input, apply changes immediately, and can switch a service's behaviour temporarily without touching these files. Otherwise, edit the YAML as described below. Mimic reloads it within a moment of saving.
+If Mittens is connected to you as an MCP server (tools like \`get_overview\`, \`upsert_scenario\`, \`send_request\`), use those tools rather than editing files: they validate input, apply changes immediately, and can switch a service's behaviour temporarily without touching these files. Otherwise, edit the YAML as described below. Mittens reloads it within a moment of saving.
 
 ## Layout
 
@@ -22,12 +22,12 @@ services/<service-id>/service.yaml           one service: a route and how to ans
 services/<service-id>/scenarios/<id>.yaml    one canned response per file
 services/<service-id>/hook.ts                optional code hook (also .js, .mjs, .mts)
 profiles/<profile-id>.yaml                   named sets of modes/scenarios, e.g. "outage"
-mimic.yaml                                   optional settings
-.mimic/                                      saved request history; don't edit or commit
+mittens.yaml                                 optional settings
+.mittens/                                    saved request history; don't edit or commit
 \`\`\`
 
 - Folder and file names are the ids: lowercase letters, digits and dashes (\`^[a-z0-9][a-z0-9-]*$\`). \`new\` and \`apply\` are reserved.
-- Unknown fields are rejected: one typo makes Mimic keep serving the previous version of every file until it's fixed.
+- Unknown fields are rejected: one typo makes Mittens keep serving the previous version of every file until it's fixed.
 
 ## Service (\`services/users/service.yaml\`)
 
@@ -90,7 +90,7 @@ body: |
 
 Values: \`params.x\`, \`query.x\`, \`headers.x\`, \`body\`, \`body.a.b[0]\`, \`method\`, \`path\`, \`url\`. Helpers: \`uuid\`, \`now\`, \`timestamp\`, \`randomInt 1 100\`. Filters: \`default "x"\`, \`upper\`, \`lower\`, \`json\` (use it for values inside JSON).
 
-## Profile (\`profiles/outage.yaml\`) and settings (\`mimic.yaml\`)
+## Profile (\`profiles/outage.yaml\`) and settings (\`mittens.yaml\`)
 
 \`\`\`yaml
 name: Outage
@@ -105,16 +105,16 @@ errorScenario: { service: users, scenario: server-error }   # used when nothing 
 
 ## After editing, check your work
 
-1. \`curl -s http://localhost:4000/_mimic/api/health\`: if \`reloadError\` is set, a file is invalid (the message names it) and Mimic is still serving the previous version.
-2. Call the route as the app would, e.g. \`curl -i http://localhost:4000/api/users/404\`. The \`x-mimic-service\`, \`x-mimic-scenario\` and \`x-mimic-source\` response headers say what answered.
-3. \`curl -s "http://localhost:4000/_mimic/api/history?service=users"\` lists recent requests and how each was answered.
+1. \`curl -s http://localhost:4000/_mittens/api/health\`: if \`reloadError\` is set, a file is invalid (the message names it) and Mittens is still serving the previous version.
+2. Call the route as the app would, e.g. \`curl -i http://localhost:4000/api/users/404\`. The \`x-mittens-service\`, \`x-mittens-scenario\` and \`x-mittens-source\` response headers say what answered.
+3. \`curl -s "http://localhost:4000/_mittens/api/history?service=users"\` lists recent requests and how each was answered.
 
 ## Good to know
 
-- To change behaviour temporarily (make a service fail while testing), don't edit these files: \`curl -X PATCH http://localhost:4000/_mimic/api/state/services/users -H 'content-type: application/json' -d '{"mode":"static","defaultScenario":"server-error"}'\`, and \`curl -X DELETE http://localhost:4000/_mimic/api/state\` to undo. That live state resets when Mimic restarts. For a clean slate between tests (live state, tag filter, hook state and history), \`curl -X POST http://localhost:4000/_mimic/api/reset\`.
-- Hooks (\`hook.ts\`) export \`request(req, ctx)\` and/or \`response(req, res, ctx)\`. Keep state that several services share in \`ctx.shared\` (modules you import aren't reloaded until Mimic restarts), and start a hook that always answers with \`if (ctx.live.modified) return;\` so profiles can still choose a scenario. See the help below.
+- To change behaviour temporarily (make a service fail while testing), don't edit these files: \`curl -X PATCH http://localhost:4000/_mittens/api/state/services/users -H 'content-type: application/json' -d '{"mode":"static","defaultScenario":"server-error"}'\`, and \`curl -X DELETE http://localhost:4000/_mittens/api/state\` to undo. That live state resets when Mittens restarts. For a clean slate between tests (live state, tag filter, hook state and history), \`curl -X POST http://localhost:4000/_mittens/api/reset\`.
+- Hooks (\`hook.ts\`) export \`request(req, ctx)\` and/or \`response(req, res, ctx)\`. Keep state that several services share in \`ctx.shared\` (modules you import aren't reloaded until Mittens restarts), and start a hook that always answers with \`if (ctx.live.modified) return;\` so profiles can still choose a scenario. See the help below.
 - Profiles can set \`delayMs\` per service, e.g. a "Slow network" profile.
-- Full documentation: http://localhost:4000/_mimic/help, or \`read_help\` if you have Mimic's tools.
+- Full documentation: http://localhost:4000/_mittens/help, or \`read_help\` if you have Mittens's tools.
 `;
 
 /** Claude Code reads CLAUDE.md rather than AGENTS.md; this imports it. */

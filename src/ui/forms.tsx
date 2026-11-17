@@ -431,10 +431,10 @@ export function SettingsForm(props: { services: Service[]; values: FormValues; e
         help="scenarios#the-global-error-scenario"
         values={values}
         errors={errors}
-        hint="Returned whenever Mimic would otherwise answer with its own error: no service matches the request, no scenario matches and the service has no fallback, or a proxy call fails and the service has no error scenario."
+        hint="Returned whenever Mittens would otherwise answer with its own error: no service matches the request, no scenario matches and the service has no fallback, or a proxy call fails and the service has no error scenario."
       >
         <select id={fieldId("errorScenario")} name="errorScenario">
-          <option value="">— none (Mimic's JSON error) —</option>
+          <option value="">— none (Mittens's JSON error) —</option>
           {withScenarios.map((s) => (
             <optgroup label={s.name}>
               {s.scenarios.map((sc) => {

@@ -10,12 +10,12 @@ export const MCP_PATH = "/mcp";
  * Only local clients get in. A web page could otherwise reach this endpoint
  * through the user's browser: requests from other origins are refused, and
  * the Host must be local (localhost, an IP address, or this machine's name),
- * which defeats DNS rebinding. Stricter than the rest of /_mimic: even pages
+ * which defeats DNS rebinding. Stricter than the rest of /_mittens: even pages
  * on localhost can't call it, since assistants don't run in a browser.
  */
 export function refuse(req: Request): string | undefined {
   const host = requestHost(req);
-  if (!isAllowedHost(host)) return `Host '${host}' isn't allowed; connect to Mimic as localhost or by IP address.`;
+  if (!isAllowedHost(host)) return `Host '${host}' isn't allowed; connect to Mittens as localhost or by IP address.`;
   const origin = req.headers.get("origin");
   if (origin && origin !== "null" && !isSameOrigin(origin, req)) return `Requests from ${origin} aren't allowed.`;
   return undefined;
@@ -37,7 +37,7 @@ async function noteClient(req: Request, deps: McpDeps) {
 
 /**
  * Streamable HTTP MCP endpoint. Stateless: each request gets a fresh server
- * and transport, and tools act directly on the running Mimic.
+ * and transport, and tools act directly on the running Mittens.
  */
 export function mcpHandler(deps: McpDeps) {
   return async (c: Context) => {

@@ -6,15 +6,15 @@ const body = (v: unknown) => ({ method: "POST", headers: { "content-type": "appl
 describe("management API", () => {
   it("creates a service and scenario, then serves it", async () => {
     const { request } = await setup([]);
-    expect((await request("/_mimic/api/services", body({ id: "ping", name: "Ping", path: "/ping" }))).status).toBe(201);
+    expect((await request("/_mittens/api/services", body({ id: "ping", name: "Ping", path: "/ping" }))).status).toBe(201);
 
-    const put = await request("/_mimic/api/services/ping/scenarios/pong", {
+    const put = await request("/_mittens/api/services/ping/scenarios/pong", {
       ...body({ name: "Pong", body: "pong" }),
       method: "PUT",
     });
     expect(put.status).toBe(200);
 
-    const patch = await request("/_mimic/api/services/ping", { ...body({ defaultScenario: "pong" }), method: "PATCH" });
+    const patch = await request("/_mittens/api/services/ping", { ...body({ defaultScenario: "pong" }), method: "PATCH" });
     expect(patch.status).toBe(200);
 
     expect(await (await request("/ping")).text()).toBe("pong");
@@ -22,44 +22,44 @@ describe("management API", () => {
 
   it("validates input", async () => {
     const { request } = await setup([]);
-    const res = await request("/_mimic/api/services", body({ id: "Bad Id", path: "nope" }));
+    const res = await request("/_mittens/api/services", body({ id: "Bad Id", path: "nope" }));
     expect(res.status).toBe(400);
     expect(((await res.json()) as { issues: unknown[] }).issues.length).toBeGreaterThan(0);
   });
 
   it("rejects unknown default scenarios and duplicate ids", async () => {
     const { request } = await setup([{ id: "a", path: "/a" }]);
-    expect((await request("/_mimic/api/services", body({ id: "a", name: "A", path: "/a" }))).status).toBe(409);
-    expect((await request("/_mimic/api/services/a", { ...body({ defaultScenario: "ghost" }), method: "PATCH" })).status).toBe(404);
-    expect((await request("/_mimic/api/services/zzz")).status).toBe(404);
+    expect((await request("/_mittens/api/services", body({ id: "a", name: "A", path: "/a" }))).status).toBe(409);
+    expect((await request("/_mittens/api/services/a", { ...body({ defaultScenario: "ghost" }), method: "PATCH" })).status).toBe(404);
+    expect((await request("/_mittens/api/services/zzz")).status).toBe(404);
   });
 
   it("reserves ids that collide with dashboard routes", async () => {
     const { request } = await setup([]);
-    expect((await request("/_mimic/api/services", body({ id: "new", name: "N", path: "/n" }))).status).toBe(409);
-    expect((await request("/_mimic/api/profiles", body({ id: "apply", name: "A" }))).status).toBe(409);
+    expect((await request("/_mittens/api/services", body({ id: "new", name: "N", path: "/n" }))).status).toBe(409);
+    expect((await request("/_mittens/api/profiles", body({ id: "apply", name: "A" }))).status).toBe(409);
   });
 
   it("requires an upstream for proxy mode", async () => {
     const { request } = await setup([{ id: "a", path: "/a" }]);
-    expect((await request("/_mimic/api/services/a", { ...body({ mode: "proxy" }), method: "PATCH" })).status).toBe(409);
+    expect((await request("/_mittens/api/services/a", { ...body({ mode: "proxy" }), method: "PATCH" })).status).toBe(409);
   });
 
   it("exposes and clears history", async () => {
     const { request } = await setup([]);
     await request("/whatever");
-    const list = (await (await request("/_mimic/api/history")).json()) as { id: string }[];
+    const list = (await (await request("/_mittens/api/history")).json()) as { id: string }[];
     expect(list).toHaveLength(1);
-    expect((await request(`/_mimic/api/history/${list[0]!.id}`)).status).toBe(200);
-    expect((await request("/_mimic/api/history", { method: "DELETE" })).status).toBe(204);
-    expect(await (await request("/_mimic/api/history")).json()).toEqual([]);
+    expect((await request(`/_mittens/api/history/${list[0]!.id}`)).status).toBe(200);
+    expect((await request("/_mittens/api/history", { method: "DELETE" })).status).toBe(204);
+    expect(await (await request("/_mittens/api/history")).json()).toEqual([]);
   });
 
   it("does not record its own API/UI traffic as mock traffic", async () => {
     const { request, history } = await setup([]);
-    await request("/_mimic/services");
-    await request("/_mimic/api/services");
-    await request("/_mimic/does-not-exist");
+    await request("/_mittens/services");
+    await request("/_mittens/api/services");
+    await request("/_mittens/does-not-exist");
     expect(history.list()).toHaveLength(0);
   });
 });
@@ -69,12 +69,12 @@ describe("UI", () => {
     const { request, store } = await setup([
       { id: "a", name: "Alpha", path: "/a", scenarios: [{ id: "x", name: "X", status: 200, headers: {}, body: "", tags: [] }] },
     ]);
-    const html = await (await request("/_mimic/services")).text();
+    const html = await (await request("/_mittens/services")).text();
     expect(html).toContain("Alpha");
-    expect(html).toContain("/_mimic/assets/htmx.min.js");
-    expect((await request("/_mimic/assets/htmx.min.js")).status).toBe(200);
+    expect(html).toContain("/_mittens/assets/htmx.min.js");
+    expect((await request("/_mittens/assets/htmx.min.js")).status).toBe(200);
 
-    const res = await request("/_mimic/ui/services/a", {
+    const res = await request("/_mittens/ui/services/a", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: "mode=dynamic&defaultScenario=x",

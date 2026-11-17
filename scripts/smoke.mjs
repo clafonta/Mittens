@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Packs Mimic, installs the tarball into a temporary project the way a user
+// Packs Mittens, installs the tarball into a temporary project the way a user
 // would, and exercises the installed CLI: --version, init, import, start,
 // a mock request, the dashboard, a TypeScript hook, and the bundled htmx.
 // Run after `npm run build`.
@@ -31,7 +31,7 @@ const step = (name) => console.log(`smoke: ${name}`);
 
 if (!existsSync(path.join(root, "dist", "cli.js"))) fail("dist/ is missing; run `npm run build` first");
 
-const work = mkdtempSync(path.join(tmpdir(), "mimic-smoke-"));
+const work = mkdtempSync(path.join(tmpdir(), "mittens-smoke-"));
 let server;
 try {
   step("npm pack");
@@ -48,14 +48,14 @@ try {
   mkdirSync(app, { recursive: true });
   writeFileSync(path.join(app, "package.json"), JSON.stringify({ name: "smoke-app", private: true, type: "module" }));
   run(npm, ["install", "--no-audit", "--no-fund", tarball], app);
-  const bin = path.join(app, "node_modules", ".bin", win ? "mimic.cmd" : "mimic");
-  if (!existsSync(bin)) fail("the mimic bin wasn't installed");
+  const bin = path.join(app, "node_modules", ".bin", win ? "mittens.cmd" : "mittens");
+  if (!existsSync(bin)) fail("the mittens bin wasn't installed");
 
-  step("mimic --version");
+  step("mittens --version");
   const version = run(bin, ["--version"], app).trim();
   if (version !== pkg.version) fail(`--version printed '${version}', expected '${pkg.version}'`);
 
-  step("mimic init and import --dry-run");
+  step("mittens init and import --dry-run");
   run(bin, ["init", "--dir", "defs"], app);
   const dry = run(bin, ["import", path.join(root, "test", "fixtures", "petstore.yaml"), "--dir", "defs", "--dry-run"], app);
   if (!dry.includes("Would import 6 services")) fail(`unexpected import output:\n${dry}`);
@@ -63,7 +63,7 @@ try {
   step("TypeScript hook using the published types");
   writeFileSync(
     path.join(app, "defs", "services", "users", "hook.ts"),
-    `import type { RequestHook } from "@clafonta/mimic";
+    `import type { RequestHook } from "@clafonta/mittens";
 export const request: RequestHook = (req) => (req.query.smoke ? { body: { smoke: req.params.id } } : undefined);
 `,
   );
@@ -90,29 +90,29 @@ export const request: RequestHook = (req) => (req.query.smoke ? { body: { smoke:
 
   step(`requests against ${origin}`);
   const mock = await fetch(`${origin}/api/users/42`);
-  if (mock.status !== 200 || mock.headers.get("x-mimic-service") !== "users") fail(`mock request: ${mock.status} ${await mock.text()}`);
-  if (mock.headers.get("x-mimic-validation") !== "pass") fail("example response didn't pass its schema");
+  if (mock.status !== 200 || mock.headers.get("x-mittens-service") !== "users") fail(`mock request: ${mock.status} ${await mock.text()}`);
+  if (mock.headers.get("x-mittens-validation") !== "pass") fail("example response didn't pass its schema");
   const hooked = await fetch(`${origin}/api/users/7?smoke=1`);
   const hookedBody = await hooked.text();
-  if (hooked.headers.get("x-mimic-source") !== "hook" || hookedBody !== '{"smoke":"7"}') fail(`hook response: ${hookedBody}`);
-  const helpPage = await (await fetch(`${origin}/_mimic/help/getting-started`)).text();
+  if (hooked.headers.get("x-mittens-source") !== "hook" || hookedBody !== '{"smoke":"7"}') fail(`hook response: ${hookedBody}`);
+  const helpPage = await (await fetch(`${origin}/_mittens/help/getting-started`)).text();
   if (!helpPage.includes(`curl ${origin}/api/users/42`)) fail("help pages missing, or examples don't show the live address");
   step("MCP endpoint for AI assistants");
   const rpc = (id, method, params) =>
-    fetch(`${origin}/_mimic/mcp`, {
+    fetch(`${origin}/_mittens/mcp`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
       body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
     }).then((r) => r.json());
   const init = await rpc(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "smoke", version: "0" } });
-  if (init.result?.serverInfo?.name !== "mimic") fail(`MCP initialize: ${JSON.stringify(init)}`);
+  if (init.result?.serverInfo?.name !== "mittens") fail(`MCP initialize: ${JSON.stringify(init)}`);
   const overview = await rpc(2, "tools/call", { name: "get_overview", arguments: {} });
   if (!overview.result?.content?.[0]?.text?.includes('"id": "users"')) fail(`MCP get_overview: ${JSON.stringify(overview).slice(0, 300)}`);
-  const home = await (await fetch(`${origin}/_mimic`)).text();
-  if (!home.includes("<title>Home · Mimic</title>")) fail("home page didn't render");
-  const dashboard = await (await fetch(`${origin}/_mimic/services`)).text();
-  if (!dashboard.includes("<title>Services · Mimic</title>")) fail("services page didn't render");
-  const htmx = await fetch(`${origin}/_mimic/assets/htmx.min.js`);
+  const home = await (await fetch(`${origin}/_mittens`)).text();
+  if (!home.includes("<title>Home · Mittens</title>")) fail("home page didn't render");
+  const dashboard = await (await fetch(`${origin}/_mittens/services`)).text();
+  if (!dashboard.includes("<title>Services · Mittens</title>")) fail("services page didn't render");
+  const htmx = await fetch(`${origin}/_mittens/assets/htmx.min.js`);
   if (htmx.status !== 200 || (await htmx.text()).length < 10_000) fail("htmx asset missing");
 
   console.log("smoke: OK");

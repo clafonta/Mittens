@@ -119,7 +119,7 @@ a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-co
 .flow .node rect { fill:var(--surface); stroke:var(--line-strong); stroke-width:1; transition:stroke .2s, fill .2s; }
 .flow .node .title { font-size:13px; font-weight:600; fill:var(--fg); } .flow .node .title.big { font-size:17px; } .flow .node .title.small { font-size:12px; }
 .flow .node .sub { font-size:11.5px; fill:var(--muted); } .flow .node .count { font-size:13px; font-weight:600; fill:var(--muted); font-variant-numeric:tabular-nums; }
-.flow .node.mimic rect { fill:color-mix(in srgb, var(--accent) 10%, var(--surface)); stroke:var(--accent); stroke-width:1.5; }
+.flow .node.mittens rect { fill:color-mix(in srgb, var(--accent) 10%, var(--surface)); stroke:var(--accent); stroke-width:1.5; }
 .flow .node.app rect { fill:var(--bg); }
 .flow .node.upstream rect { fill:var(--bg); stroke-dasharray:3 3; }
 .flow .node.nomatch rect { fill:var(--bg); stroke:var(--line); }
@@ -129,7 +129,7 @@ a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-co
 .flow .changed { fill:var(--warn); }
 .flow .node.hit rect:first-of-type { animation:hit .7s ease-out; }
 @keyframes hit { from { stroke:var(--accent); stroke-width:3; } to { stroke:var(--line-strong); stroke-width:1; } }
-.flow .node.mimic.hit rect { animation-name:hit-mimic; } @keyframes hit-mimic { from { stroke-width:4; } to { stroke-width:1.5; } }
+.flow .node.mittens.hit rect { animation-name:hit-mittens; } @keyframes hit-mittens { from { stroke-width:4; } to { stroke-width:1.5; } }
 .flow circle.dot { stroke:var(--surface); stroke-width:1.5; filter:drop-shadow(0 0 3px color-mix(in srgb, currentColor 60%, transparent)); }
 .flow circle.dot.req { fill:var(--accent); color:var(--accent); } .flow circle.dot.s2 { fill:var(--ok); color:var(--ok); } .flow circle.dot.s3 { fill:var(--accent); color:var(--accent); }
 .flow circle.dot.s4 { fill:var(--warn); color:var(--warn); } .flow circle.dot.s5 { fill:var(--bad); color:var(--bad); }
@@ -160,7 +160,7 @@ a.pill.tag { color:inherit; text-decoration:none; } a.pill.tag:hover { border-co
 .trust-diagram .boundary { fill:color-mix(in srgb, var(--ok) 5%, var(--surface)); stroke:var(--ok); stroke-width:1.5; stroke-dasharray:6 5; }
 .trust-diagram .boundary-label { font-size:14px; font-weight:600; fill:var(--ok); }
 .trust-diagram .t-node rect { fill:var(--surface); stroke:var(--line-strong); }
-.trust-diagram .t-node.mimic rect { fill:color-mix(in srgb, var(--accent) 10%, var(--surface)); stroke:var(--accent); stroke-width:1.5; }
+.trust-diagram .t-node.mittens rect { fill:color-mix(in srgb, var(--accent) 10%, var(--surface)); stroke:var(--accent); stroke-width:1.5; }
 .trust-diagram .t-node.assistant.connected rect { stroke:var(--ok); stroke-width:1.5; }
 .trust-diagram .t-node.outside rect { fill:var(--bg); stroke-dasharray:3 3; }
 .trust-diagram .t-title { font-size:14px; font-weight:600; fill:var(--fg); } .trust-diagram .t-title.big { font-size:18px; }
@@ -252,7 +252,7 @@ export function Layout(props: { title: string; readOnly: boolean; flash?: string
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{`${props.title} · Mimic`}</title>
+        <title>{`${props.title} · Mittens`}</title>
         {/* raw: JSX would escape quotes and ">" inside the CSS and break those rules. */}
         <style>{raw(css)}</style>
         <link rel="icon" type="image/svg+xml" href={`${BASE}/assets/favicon.svg`} />
@@ -260,8 +260,8 @@ export function Layout(props: { title: string; readOnly: boolean; flash?: string
       </head>
       <body>
         <header>
-          <a class="brand" href={BASE} aria-current={current === undefined && props.path !== undefined && /^\/_mimic\/?$/.test(props.path) ? "page" : undefined}>
-            Mimic
+          <a class="brand" href={BASE} aria-current={current === undefined && props.path !== undefined && /^\/_mittens\/?$/.test(props.path) ? "page" : undefined}>
+            Mittens
           </a>
           {NAV.map((n) => (
             <a

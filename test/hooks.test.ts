@@ -26,7 +26,7 @@ async function writeHook(serviceId: string, source: string, name = "hook.js") {
 }
 
 async function project(hookSource?: string, opts: { fetchImpl?: typeof fetch; enabled?: boolean; name?: string } = {}) {
-  dir = await mkdtemp(path.join(tmpdir(), "mimic-hooks-"));
+  dir = await mkdtemp(path.join(tmpdir(), "mittens-hooks-"));
   const store = new Store(new FileRepo(dir));
   await store.load();
   await store.createService({
@@ -60,20 +60,20 @@ describe("request hooks", () => {
     const res = await request("/users/7?page=2");
     expect(res.status).toBe(401);
     expect(res.headers.get("content-type")).toBe("application/json");
-    expect(res.headers.get("x-mimic-source")).toBe("hook");
+    expect(res.headers.get("x-mittens-source")).toBe("hook");
     expect(await res.json()).toEqual({ error: "unauthorized", path: "/users/7", page: "2" });
     expect(history.list()[0]).toMatchObject({ source: "hook", note: "Answered by hook", serviceId: "users" });
 
     // Returning nothing carries on as usual.
     const normal = await request("/users/7", { headers: { authorization: "Bearer t" } });
-    expect(normal.headers.get("x-mimic-scenario")).toBe("ok");
+    expect(normal.headers.get("x-mittens-scenario")).toBe("ok");
   });
 
   it("can pick a scenario (templates still render) and read the JSON body", async () => {
     const { request } = await project(`
       export const request = (req, ctx) => (req.json?.greet ? ctx.scenario("greet") : undefined);`);
     const res = await request("/users/42", { method: "POST", headers: json, body: '{"greet":true}' });
-    expect(res.headers.get("x-mimic-scenario")).toBe("greet");
+    expect(res.headers.get("x-mittens-scenario")).toBe("greet");
     expect(await res.json()).toEqual({ id: "42", hi: true });
   });
 
@@ -84,7 +84,7 @@ describe("request hooks", () => {
         return { body: { count: ctx.state.count } };
       }`);
     for (const n of [1, 2, 3]) expect(await (await request("/users/1")).json()).toEqual({ count: n });
-    expect((await request("/_mimic/api/hooks/state", { method: "DELETE" })).status).toBe(204);
+    expect((await request("/_mittens/api/hooks/state", { method: "DELETE" })).status).toBe(204);
     expect(await (await request("/users/1")).json()).toEqual({ count: 1 });
   });
 
@@ -93,7 +93,7 @@ describe("request hooks", () => {
     const res = await thrower.request("/users/1");
     expect(res.status).toBe(500);
     expect(await res.text()).toContain("Request hook threw: kaboom");
-    expect(res.headers.get("x-mimic-source")).toBe("error");
+    expect(res.headers.get("x-mittens-source")).toBe("error");
 
     await writeHook("users", `export const request = (req, ctx) => ctx.scenario("nope");`);
     await thrower.reload();
@@ -120,7 +120,7 @@ describe("response hooks", () => {
     const res = await request("/users/9");
     expect(res.headers.get("x-hooked")).toBe("yes");
     expect(await res.json()).toEqual({ name: "from upstream", id: "9" });
-    expect(res.headers.get("x-mimic-validation")).toBe("pass");
+    expect(res.headers.get("x-mittens-validation")).toBe("pass");
     expect(history.list()[0]!.note).toContain("changed by response hook");
   });
 
@@ -131,7 +131,7 @@ describe("response hooks", () => {
     expect(await res.json()).toEqual({ wrapped: { id: "x" } });
   });
 
-  it("don't run on Mimic's own errors", async () => {
+  it("don't run on Mittens's own errors", async () => {
     const { request, store } = await project(`export const response = () => ({ status: 299 });`);
     await store.updateService("users", { defaultScenario: undefined });
     expect((await request("/users/1")).status).toBe(500);
@@ -160,10 +160,10 @@ describe("loading", () => {
     await reload();
     expect(await (await request("/users/1")).text()).toBe("v2");
     expect(messages.at(-1)).toContain("Couldn't load hook for 'users' (keeping the previous version)");
-    const page = await (await request("/_mimic/services/users")).text();
+    const page = await (await request("/_mittens/services/users")).text();
     expect(page).toContain("services/users/hook.js");
     expect(page).toContain("couldn&#39;t load the latest version");
-    expect(((await (await request("/_mimic/api/hooks")).json()) as { hooks: { error?: string }[] }).hooks[0]!.error).toContain("hook.js");
+    expect(((await (await request("/_mittens/api/hooks")).json()) as { hooks: { error?: string }[] }).hooks[0]!.error).toContain("hook.js");
 
     await writeHook("users", `export const nothing = 1;`);
     await reload();

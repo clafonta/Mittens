@@ -75,7 +75,7 @@ describe("template scenarios", () => {
     expect(res.status).toBe(201);
     expect(res.headers.get("location")).toBe("/users/42");
     expect(await res.json()).toEqual({ id: "42", name: "Grace" });
-    expect(res.headers.get("x-mimic-validation")).toBe("pass");
+    expect(res.headers.get("x-mittens-validation")).toBe("pass");
     expect(history.list()[0]!.response.body).toBe('{"id": "42", "name": "Grace"}');
   });
 
@@ -94,7 +94,7 @@ describe("template scenarios", () => {
 
   it("invalid templates are rejected when saved", async () => {
     const { request } = await setup([{ id: "s", path: "/s" }]);
-    const put = (body: unknown) => request("/_mimic/api/services/s/scenarios/x", { method: "PUT", headers: json, body: JSON.stringify(body) });
+    const put = (body: unknown) => request("/_mittens/api/services/s/scenarios/x", { method: "PUT", headers: json, body: JSON.stringify(body) });
     const bad = await put({ name: "X", template: true, body: "{{nope}}" });
     expect(bad.status).toBe(400);
     expect(await bad.text()).toContain("Unknown value 'nope'");
@@ -104,28 +104,28 @@ describe("template scenarios", () => {
 
   it("render API and dashboard preview", async () => {
     const { request } = await setup([{ id: "users", path: "/users/{id}", scenarios: [tpl("hi {{params.id}} {{query.x}} {{body.n}}")] }]);
-    const res = await request("/_mimic/api/services/users/scenarios/t/render", { method: "POST", headers: json, body: JSON.stringify({ path: "/users/9?x=1", body: '{"n":5}' }) });
+    const res = await request("/_mittens/api/services/users/scenarios/t/render", { method: "POST", headers: json, body: JSON.stringify({ path: "/users/9?x=1", body: '{"n":5}' }) });
     expect(await res.json()).toMatchObject({ status: 201, body: "hi 9 1 5", params: { id: "9" } });
-    expect((await request("/_mimic/api/services/users/scenarios/t/render", { method: "POST", headers: json, body: "{bad" })).status).toBe(400);
+    expect((await request("/_mittens/api/services/users/scenarios/t/render", { method: "POST", headers: json, body: "{bad" })).status).toBe(400);
 
-    const page = await (await request("/_mimic/services/users")).text();
+    const page = await (await request("/_mittens/services/users")).text();
     expect(page).toContain(">template</span>");
     expect(page).toContain("Preview with a request");
-    const preview = await request("/_mimic/ui/services/users/scenarios/t/render", form({ method: "GET", path: "/users/3", body: "" }));
+    const preview = await request("/_mittens/ui/services/users/scenarios/t/render", form({ method: "GET", path: "/users/3", body: "" }));
     expect(await preview.text()).toContain("hi 3");
   });
 
   it("form saves the template flag and shows template errors on the body", async () => {
     const { request, store } = await setup([{ id: "users", path: "/users/{id}" }]);
-    let res = await request("/_mimic/services/users/scenarios", form({ id: "t", name: "T", status: "200", body: "{{params.id}}", template: "on" }));
+    let res = await request("/_mittens/services/users/scenarios", form({ id: "t", name: "T", status: "200", body: "{{params.id}}", template: "on" }));
     expect(res.status).toBe(303);
     expect(store.getScenario("users", "t").template).toBe(true);
-    expect(await (await request("/_mimic/services/users/scenarios/t/edit")).text()).toMatch(/name="template" checked/);
+    expect(await (await request("/_mittens/services/users/scenarios/t/edit")).text()).toMatch(/name="template" checked/);
 
-    res = await request("/_mimic/services/users/scenarios/t", form({ name: "T", status: "200", body: "{{oops}}", template: "on" }));
+    res = await request("/_mittens/services/users/scenarios/t", form({ name: "T", status: "200", body: "{{oops}}", template: "on" }));
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("Unknown value &#39;oops&#39;");
-    res = await request("/_mimic/services/users/scenarios/t", form({ name: "T", status: "200", body: "{{oops}}" }));
+    res = await request("/_mittens/services/users/scenarios/t", form({ name: "T", status: "200", body: "{{oops}}" }));
     expect(res.status).toBe(303);
     expect(store.getScenario("users", "t").template).toBeUndefined();
   });

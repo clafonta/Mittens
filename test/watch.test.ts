@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 async function fresh() {
-  dir = await mkdtemp(path.join(tmpdir(), "mimic-watch-"));
+  dir = await mkdtemp(path.join(tmpdir(), "mittens-watch-"));
   await init(dir);
   const store = new Store(new FileRepo(dir));
   await store.load();
@@ -109,7 +109,7 @@ describe("watchDefinitions", () => {
     expect(logs).toEqual(["Reloaded definitions (2 services, 2 profiles)"]);
   });
 
-  it("stays quiet about Mimic's own writes", async () => {
+  it("stays quiet about Mittens's own writes", async () => {
     const { dir, store } = await fresh();
     const logs: string[] = [];
     watcher = watchDefinitions(dir, store, { debounceMs: 30, log: (m) => logs.push(m) });

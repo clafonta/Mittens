@@ -3,7 +3,7 @@ import type { History } from "./history.js";
 import type { Hooks } from "./hooks.js";
 import type { Store } from "./store.js";
 
-/** The parts of Mimic's in-memory state that a reset can clear. */
+/** The parts of Mittens's in-memory state that a reset can clear. */
 export const ResetPart = z.enum(["state", "tags", "hooks", "history"]);
 export type ResetPart = z.infer<typeof ResetPart>;
 export const RESET_PARTS = ResetPart.options;
@@ -20,7 +20,7 @@ export interface ResetResult {
 }
 
 /**
- * Puts Mimic back the way it started, in one go: live state (modes, default
+ * Puts Mittens back the way it started, in one go: live state (modes, default
  * scenarios, delays), the tag filter, hook state (ctx.state and ctx.shared)
  * and request history. Files on disk are never touched. `keep` leaves parts
  * alone, e.g. ["history"] to look at requests after a reset.

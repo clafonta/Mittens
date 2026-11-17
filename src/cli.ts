@@ -21,33 +21,33 @@ import { VERSION } from "./version.js";
 
 const pkg = { version: VERSION };
 
-const HELP = `mimic ${pkg.version} — local HTTP mock server and recording proxy
+const HELP = `mittens ${pkg.version} — local HTTP mock server and recording proxy
 
 Usage:
-  mimic [start] [options]   Start the server
-  mimic init [--dir <path>] Create example definitions, plus AGENTS.md for coding
-                           agents (--no-examples: only AGENTS.md)
-  mimic mcp [--url <url>]   Connect an AI assistant that launches local commands
-                           (stdio) to the running Mimic; see the Assistants page
-  mimic import <spec>       Create services from an OpenAPI 3 file or URL
-      --dry-run            Show what would be created; write nothing
-      --mode <mode>        Starting mode: static (default), dynamic or proxy
-      --prefix <path>      Route prefix (default: the path of servers[0])
-      --tag <tag>          Add a tag to every imported service (repeatable)
+  mittens [start] [options]   Start the server
+  mittens init [--dir <path>] Create example definitions, plus AGENTS.md for coding
+                              agents (--no-examples: only AGENTS.md)
+  mittens mcp [--url <url>]   Connect an AI assistant that launches local commands
+                              (stdio) to the running Mittens; see the Assistants page
+  mittens import <spec>       Create services from an OpenAPI 3 file or URL
+      --dry-run               Show what would be created; write nothing
+      --mode <mode>           Starting mode: static (default), dynamic or proxy
+      --prefix <path>         Route prefix (default: the path of servers[0])
+      --tag <tag>             Add a tag to every imported service (repeatable)
 
 Options:
-  -p, --port <n>       Port to listen on (default: 4000, env MIMIC_PORT)
-      --host <addr>    Interface to bind (default: 127.0.0.1, env MIMIC_HOST)
-  -d, --dir <path>     Definitions directory (default: ./mimic, env MIMIC_DIR)
+  -p, --port <n>       Port to listen on (default: 4000, env MITTENS_PORT)
+      --host <addr>    Interface to bind (default: 127.0.0.1, env MITTENS_HOST)
+  -d, --dir <path>     Definitions directory (default: ./mittens, env MITTENS_DIR)
       --read-only      Load definitions but never write changes to disk
-      --profile <id>   Apply a profile on start, in memory only (env MIMIC_PROFILE)
+      --profile <id>   Apply a profile on start, in memory only (env MITTENS_PROFILE)
   -t, --tag <tags>     Only serve services tagged with one of these (comma-separated
-                       or repeated; env MIMIC_TAGS). Changeable from the dashboard.
+                       or repeated; env MITTENS_TAGS). Changeable from the dashboard.
       --no-watch       Don't reload definitions when files change
       --no-hooks       Don't run services/<id>/hook.js (or .mjs/.ts/.mts) files
       --persist-history
                        Keep request history across restarts, in
-                       <dir>/.mimic/history.jsonl (env MIMIC_PERSIST_HISTORY=1)
+                       <dir>/.mittens/history.jsonl (env MITTENS_PERSIST_HISTORY=1)
       --history-file <path>
                        Persist history to this file instead (implies the above)
       --history-limit <n>
@@ -63,7 +63,7 @@ Options:
 `;
 
 function fail(message: string): never {
-  console.error(`mimic: ${message}`);
+  console.error(`mittens: ${message}`);
   process.exit(1);
 }
 
@@ -119,7 +119,7 @@ async function main() {
   if (values.version) return void console.log(pkg.version);
 
   const command = positionals[0] ?? "start";
-  const dir = path.resolve(values.dir ?? process.env.MIMIC_DIR ?? "mimic");
+  const dir = path.resolve(values.dir ?? process.env.MITTENS_DIR ?? "mittens");
 
   if (command === "init") {
     const { created, agents, claude } = await init(dir, { examples: !values["no-examples"] });
@@ -127,20 +127,20 @@ async function main() {
     else if (!values["no-examples"]) console.log(`${dir} already has services; left them untouched.`);
     const added = [agents === "created" && "AGENTS.md", claude === "created" && "CLAUDE.md"].filter(Boolean);
     if (added.length) console.log(`Added ${added.join(" and ")} so coding agents (Codex, Copilot, Cursor, Claude Code…) know how to edit these files.`);
-    console.log(`Start with: npx @clafonta/mimic${values.dir ? ` --dir ${values.dir}` : ""}`);
+    console.log(`Start with: npx @clafonta/mittens${values.dir ? ` --dir ${values.dir}` : ""}`);
     return;
   }
   if (command === "import") return importSpec(positionals[1], dir, values);
   if (command === "mcp") {
-    const port = values.port ?? process.env.MIMIC_PORT ?? "4000";
+    const port = values.port ?? process.env.MITTENS_PORT ?? "4000";
     const { runBridge } = await import("./mcp/bridge.js");
-    return runBridge(values.url ?? `http://127.0.0.1:${port}/_mimic/mcp`);
+    return runBridge(values.url ?? `http://127.0.0.1:${port}/_mittens/mcp`);
   }
-  if (command !== "start") fail(`unknown command '${command}'. Run 'mimic --help'.`);
+  if (command !== "start") fail(`unknown command '${command}'. Run 'mittens --help'.`);
 
-  const port = Number(values.port ?? process.env.MIMIC_PORT ?? 4000);
+  const port = Number(values.port ?? process.env.MITTENS_PORT ?? 4000);
   if (!Number.isInteger(port) || port < 0 || port > 65535) fail(`invalid port '${values.port}'`);
-  const host = values.host ?? process.env.MIMIC_HOST ?? "127.0.0.1";
+  const host = values.host ?? process.env.MITTENS_HOST ?? "127.0.0.1";
 
   const store = new Store(new FileRepo(dir), { readOnly: values["read-only"] });
   // Create the definitions directory up front so it can be watched (not in read-only mode).
@@ -150,7 +150,7 @@ async function main() {
   } catch (err) {
     fail(err instanceof LoadError ? err.message : String(err));
   }
-  const profileId = values.profile ?? process.env.MIMIC_PROFILE;
+  const profileId = values.profile ?? process.env.MITTENS_PROFILE;
   if (profileId) {
     try {
       store.applyProfile(profileId);
@@ -160,7 +160,7 @@ async function main() {
     }
   }
 
-  const tags = store.setActiveTags((values.tag ?? (process.env.MIMIC_TAGS ? [process.env.MIMIC_TAGS] : [])).flatMap((t) => t.split(",")));
+  const tags = store.setActiveTags((values.tag ?? (process.env.MITTENS_TAGS ? [process.env.MITTENS_TAGS] : [])).flatMap((t) => t.split(",")));
   const unknownTags = tags.filter((t) => !store.allTags().includes(t));
 
   const hooks = new Hooks(dir, { enabled: !values["no-hooks"], log: (m) => console.error(m) });
@@ -186,13 +186,13 @@ async function main() {
   const historyLimit = Number(values["history-limit"] ?? 500);
   if (!Number.isInteger(historyLimit) || historyLimit < 1) fail(`invalid --history-limit '${values["history-limit"]}'`);
   const history = new History(historyLimit);
-  const historyPath = values["history-file"] ?? process.env.MIMIC_HISTORY_FILE;
-  const persist = !!historyPath || values["persist-history"] || ["1", "true"].includes(process.env.MIMIC_PERSIST_HISTORY ?? "");
+  const historyPath = values["history-file"] ?? process.env.MITTENS_HISTORY_FILE;
+  const persist = !!historyPath || values["persist-history"] || ["1", "true"].includes(process.env.MITTENS_PERSIST_HISTORY ?? "");
   let historyFile: HistoryFile | undefined;
   let restored = { restored: 0, skipped: 0 };
   if (persist) {
     // The default location gets its own .gitignore; a path you chose is left alone.
-    historyFile = new HistoryFile(path.resolve(historyPath ?? path.join(dir, ".mimic", "history.jsonl")), { gitignore: !historyPath });
+    historyFile = new HistoryFile(path.resolve(historyPath ?? path.join(dir, ".mittens", "history.jsonl")), { gitignore: !historyPath });
     try {
       restored = await historyFile.attach(history);
     } catch (err) {
@@ -204,7 +204,7 @@ async function main() {
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     const origin = `http://${host.includes(":") ? `[${host}]` : host}:${info.port}`;
     const count = store.listServices().length;
-    console.log(`Mimic ${pkg.version} listening on ${origin}`);
+    console.log(`Mittens ${pkg.version} listening on ${origin}`);
     console.log(`  Dashboard:   ${origin}${BASE}`);
     const profiles = store.listProfiles().length;
     console.log(
@@ -226,15 +226,15 @@ async function main() {
       const extra = restored.skipped ? `, skipped ${restored.skipped} unreadable line${restored.skipped === 1 ? "" : "s"}` : "";
       console.log(`  History:     ${historyFile.file} (restored ${restored.restored}${extra})`);
     }
-    if (count === 0) console.log(`  No services yet — try 'npx @clafonta/mimic init'.`);
+    if (count === 0) console.log(`  No services yet — try 'npx @clafonta/mittens init'.`);
     if (values.open) openBrowser(`${origin}${BASE}`);
   });
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code !== "EADDRINUSE") fail(err.message);
     void freePortAfter(port, host).then((free) =>
       fail(
-        `port ${port} is already in use (another Mimic?).` +
-          (free ? ` Port ${free} is free: npx @clafonta/mimic --port ${free}` : " Pick another with --port."),
+        `port ${port} is already in use (another Mittens?).` +
+          (free ? ` Port ${free} is free: npx @clafonta/mittens --port ${free}` : " Pick another with --port."),
       ),
     );
   });
@@ -253,7 +253,7 @@ async function importSpec(
   dir: string,
   values: { "dry-run"?: boolean; mode?: string; prefix?: string; tag?: string[]; "read-only"?: boolean },
 ) {
-  if (!source) fail("usage: mimic import <openapi.yaml|json|url> [--dir <path>] [--dry-run]");
+  if (!source) fail("usage: mittens import <openapi.yaml|json|url> [--dir <path>] [--dry-run]");
   const mode = values.mode === undefined ? undefined : ServiceMode.safeParse(values.mode).data;
   if (values.mode !== undefined && !mode) fail(`invalid --mode '${values.mode}' (static, dynamic or proxy)`);
   if (values.prefix !== undefined && !values.prefix.startsWith("/") && values.prefix !== "") fail("--prefix must start with /");
@@ -292,8 +292,8 @@ async function importSpec(
     console.log(`Definitions: ${dir}`);
     if (!existsSync(path.join(dir, "AGENTS.md"))) {
       const rel = path.relative(process.cwd(), dir) || ".";
-      const dirFlag = rel === "mimic" ? "" : ` --dir ${rel}`;
-      console.log(`Tip: npx @clafonta/mimic init --no-examples${dirFlag} adds AGENTS.md, so coding agents know how to edit these files.`);
+      const dirFlag = rel === "mittens" ? "" : ` --dir ${rel}`;
+      console.log(`Tip: npx @clafonta/mittens init --no-examples${dirFlag} adds AGENTS.md, so coding agents know how to edit these files.`);
     }
   } catch (err) {
     fail(err instanceof ImportError ? err.message : String(err));

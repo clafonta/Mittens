@@ -79,7 +79,7 @@ describe("JSONPath matching", () => {
   it("rejects bad definitions", async () => {
     const { request } = await orders([]);
     const put = (match: unknown) =>
-      request("/_mimic/api/services/orders/scenarios/x", { method: "PUT", headers: json, body: JSON.stringify({ name: "X", match }) });
+      request("/_mittens/api/services/orders/scenarios/x", { method: "PUT", headers: json, body: JSON.stringify({ name: "X", match }) });
     expect((await put({ json: { "user.role": "admin" } })).status).toBe(400);
     expect((await put({ params: { id: { regex: "(" } } })).status).toBe(400);
     expect((await put({ bodyMatches: { regex: "a", flags: "g" } })).status).toBe(400);
@@ -93,7 +93,7 @@ describe("scenario form match syntax", () => {
   it("parses and round-trips regex lines, JSONPath lines and body regex", async () => {
     const { request, store } = await orders([]);
     const res = await request(
-      "/_mimic/services/orders/scenarios",
+      "/_mittens/services/orders/scenarios",
       form({
         ...base,
         id: "x",
@@ -120,7 +120,7 @@ describe("scenario form match syntax", () => {
       bodyMatches: { regex: "refund", flags: "i" },
     });
 
-    const edit = await (await request("/_mimic/services/orders/scenarios/x/edit")).text();
+    const edit = await (await request("/_mittens/services/orders/scenarios/x/edit")).text();
     expect(edit).toContain(">id ~ ^9\\d$\nkind: plain</textarea>");
     expect(edit).toContain(">user-agent ~i iphone</textarea>");
     expect(edit).toContain('$.qty = 100\n$.code = &quot;100&quot;\n$.items[*].sku ~ ^X-\n$.coupon exists\n$.legacy missing</textarea>');
@@ -128,7 +128,7 @@ describe("scenario form match syntax", () => {
 
   it("reports bad lines", async () => {
     const { request } = await orders([]);
-    const submit = (fields: Record<string, string>) => request("/_mimic/services/orders/scenarios", form({ ...base, id: "y", ...fields }));
+    const submit = (fields: Record<string, string>) => request("/_mittens/services/orders/scenarios", form({ ...base, id: "y", ...fields }));
     let res = await submit({ "match.params": "id ~ (" });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("Line 1: &quot;(&quot; is not a valid regular expression");

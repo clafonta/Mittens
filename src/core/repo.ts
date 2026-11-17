@@ -12,7 +12,7 @@ import { type Profile, ProfileFile, type Scenario, ScenarioFile, type Service, S
  *   <root>/services/<service-id>/service.yaml
  *   <root>/services/<service-id>/scenarios/<scenario-id>.yaml
  *   <root>/profiles/<profile-id>.yaml
- *   <root>/mimic.yaml                     (settings; optional)
+ *   <root>/mittens.yaml                   (settings; optional)
  */
 export interface Repo {
   loadAll(): Promise<Service[]>;
@@ -119,7 +119,7 @@ export class FileRepo implements Repo {
   }
 
   private settingsPath() {
-    return path.join(this.root, "mimic.yaml");
+    return path.join(this.root, "mittens.yaml");
   }
 
   async loadSettings(): Promise<Settings> {

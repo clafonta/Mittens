@@ -85,7 +85,7 @@ export class HistoryFile {
     await mkdir(dir, { recursive: true });
     if (this.options.gitignore) {
       const ignore = path.join(dir, ".gitignore");
-      if (!existsSync(ignore)) await writeFile(ignore, "# Mimic's request history; may contain credentials.\n*\n");
+      if (!existsSync(ignore)) await writeFile(ignore, "# Mittens's request history; may contain credentials.\n*\n");
     }
   }
 

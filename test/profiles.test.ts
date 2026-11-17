@@ -59,35 +59,35 @@ describe("profiles (API)", () => {
 
   it("creates from current state, lists with status, applies and deletes", async () => {
     const { request } = await setup(fixtures());
-    const created = await request("/_mimic/api/profiles?from=current", send("POST", { id: "now", name: "Now" }));
+    const created = await request("/_mittens/api/profiles?from=current", send("POST", { id: "now", name: "Now" }));
     expect(created.status).toBe(201);
     expect(await created.json()).toMatchObject({ id: "now", active: true, problems: [], services: { users: { mode: "dynamic" } } });
 
-    expect((await request("/_mimic/api/profiles", send("POST", { id: "now", name: "Again" }))).status).toBe(409);
+    expect((await request("/_mittens/api/profiles", send("POST", { id: "now", name: "Again" }))).status).toBe(409);
 
-    const put = await request("/_mimic/api/profiles/now", send("PUT", { name: "Now", services: { users: { scenario: "boom" } } }));
+    const put = await request("/_mittens/api/profiles/now", send("PUT", { name: "Now", services: { users: { scenario: "boom" } } }));
     expect(await put.json()).toMatchObject({ active: false });
 
-    const applied = await request("/_mimic/api/profiles/now/apply", { method: "POST" });
+    const applied = await request("/_mittens/api/profiles/now/apply", { method: "POST" });
     expect(await applied.json()).toEqual({ applied: "now", changed: ["users"] });
     expect(await (await request("/users/1")).text()).toBe("boom");
 
-    expect((await request("/_mimic/api/profiles/now", { method: "DELETE" })).status).toBe(204);
-    expect((await request("/_mimic/api/profiles/now")).status).toBe(404);
+    expect((await request("/_mittens/api/profiles/now", { method: "DELETE" })).status).toBe(204);
+    expect((await request("/_mittens/api/profiles/now")).status).toBe(404);
   });
 
   it("rejects applying a broken profile with 409", async () => {
     const { request } = await setup(fixtures(), undefined, [
       { id: "x", name: "X", description: "", services: { ghost: { mode: "static" } } },
     ]);
-    const res = await request("/_mimic/api/profiles/x/apply", { method: "POST" });
+    const res = await request("/_mittens/api/profiles/x/apply", { method: "POST" });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toContain("ghost");
   });
 
   it("validates profile bodies", async () => {
     const { request } = await setup(fixtures());
-    const res = await request("/_mimic/api/profiles", send("POST", { id: "x", name: "X", services: { users: { mode: "sideways" } } }));
+    const res = await request("/_mittens/api/profiles", send("POST", { id: "x", name: "X", services: { users: { mode: "sideways" } } }));
     expect(res.status).toBe(400);
   });
 });

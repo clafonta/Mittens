@@ -14,7 +14,7 @@ function corsHeaders(req: Request): Record<string, string> {
   };
 }
 
-/** Handler for all mock traffic (every path outside /_mimic). */
+/** Handler for all mock traffic (every path outside /_mittens). */
 export function mockHandler(engine: Engine) {
   return async (c: Context) => {
     const req = c.req.raw;
@@ -30,10 +30,10 @@ export function mockHandler(engine: Engine) {
     });
     const headers = new Headers(res.headers);
     for (const [k, v] of Object.entries(corsHeaders(req))) if (!headers.has(k)) headers.set(k, v);
-    headers.set("x-mimic-source", res.source);
-    if (res.service) headers.set("x-mimic-service", res.service.id);
-    if (res.scenario) headers.set("x-mimic-scenario", res.scenario.id);
-    if (res.validation) headers.set("x-mimic-validation", res.validation.ok ? "pass" : "fail");
+    headers.set("x-mittens-source", res.source);
+    if (res.service) headers.set("x-mittens-service", res.service.id);
+    if (res.scenario) headers.set("x-mittens-scenario", res.scenario.id);
+    if (res.validation) headers.set("x-mittens-validation", res.validation.ok ? "pass" : "fail");
     const noBody = NO_BODY_STATUS.has(res.status) || req.method === "HEAD";
     return new Response(noBody ? null : res.body, { status: res.status, headers });
   };

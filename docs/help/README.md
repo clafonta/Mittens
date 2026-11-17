@@ -1,6 +1,6 @@
-# Mimic help
+# Mittens help
 
-Mimic is a mock server and recording proxy that runs on your machine. Point your app at Mimic instead of a real backend, then decide, endpoint by endpoint, whether it gets a canned response, a response picked to fit the request, or the real service, and watch every request arrive in History.
+Mittens is a mock server and recording proxy that runs on your machine. Point your app at Mittens instead of a real backend, then decide, endpoint by endpoint, whether it gets a canned response, a response picked to fit the request, or the real service, and watch every request arrive in History.
 
 ## How it fits together
 
@@ -12,10 +12,10 @@ Mimic is a mock server and recording proxy that runs on your machine. Point your
 
 ## Topics
 
-In Mimic, the search box above the topic list finds any section; press `/` to jump to it.
+In Mittens, the search box above the topic list finds any section; press `/` to jump to it.
 
-1. [Getting started](getting-started.md): run Mimic, point your app at it, make your first service
-2. [AI assistants](assistants.md): let Claude, Codex, Copilot or Cursor set Mimic up for you
+1. [Getting started](getting-started.md): run Mittens, point your app at it, make your first service
+2. [AI assistants](assistants.md): let Claude, Codex, Copilot or Cursor set Mittens up for you
 3. [Services and modes](services.md): routes, methods, static / dynamic / proxy, delays, tags
 4. [Scenarios and matching](scenarios.md): match rules, regexes, JSONPath, which scenario wins, error fallbacks
 5. [Live state and profiles](live-state.md): what changes the files and what doesn't; switching many services at once
@@ -27,5 +27,5 @@ In Mimic, the search box above the topic list finds any section; press `/` to ju
 11. [Importing OpenAPI](openapi.md): build services from a spec
 12. [Files on disk](files.md): the definitions folder, YAML reference, reloading, git tips
 13. [Command line](cli.md): commands, options and environment variables
-14. [HTTP API](api.md): control Mimic from scripts and tests
+14. [HTTP API](api.md): control Mittens from scripts and tests
 15. [Troubleshooting](troubleshooting.md): "why did I get this response?" and other puzzles

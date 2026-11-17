@@ -26,7 +26,7 @@ export interface McpDeps {
 }
 
 /** What the assistant is told when it connects. Keep it short: tools carry the details. */
-export const INSTRUCTIONS = `Mimic is a local HTTP mock server and recording proxy. The user's app calls Mimic instead of a real backend.
+export const INSTRUCTIONS = `Mittens is a local HTTP mock server and recording proxy. The user's app calls Mittens instead of a real backend.
 
 Model:
 - A service is a route (method + path template like /api/users/{id}) with a mode: static (always its default scenario), dynamic (the scenario whose match rule fits the request best), or proxy (forward to its upstream URL and record).
@@ -37,10 +37,10 @@ Model:
 How to work:
 - Start with get_overview.
 - To try something out (switch a mode, make an endpoint fail), change live state with set_live_state or apply_profile; it doesn't touch the user's files. Only call save_live_state if the user wants the change kept.
-- To build mocks: create_service, then upsert_scenario. Check your work with send_request, which goes through Mimic like the user's app would and is recorded in History.
+- To build mocks: create_service, then upsert_scenario. Check your work with send_request, which goes through Mittens like the user's app would and is recorded in History.
 - To debug "why did my app get X?": list_requests, then explain_request.
 - read_help has the full user documentation.
-Mimic's dashboard is at {origin}${BASE}; mention the relevant page when it helps the user see the result.`;
+Mittens's dashboard is at {origin}${BASE}; mention the relevant page when it helps the user see the result.`;
 
 // ------------------------------------------------------------------ helpers
 
@@ -67,10 +67,10 @@ const bodyText = (b: z.infer<typeof BodyInput> | undefined) => (b === undefined 
 
 // ------------------------------------------------------------------- server
 
-/** A fresh server per request (the endpoint is stateless); tools act on the running Mimic. */
+/** A fresh server per request (the endpoint is stateless); tools act on the running Mittens. */
 export function createMcpServer(deps: McpDeps, origin: string): McpServer {
   const { store, history, engine, hooks, help, activity } = deps;
-  const server = new McpServer({ name: "mimic", title: "Mimic", version: VERSION }, { instructions: INSTRUCTIONS.replace("{origin}", origin) });
+  const server = new McpServer({ name: "mittens", title: "Mittens", version: VERSION }, { instructions: INSTRUCTIONS.replace("{origin}", origin) });
 
   /** Registers a tool whose handler can throw; errors become tool errors, and every call is logged. */
   const tool = <S extends z.ZodRawShape>(
@@ -130,7 +130,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     () => {
       const entries = history.list();
       return {
-        mimic: { version: VERSION, mockBaseUrl: origin, dashboard: `${origin}${BASE}`, readOnly: store.readOnly },
+        mittens: { version: VERSION, mockBaseUrl: origin, dashboard: `${origin}${BASE}`, readOnly: store.readOnly },
         services: store.listServices().map((s) => ({
           id: s.id,
           name: s.name,
@@ -353,9 +353,9 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
   tool(
     "reset_everything",
     {
-      title: "Reset Mimic to a clean slate",
+      title: "Reset Mittens to a clean slate",
       description:
-        "Puts Mimic back the way it started: every service's live mode, scenario and delay, the tag filter, hook state (ctx.state and ctx.shared) and request history. Files are not touched. Pass keep to leave parts alone, e.g. [\"history\"].",
+        "Puts Mittens back the way it started: every service's live mode, scenario and delay, the tag filter, hook state (ctx.state and ctx.shared) and request history. Files are not touched. Pass keep to leave parts alone, e.g. [\"history\"].",
       input: { keep: z.array(ResetPart).optional() },
       annotations: OVERWRITE,
     },
@@ -366,7 +366,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     "save_live_state",
     {
       title: "Save live state to files",
-      description: "Writes every service's current live mode and default scenario into its YAML, so Mimic starts that way next time. Only when the user wants the change kept.",
+      description: "Writes every service's current live mode and default scenario into its YAML, so Mittens starts that way next time. Only when the user wants the change kept.",
       input: {},
       annotations: OVERWRITE,
     },
@@ -419,7 +419,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     "list_requests",
     {
       title: "List recent requests",
-      description: "Recent requests Mimic handled, newest first: method, path, status, which service and scenario answered, and why (source). Use get_request or explain_request for one.",
+      description: "Recent requests Mittens handled, newest first: method, path, status, which service and scenario answered, and why (source). Use get_request or explain_request for one.",
       input: {
         service: Slug.optional(),
         limit: z.number().int().min(1).max(200).optional().describe("Default 20"),
@@ -511,7 +511,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
           : e.source === "fallback"
             ? `No match rule fitted, so the fallback was used${e.note ? ` (${e.note})` : ""}.`
             : e.source === "error"
-              ? `Mimic couldn't answer: ${e.note ?? "see note"}.`
+              ? `Mittens couldn't answer: ${e.note ?? "see note"}.`
               : service.mode === "static"
                 ? "Static mode always sends the default scenario."
                 : "This scenario's match rule fitted best.";
@@ -530,7 +530,7 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
     {
       title: "Send test request",
       description:
-        "Sends a request through Mimic exactly as the user's app would, and returns what came back (status, which service and scenario answered, headers, body). Use it to check a configuration works. It's recorded in History. In proxy mode it reaches the real API.",
+        "Sends a request through Mittens exactly as the user's app would, and returns what came back (status, which service and scenario answered, headers, body). Use it to check a configuration works. It's recorded in History. In proxy mode it reaches the real API.",
       input: {
         method: HttpMethod.exclude(["ANY"]).optional().describe("Default GET"),
         path: z.string().startsWith("/").describe("Path and query, e.g. /api/users/7?verbose=true"),
@@ -613,8 +613,8 @@ export function createMcpServer(deps: McpDeps, origin: string): McpServer {
   tool(
     "read_help",
     {
-      title: "Read Mimic help",
-      description: "Mimic's user documentation. No arguments: the list of topics. topic: that topic's full text (Markdown). search: matching sections.",
+      title: "Read Mittens help",
+      description: "Mittens's user documentation. No arguments: the list of topics. topic: that topic's full text (Markdown). search: matching sections.",
       input: { topic: z.string().optional(), search: z.string().optional() },
       annotations: READ,
     },

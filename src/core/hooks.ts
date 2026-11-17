@@ -35,12 +35,12 @@ export interface HookContext {
   service: Service;
   /** Answer with one of the service's scenarios (templates are rendered as usual). */
   scenario(id: string): HookResult;
-  /** Per-service storage that lasts across requests until Mimic restarts. */
+  /** Per-service storage that lasts across requests until Mittens restarts. */
   state: Record<string, unknown>;
   /**
    * Storage shared by every hook in the project, for state that spans
    * services (a cart that add-to-cart, view-cart and checkout all use).
-   * Lasts until Mimic restarts or hook state is cleared.
+   * Lasts until Mittens restarts or hook state is cleared.
    */
   shared: Record<string, unknown>;
   /**
@@ -50,7 +50,7 @@ export interface HookContext {
    * answer instead (`if (ctx.live.modified) return;`).
    */
   live: { mode: Service["mode"]; defaultScenario?: string; delayMs: number; modified: boolean };
-  /** Write to Mimic's terminal output, prefixed with the service id. */
+  /** Write to Mittens's terminal output, prefixed with the service id. */
   log(...args: unknown[]): void;
 }
 
@@ -75,7 +75,7 @@ export interface HookModule {
 
 // --------------------------------------------------------------- internals
 
-const PICK = Symbol("mimic.scenario");
+const PICK = Symbol("mittens.scenario");
 export const scenarioPick = (id: string) => ({ [PICK]: id }) as unknown as HookResult;
 export const pickedScenario = (v: unknown): string | undefined =>
   typeof v === "object" && v !== null && PICK in v ? String((v as Record<symbol, unknown>)[PICK]) : undefined;

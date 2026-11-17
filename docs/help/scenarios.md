@@ -11,7 +11,7 @@ A scenario is one canned response: a status code, headers, a body, and optionall
 
 ## Match rules
 
-In dynamic mode, Mimic compares the request with each scenario's match rule. Every criterion you fill in must match. Leave a scenario's match rule empty if it should only be used as a default.
+In dynamic mode, Mittens compares the request with each scenario's match rule. Every criterion you fill in must match. Leave a scenario's match rule empty if it should only be used as a default.
 
 | Criterion | Matches when |
 |---|---|
@@ -66,9 +66,9 @@ match:
 1. Scenarios whose match rule fits the request are candidates.
 2. The candidate with the **most criteria** wins, so a rule checking `id` and `verbose` beats one checking only `id`.
 3. On a tie, the one with **more exact criteria** (not regexes) wins, so `id: 404` beats `id ~ .*`.
-4. If nothing fits, Mimic sends the service's default scenario, then its error scenario, then a 404 explaining that nothing matched.
+4. If nothing fits, Mittens sends the service's default scenario, then its error scenario, then a 404 explaining that nothing matched.
 
-To check which scenario answered, look at the `x-mimic-scenario` response header, or open the request in History.
+To check which scenario answered, look at the `x-mittens-scenario` response header, or open the request in History.
 
 ## Error scenarios
 
@@ -76,6 +76,6 @@ A service's **error scenario** is sent when a proxy call fails (timeout, refused
 
 ## The global error scenario
 
-On the **Settings** page you can choose one scenario, from any service, as the **global error scenario**. Mimic sends it whenever it would otherwise answer with its own error: no service matches the request, a dynamic service has nothing to fall back on, or a proxy call fails and the service has no error scenario. A service's own fallbacks always come first.
+On the **Settings** page you can choose one scenario, from any service, as the **global error scenario**. Mittens sends it whenever it would otherwise answer with its own error: no service matches the request, a dynamic service has nothing to fall back on, or a proxy call fails and the service has no error scenario. A service's own fallbacks always come first.
 
 Use it with care: if the global error looks like a normal response, real problems (a typo in a URL, a missing service) become hard to notice. History always records why it was used.

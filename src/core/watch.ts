@@ -31,7 +31,7 @@ function importedByHooks(filename: string): boolean {
 
 /**
  * Reloads the store when files under `root` change. Events are debounced and
- * reloads never overlap. Only real changes (or errors) are logged, so Mimic's
+ * reloads never overlap. Only real changes (or errors) are logged, so Mittens's
  * own writes stay quiet.
  */
 export function watchDefinitions(root: string, store: Store, opts: WatchOptions = {}): DefinitionsWatcher {
@@ -91,7 +91,7 @@ export function watchDefinitions(root: string, store: Store, opts: WatchOptions 
       const now = Date.now();
       if (now - (warned.get(filename) ?? 0) > 2000) {
         warned.set(filename, now);
-        log(`Changed ${filename.split(/[\\/]/).join("/")}: hooks keep using the version they first imported. Restart Mimic to pick it up.`);
+        log(`Changed ${filename.split(/[\\/]/).join("/")}: hooks keep using the version they first imported. Restart Mittens to pick it up.`);
       }
     }
   });

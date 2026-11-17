@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 async function project() {
-  dir = await mkdtemp(path.join(tmpdir(), "mimic-mcp-authoring-"));
+  dir = await mkdtemp(path.join(tmpdir(), "mittens-mcp-authoring-"));
   const store = new Store(new FileRepo(dir));
   await store.load();
   for (const id of ["cart", "reviews"]) {
@@ -32,7 +32,7 @@ async function project() {
   const app = createApp({ store, history: new History(), hooks });
   const client = new Client({ name: "test-assistant", version: "1.0.0" });
   await client.connect(
-    new StreamableHTTPClientTransport(new URL("http://localhost/_mimic/mcp"), {
+    new StreamableHTTPClientTransport(new URL("http://localhost/_mittens/mcp"), {
       fetch: ((url: string | URL, init?: RequestInit) => app.request(String(url), init)) as typeof fetch,
     }),
   );
@@ -93,14 +93,14 @@ describe("save_profile with merge", () => {
   });
 });
 
-describe("PATCH /_mimic/api/profiles/:id", () => {
+describe("PATCH /_mittens/api/profiles/:id", () => {
   it("merges like save_profile with merge", async () => {
     const { request, store } = await project();
     await store.putProfile({ id: "p", name: "P", description: "", services: { cart: { mode: "static" } } });
-    const res = await request("/_mimic/api/profiles/p", { method: "PATCH", headers: json, body: JSON.stringify({ services: { reviews: { scenario: "down" } } }) });
+    const res = await request("/_mittens/api/profiles/p", { method: "PATCH", headers: json, body: JSON.stringify({ services: { reviews: { scenario: "down" } } }) });
     expect(res.status).toBe(200);
     expect((await res.json()).services).toEqual({ cart: { mode: "static" }, reviews: { scenario: "down" } });
-    const bad = await request("/_mimic/api/profiles/p", { method: "PATCH", headers: json, body: JSON.stringify({ servics: {} }) });
+    const bad = await request("/_mittens/api/profiles/p", { method: "PATCH", headers: json, body: JSON.stringify({ servics: {} }) });
     expect(bad.status).toBe(400);
   });
 });

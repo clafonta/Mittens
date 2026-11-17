@@ -77,48 +77,48 @@ describe("form parsing", () => {
 describe("UI forms", () => {
   it("creates, edits and deletes a service", async () => {
     const { request, store } = await setup([]);
-    expect((await request("/_mimic/services/new")).status).toBe(200);
+    expect((await request("/_mittens/services/new")).status).toBe(200);
 
-    const created = await request("/_mimic/services", form({ id: "ping", name: "Ping", path: "/ping", method: "GET", mode: "static", delayMs: "0" }));
+    const created = await request("/_mittens/services", form({ id: "ping", name: "Ping", path: "/ping", method: "GET", mode: "static", delayMs: "0" }));
     expect(created.status).toBe(303);
-    expect(created.headers.get("location")).toMatch(/^\/_mimic\/services\/ping\?flash=/);
+    expect(created.headers.get("location")).toMatch(/^\/_mittens\/services\/ping\?flash=/);
     expect(store.getService("ping").method).toBe("GET");
 
     const flashed = await (await request(created.headers.get("location")!)).text();
     expect(flashed).toContain("Created service &#39;Ping&#39;");
 
     const edited = await request(
-      "/_mimic/services/ping",
+      "/_mittens/services/ping",
       form({ id: "hacked", name: "Ping 2", path: "/ping2", method: "ANY", mode: "static", delayMs: "10", tags: "x, y" }),
     );
     expect(edited.status).toBe(303);
     expect(store.getService("ping")).toMatchObject({ id: "ping", name: "Ping 2", path: "/ping2", delayMs: 10, tags: ["x", "y"] });
 
-    expect((await request("/_mimic/services/ping/delete", form({}))).status).toBe(303);
+    expect((await request("/_mittens/services/ping/delete", form({}))).status).toBe(303);
     expect(store.listServices()).toEqual([]);
   });
 
   it("re-renders the form with field errors and keeps the input", async () => {
     const { request } = await setup(fixtures());
-    const res = await request("/_mimic/services", form({ id: "Bad Id", name: "Mine", path: "no-slash", delayMs: "soon" }));
+    const res = await request("/_mittens/services", form({ id: "Bad Id", name: "Mine", path: "no-slash", delayMs: "soon" }));
     expect(res.status).toBe(422);
     const html = await res.text();
     expect(html).toContain('value="Mine"');
     expect(html).toContain("Must be a whole number");
 
-    const res2 = await request("/_mimic/services", form({ id: "Bad Id", name: "Mine", path: "no-slash", delayMs: "0" }));
+    const res2 = await request("/_mittens/services", form({ id: "Bad Id", name: "Mine", path: "no-slash", delayMs: "0" }));
     const html2 = await res2.text();
     expect(html2).toContain("lowercase letters, digits and dashes only");
     expect(html2).toMatch(/field invalid[^]*f-path/);
 
-    const dup = await request("/_mimic/services", form({ id: "users", name: "Dup", path: "/x" }));
+    const dup = await request("/_mittens/services", form({ id: "users", name: "Dup", path: "/x" }));
     expect(dup.status).toBe(422);
     expect(await dup.text()).toContain("Service &#39;users&#39; already exists");
   });
 
   it("puts the 'proxy needs upstream' error on the upstream field", async () => {
     const { request } = await setup(fixtures());
-    const res = await request("/_mimic/services/users", form({ name: "Users", path: "/users/{id}", mode: "proxy", delayMs: "0", upstream: "" }));
+    const res = await request("/_mittens/services/users", form({ name: "Users", path: "/users/{id}", mode: "proxy", delayMs: "0", upstream: "" }));
     expect(res.status).toBe(422);
     expect(await res.text()).toMatch(/field invalid[^]*f-upstream[^]*Proxy mode needs an upstream URL/);
   });
@@ -126,7 +126,7 @@ describe("UI forms", () => {
   it("creates the first scenario as default, edits and deletes scenarios", async () => {
     const { request, store } = await setup([{ id: "ping", name: "Ping", path: "/ping" }]);
     const created = await request(
-      "/_mimic/services/ping/scenarios",
+      "/_mittens/services/ping/scenarios",
       form({ id: "pong", name: "Pong", status: "201", headers: "content-type: text/plain", body: "pong", "match.query": "q: 1" }),
     );
     expect(created.status).toBe(303);
@@ -135,48 +135,48 @@ describe("UI forms", () => {
     expect(res.status).toBe(201);
     expect(await res.text()).toBe("pong");
 
-    const dup = await request("/_mimic/services/ping/scenarios", form({ id: "pong", name: "Again" }));
+    const dup = await request("/_mittens/services/ping/scenarios", form({ id: "pong", name: "Again" }));
     expect(dup.status).toBe(422);
 
-    expect((await request("/_mimic/services/ping/scenarios/pong/edit")).status).toBe(200);
-    await request("/_mimic/services/ping/scenarios/pong", form({ name: "Pong!", status: "200", body: "PONG" }));
+    expect((await request("/_mittens/services/ping/scenarios/pong/edit")).status).toBe(200);
+    await request("/_mittens/services/ping/scenarios/pong", form({ name: "Pong!", status: "200", body: "PONG" }));
     expect(store.getScenario("ping", "pong")).toMatchObject({ name: "Pong!", body: "PONG", match: undefined });
 
-    await request("/_mimic/services/ping/scenarios/pong/delete", form({}));
+    await request("/_mittens/services/ping/scenarios/pong/delete", form({}));
     expect(store.getService("ping")).toMatchObject({ scenarios: [], defaultScenario: undefined });
   });
 
   it("creates a profile from the form and applies it from the switcher", async () => {
     const { request, store } = await setup(fixtures());
-    const newPage = await (await request("/_mimic/profiles/new")).text();
+    const newPage = await (await request("/_mittens/profiles/new")).text();
     expect(newPage).toContain('name="svc.users.include" checked');
 
     const created = await request(
-      "/_mimic/profiles",
+      "/_mittens/profiles",
       form({ id: "fail", name: "Fail", "svc.users.include": "on", "svc.users.mode": "static", "svc.users.scenario": "boom" }),
     );
     expect(created.status).toBe(303);
     expect(store.getProfile("fail").services).toEqual({ users: { mode: "static", scenario: "boom" } });
 
-    const applied = await request("/_mimic/profiles/apply", form({ id: "fail", return: "/_mimic/services" }));
+    const applied = await request("/_mittens/profiles/apply", form({ id: "fail", return: "/_mittens/services" }));
     expect(applied.status).toBe(303);
-    expect(decodeURIComponent(applied.headers.get("location")!)).toBe("/_mimic/services?flash=Applied 'Fail' (1 service changed)");
+    expect(decodeURIComponent(applied.headers.get("location")!)).toBe("/_mittens/services?flash=Applied 'Fail' (1 service changed)");
     expect(store.getService("users")).toMatchObject({ mode: "static", defaultScenario: "boom" });
 
-    const dashboard = await (await request("/_mimic/services")).text();
+    const dashboard = await (await request("/_mittens/services")).text();
     expect(dashboard).toMatch(/<option value="fail" selected/);
   });
 
   it("never redirects outside the dashboard", async () => {
     const { request } = await setup(fixtures(), undefined, [{ id: "p", name: "P", description: "", services: {} }]);
     for (const target of ["https://evil.test", "//evil.test", "/elsewhere"]) {
-      const res = await request("/_mimic/profiles/p/apply", form({ return: target }));
-      expect(res.headers.get("location")).toMatch(/^\/_mimic\/profiles\?flash=/);
+      const res = await request("/_mittens/profiles/p/apply", form({ return: target }));
+      expect(res.headers.get("location")).toMatch(/^\/_mittens\/profiles\?flash=/);
     }
   });
 
   it("shows a 404 page for unknown services", async () => {
     const { request } = await setup([]);
-    expect((await request("/_mimic/services/nope/edit")).status).toBe(404);
+    expect((await request("/_mittens/services/nope/edit")).status).toBe(404);
   });
 });

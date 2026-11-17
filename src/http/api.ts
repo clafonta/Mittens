@@ -14,7 +14,7 @@ import type { Store } from "../core/store.js";
 import { ResetPart, resetAll } from "../core/reset.js";
 import { errorStatus } from "./errors.js";
 
-/** JSON management API, mounted at /_mimic/api. */
+/** JSON management API, mounted at /_mittens/api. */
 export function createApi(store: Store, history: History, engine: Engine, hooks: Hooks) {
   const api = new Hono();
 
@@ -30,7 +30,7 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
     return c.json(body, status);
   });
 
-  /** reloadError: set when a definition file is invalid; Mimic keeps serving the last good version. */
+  /** reloadError: set when a definition file is invalid; Mittens keeps serving the last good version. */
   api.get("/health", (c) => c.json({ ok: true, readOnly: store.readOnly, reloadError: store.reloadError ?? null }));
 
   // services & scenarios
@@ -52,7 +52,7 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
   api.get("/services/:id/upstream", (c) => {
     const service = store.getService(c.req.param("id"));
     const path = c.req.query("path") ?? service.path;
-    const url = upstreamUrl(service, new URL(path.startsWith("/") ? path : `/${path}`, "http://mimic.local"));
+    const url = upstreamUrl(service, new URL(path.startsWith("/") ? path : `/${path}`, "http://mittens.local"));
     return url ? c.json({ url: url.toString() }) : c.json({ error: `Service '${service.id}' has no upstream` }, 409);
   });
   api.put("/services/:id/scenarios/:sid", async (c) => {
@@ -182,7 +182,7 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
     return c.body(null, 204);
   });
 
-  // settings (mimic.yaml)
+  // settings (mittens.yaml)
   const settingsView = () => ({ ...store.getSettings(), problems: store.settingsProblems() });
   api.get("/settings", (c) => c.json(settingsView()));
   /** Body: { errorScenario?: { service, scenario } }. Replaces all settings. */
@@ -193,7 +193,7 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
 
   /**
    * Server-sent events: a `request` event (a RequestSummary as JSON) for each
-   * request Mimic handles, `clear` when history is cleared, `state` when the
+   * request Mittens handles, `clear` when history is cleared, `state` when the
    * live state changes ({ modified, tags }), `hooks` when hook state is cleared
    * ({ service }, null for all), and `definitions` when services,
    * scenarios, profiles or settings change. A comment is sent every 15 s to
@@ -237,13 +237,13 @@ export function createApi(store: Store, history: History, engine: Engine, hooks:
   });
   /** ?service=id, ?validation=pass|fail */
   api.get("/history", (c) => c.json(history.list(historyFilter(c))));
-  /** Download history as HAR 1.2 (default) or Mimic's JSON; same filters as /history. */
+  /** Download history as HAR 1.2 (default) or Mittens's JSON; same filters as /history. */
   api.get("/history/export", (c) => {
     const format = z.enum(["har", "json"]).parse(c.req.query("format") ?? "har");
     const entries = history.list(historyFilter(c));
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const service = Slug.safeParse(c.req.query("service")).data;
-    const name = `mimic-history${service ? `-${service}` : ""}-${stamp}.${format}`;
+    const name = `mittens-history${service ? `-${service}` : ""}-${stamp}.${format}`;
     c.header("content-disposition", `attachment; filename="${name}"`);
     return c.json(format === "har" ? toHar(entries, VERSION) : entries);
   });

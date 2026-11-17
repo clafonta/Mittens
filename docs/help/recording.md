@@ -2,7 +2,7 @@
 
 ## History
 
-Every request Mimic answers appears in **History**, newest first: method, path, status, which service and scenario answered, why (`scenario`, `fallback`, `proxy`, `hook`, `unmatched`, `error`), and how long it took. Click a request to see its full headers and bodies. The Services page and each service page show recent requests too.
+Every request Mittens answers appears in **History**, newest first: method, path, status, which service and scenario answered, why (`scenario`, `fallback`, `proxy`, `hook`, `unmatched`, `error`), and how long it took. Click a request to see its full headers and bodies. The Services page and each service page show recent requests too.
 
 History keeps the latest 500 requests and bodies up to 256 KB.
 
@@ -22,10 +22,10 @@ Click **Replay** on any request in History to send it again: same method, path, 
 
 ## Exporting
 
-**Export HAR** and **Export JSON** download what's in History (the service page exports just that service). HAR files open in browser devtools, Charles, Fiddler and similar tools; Mimic's details (which service and scenario answered, validation results) are kept in `_mimic` fields.
+**Export HAR** and **Export JSON** download what's in History (the service page exports just that service). HAR files open in browser devtools, Charles, Fiddler and similar tools; Mittens's details (which service and scenario answered, validation results) are kept in `_mittens` fields.
 
 ## Keeping history across restarts
 
-By default History lives in memory and is gone when Mimic stops. Start with `--persist-history` to also save it to `.mimic/history.jsonl` inside the definitions folder; it's reloaded on start, so you can still replay or save what you recorded yesterday.
+By default History lives in memory and is gone when Mittens stops. Start with `--persist-history` to also save it to `.mittens/history.jsonl` inside the definitions folder; it's reloaded on start, so you can still replay or save what you recorded yesterday.
 
 That folder gets its own `.gitignore`, because history can contain passwords and tokens from proxied traffic. `--history-file <path>` stores it somewhere else; `--history-limit <n>` changes how many requests are kept. **Clear history** empties the file too.

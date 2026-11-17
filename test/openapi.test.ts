@@ -102,7 +102,7 @@ describe("planImport edge cases", () => {
     expect(JSON.parse(plan.services[0]!.scenarios[0]!.body)).toEqual({ n: 5 });
     expect(plan.services[0]!.mode).toBe("static"); // no absolute server URL for proxy mode
     expect(plan.warnings[0]).toContain("Proxy mode needs an absolute URL");
-    expect(plan.skipped).toEqual([{ id: "", route: "TRACE /base/things/{thing_id}", reason: "TRACE isn't supported by Mimic" }]);
+    expect(plan.skipped).toEqual([{ id: "", route: "TRACE /base/things/{thing_id}", reason: "TRACE isn't supported by Mittens" }]);
     expect(plan.warnings).toContain("GET /base/dup has no responses; its service has no scenarios");
   });
 
@@ -127,7 +127,7 @@ describe("planImport edge cases", () => {
 describe("import via API and dashboard", () => {
   it("API: dry run, then import, then nothing left to import", async () => {
     const { request, store } = await setup([]);
-    const post = (q: string) => request(`/_mimic/api/import/openapi${q}`, { method: "POST", body: petstoreText });
+    const post = (q: string) => request(`/_mittens/api/import/openapi${q}`, { method: "POST", body: petstoreText });
     const dry = (await (await post("?dryRun=1&tags=petstore")).json()) as { dryRun: boolean; services: unknown[] };
     expect(dry).toMatchObject({ dryRun: true });
     expect(dry.services).toHaveLength(6);
@@ -139,22 +139,22 @@ describe("import via API and dashboard", () => {
     expect(store.getService("list-pets").tags).toEqual(["pets", "petstore"]);
 
     const mock = await request("/v1/pets/3");
-    expect(mock.headers.get("x-mimic-service")).toBe("show-pet-by-id");
-    expect(mock.headers.get("x-mimic-validation")).toBe("pass");
+    expect(mock.headers.get("x-mittens-service")).toBe("show-pet-by-id");
+    expect(mock.headers.get("x-mittens-validation")).toBe("pass");
 
     const again = (await (await post("")).json()) as { services: unknown[]; skipped: unknown[] };
     expect(again.services).toHaveLength(0);
     expect(again.skipped).toHaveLength(6);
 
-    const bad = await request("/_mimic/api/import/openapi", { method: "POST", body: '{"swagger":"2.0"}' });
+    const bad = await request("/_mittens/api/import/openapi", { method: "POST", body: '{"swagger":"2.0"}' });
     expect(bad.status).toBe(400);
-    expect((await request("/_mimic/api/import/openapi?mode=weird", { method: "POST", body: petstoreText })).status).toBe(400);
+    expect((await request("/_mittens/api/import/openapi?mode=weird", { method: "POST", body: petstoreText })).status).toBe(400);
   });
 
   it("dashboard: upload, preview, import", async () => {
     const { request, store } = await setup([]);
-    expect(await (await request("/_mimic/services")).text()).toContain('href="/_mimic/import"');
-    expect(await (await request("/_mimic/import")).text()).toContain('enctype="multipart/form-data"');
+    expect(await (await request("/_mittens/services")).text()).toContain('href="/_mittens/import"');
+    expect(await (await request("/_mittens/import")).text()).toContain('enctype="multipart/form-data"');
 
     const submit = (action: string, file?: string, spec = "") => {
       const fd = new FormData();
@@ -162,7 +162,7 @@ describe("import via API and dashboard", () => {
       fd.set("spec", spec);
       fd.set("action", action);
       fd.set("prefix", "/api");
-      return request("/_mimic/import", { method: "POST", body: fd });
+      return request("/_mittens/import", { method: "POST", body: fd });
     };
     const preview = await (await submit("preview", petstoreText)).text();
     expect(preview).toContain("Would import 6 services from “Petstore”");
@@ -172,7 +172,7 @@ describe("import via API and dashboard", () => {
 
     const done = await (await submit("import", undefined, petstoreText)).text();
     expect(done).toContain("Imported 6 services");
-    expect(done).toContain('href="/_mimic/services/list-pets"');
+    expect(done).toContain('href="/_mittens/services/list-pets"');
     expect(store.getService("list-pets").path).toBe("/api/pets");
 
     const empty = await submit("preview");

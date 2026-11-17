@@ -16,7 +16,7 @@ afterEach(async () => {
 
 describe("init --no-examples", () => {
   it("writes only the agent notes", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-noex-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-noex-"));
     expect(await init(dir, { examples: false })).toMatchObject({ created: false, agents: "created", claude: "created" });
     expect((await readdir(dir)).sort()).toEqual(["AGENTS.md", "CLAUDE.md"]);
     expect(existsSync(path.join(dir, "services"))).toBe(false);
@@ -28,7 +28,7 @@ describe("live stream: state and definitions events", () => {
     const { request, store } = await setup(fixtures(), undefined, [{ id: "p", name: "P", description: "", services: { users: { mode: "static" } } }]);
     const before = store.events.listenerCount("state");
     const abort = new AbortController();
-    const res = await request("/_mimic/api/events", { signal: abort.signal });
+    const res = await request("/_mittens/api/events", { signal: abort.signal });
     const reader = res.body!.getReader();
     const dec = new TextDecoder();
     let text = "";
@@ -36,10 +36,10 @@ describe("live stream: state and definitions events", () => {
       while (!text.includes(needle)) text += dec.decode((await reader.read()).value);
     };
     await until(": connected");
-    await request("/_mimic/api/profiles/p/apply", { method: "POST" });
+    await request("/_mittens/api/profiles/p/apply", { method: "POST" });
     await until("event: state");
     expect(text).toContain('"modified":["users"]');
-    await request("/_mimic/api/services/users/scenarios/new-one", { method: "PUT", headers: json, body: JSON.stringify({ name: "New" }) });
+    await request("/_mittens/api/services/users/scenarios/new-one", { method: "PUT", headers: json, body: JSON.stringify({ name: "New" }) });
     await until("event: definitions");
     expect(store.events.listenerCount("state")).toBe(before + 1);
     abort.abort();
@@ -65,7 +65,7 @@ describe("overview diagram", () => {
 
   it("cuts long names at a word and shows the full name, id and route on hover", async () => {
     const { request } = await setup([{ id: "add-cart-item", name: "Add a product to the cart", path: "/api/cart/items", method: "POST" }]);
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mittens")).text();
     expect(html).toContain(">Add a product to…</text>");
     expect(html).toContain("<title>Add a product to the cart (add-cart-item)\nPOST /api/cart/items</title>");
   });
@@ -73,7 +73,7 @@ describe("overview diagram", () => {
   it("explains counts on answers that can't be used now", async () => {
     const { request, store } = await setup(fixtures());
     store.setLiveState("users", { mode: "static" });
-    const html = await (await request("/_mimic/services/users")).text();
+    const html = await (await request("/_mittens/services/users")).text();
     expect(html).toContain("<title>Boom: can&#39;t answer in static mode; its count is from earlier requests</title>");
     expect(html).toContain("(counts are from earlier requests)");
   });
@@ -82,7 +82,7 @@ describe("overview diagram", () => {
 describe("changed and Reset are one control", () => {
   it("in the services row", async () => {
     const { request } = await setup(fixtures());
-    const row = await (await request("/_mimic/ui/services/users", form({ mode: "static", defaultScenario: "boom" }))).text();
+    const row = await (await request("/_mittens/ui/services/users", form({ mode: "static", defaultScenario: "boom" }))).text();
     expect(row).toMatch(/<button type="button" class="changed-reset"[^>]*><span class="changed-label">changed<\/span><span>Reset<\/span><\/button>/);
   });
 });

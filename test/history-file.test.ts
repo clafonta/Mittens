@@ -21,8 +21,8 @@ const entry = (n: number): Omit<HistoryEntry, "id"> => ({
 });
 
 async function fresh(limit = 5, opts = { gitignore: true }) {
-  dir ??= await mkdtemp(path.join(tmpdir(), "mimic-history-"));
-  const file = path.join(dir, ".mimic", "history.jsonl");
+  dir ??= await mkdtemp(path.join(tmpdir(), "mittens-history-"));
+  const file = path.join(dir, ".mittens", "history.jsonl");
   const history = new History(limit);
   const persisted = new HistoryFile(file, { ...opts, log: () => {} });
   const result = await persisted.attach(history);
@@ -85,7 +85,7 @@ describe("history persistence", () => {
   });
 
   it("keeps serving when writes fail, and says so once", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-history-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-history-"));
     const file = path.join(dir, "history.jsonl");
     const messages: string[] = [];
     const history = new History(5);

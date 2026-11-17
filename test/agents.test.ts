@@ -19,7 +19,7 @@ afterEach(async () => {
   if (dir) await rm(dir, { recursive: true, force: true });
   dir = undefined;
 });
-const fresh = async () => (dir = await mkdtemp(path.join(tmpdir(), "mimic-agents-")));
+const fresh = async () => (dir = await mkdtemp(path.join(tmpdir(), "mittens-agents-")));
 
 describe("AGENTS.md", () => {
   it("every YAML example is valid for the file it describes", () => {
@@ -40,13 +40,13 @@ describe("AGENTS.md", () => {
   });
 });
 
-describe("mimic init", () => {
+describe("mittens init", () => {
   it("writes AGENTS.md and CLAUDE.md next to the examples", async () => {
     const root = await fresh();
     expect(await init(root)).toMatchObject({ created: true, agents: "created", claude: "created" });
     expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toBe(AGENTS_MD);
     expect(await readFile(path.join(root, "CLAUDE.md"), "utf8")).toBe(CLAUDE_MD);
-    // the files don't confuse Mimic's loader
+    // the files don't confuse Mittens's loader
     const store = new Store(new FileRepo(root));
     await store.load();
     expect(store.listServices().length).toBeGreaterThan(0);
@@ -76,33 +76,33 @@ describe("home page assistant panel", () => {
 
   it("invites people to connect an assistant, and mentions AGENTS.md", async () => {
     const { request, root } = await app(true);
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mittens")).text();
     expect(html).toContain('<span class="ap-title">Let your AI assistant set this up</span>');
-    expect(html).toContain('class="button primary" href="/_mimic/assistants">Connect your AI assistant</a>');
+    expect(html).toContain('class="button primary" href="/_mittens/assistants">Connect your AI assistant</a>');
     expect(html).toContain(`<code>${path.join(root, "AGENTS.md")}</code>`);
     expect(html).toContain("Optional, and you stay in control");
     expect(html).toContain("only accepts connections from this computer");
-    const page = await (await request("/_mimic/assistants")).text();
+    const page = await (await request("/_mittens/assistants")).text();
     for (const heading of ["<strong>Optional</strong>", "<strong>Local</strong>", "<strong>In your control</strong>"]) expect(page).toContain(heading);
     expect(page).toContain("is sent to the AI service it uses");
   });
 
   it("suggests init when AGENTS.md is missing", async () => {
     const { request } = await app(false);
-    expect(await (await request("/_mimic")).text()).toContain("to add an <code>AGENTS.md</code>");
+    expect(await (await request("/_mittens")).text()).toContain("to add an <code>AGENTS.md</code>");
   });
 
   it("shows the connected assistant", async () => {
     const { app: a, request } = await app(true);
     const client = new Client({ name: "claude-code", version: "9.9" });
     await client.connect(
-      new StreamableHTTPClientTransport(new URL("http://localhost/_mimic/mcp"), {
+      new StreamableHTTPClientTransport(new URL("http://localhost/_mittens/mcp"), {
         fetch: ((u: string | URL, i?: RequestInit) => a.request(String(u), i)) as typeof fetch,
       }),
     );
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mittens")).text();
     expect(html).toContain('<span class="pill s2">connected</span> claude-code');
-    expect(html).toContain('href="/_mimic/assistants">Assistant activity</a>');
+    expect(html).toContain('href="/_mittens/assistants">Assistant activity</a>');
   });
 });
 
@@ -113,7 +113,7 @@ describe("health", () => {
     const store = new Store(new FileRepo(root));
     await store.load();
     const a = createApp({ store, history: new History() });
-    const health = async () => (await a.request("http://localhost/_mimic/api/health")).json() as Promise<{ reloadError: string | null }>;
+    const health = async () => (await a.request("http://localhost/_mittens/api/health")).json() as Promise<{ reloadError: string | null }>;
     expect((await health()).reloadError).toBeNull();
     await writeFile(path.join(root, "services/users/service.yaml"), "name: Users\npath: /x\nmode: sometimes\n");
     await store.reload();
@@ -122,14 +122,14 @@ describe("health", () => {
 });
 
 describe("AGENTS.md path on the home page", () => {
-  it("is shown relative to where Mimic was started", async () => {
+  it("is shown relative to where Mittens was started", async () => {
     const root = path.join(process.cwd(), "test", `.tmp-agents-${process.pid}`);
     try {
       await init(root);
       const store = new Store(new FileRepo(root));
       await store.load();
       const a = createApp({ store, history: new History(), definitionsDir: root });
-      const html = await (await a.request("http://localhost/_mimic")).text();
+      const html = await (await a.request("http://localhost/_mittens")).text();
       expect(html).toContain(`<code>${path.join("test", `.tmp-agents-${process.pid}`, "AGENTS.md")}</code>`);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -147,7 +147,7 @@ describe("assistant panel: diagram and minimising", () => {
     if (connect) {
       const client = new Client({ name: "claude-code", version: "1" });
       await client.connect(
-        new StreamableHTTPClientTransport(new URL("http://localhost/_mimic/mcp"), {
+        new StreamableHTTPClientTransport(new URL("http://localhost/_mittens/mcp"), {
           fetch: ((u: string | URL, i?: RequestInit) => a.request(String(u), i)) as typeof fetch,
         }),
       );
@@ -156,17 +156,17 @@ describe("assistant panel: diagram and minimising", () => {
   }
 
   it("is a <details> that starts open and remembers being minimised", async () => {
-    const html = await (await home(false))("/_mimic");
+    const html = await (await home(false))("/_mittens");
     expect(html).toContain('<details class="assistant-panel" id="assistant-panel" open="">');
     expect(html).toContain("optional · local · in your control");
     expect(html).toContain("localStorage.getItem(KEY) === 'collapsed'");
-    expect(html).toContain("KEY = 'mimic.assistantPanel'");
+    expect(html).toContain("KEY = 'mittens.assistantPanel'");
     // the script follows the panel directly, so it runs before the page paints
     expect(html).toMatch(/<\/details><script>\s*\(function \(\) \{\s*var panel = document.getElementById\('assistant-panel'\)/);
   });
 
   it("shows what's local, what's approved, what's blocked and what leaves the computer", async () => {
-    const html = await (await home(false))("/_mimic");
+    const html = await (await home(false))("/_mittens");
     for (const text of ["Your computer", "local only", "you approve", "no API keys", "Other websites", "blocked", "AI service", "your assistant&#39;s provider", "not connected"]) {
       expect(html, text).toContain(text);
     }
@@ -175,9 +175,9 @@ describe("assistant panel: diagram and minimising", () => {
 
   it("animates the local link and names the assistant once one is connected", async () => {
     const get = await home(true);
-    const html = await get("/_mimic");
+    const html = await get("/_mittens");
     expect(html).toContain('class="t-link local active"');
     expect(html).toContain('<span class="pill s2">connected</span> claude-code');
-    expect(await get("/_mimic/assistants")).toContain('class="t-link local active"');
+    expect(await get("/_mittens/assistants")).toContain('class="t-link local active"');
   });
 });

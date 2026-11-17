@@ -2,9 +2,9 @@ import type { HistoryEntry } from "./history.js";
 import { compilePath, matchPath } from "./path.js";
 import type { MatchRule, Scenario, Service } from "./schema.js";
 
-/** Response headers not worth replaying: transport details and headers Mimic sets itself. */
+/** Response headers not worth replaying: transport details and headers Mittens sets itself. */
 const DROP_HEADERS = new Set(["content-length", "transfer-encoding", "connection", "keep-alive", "date", "age", "via", "alt-svc"]);
-const dropHeader = (name: string) => DROP_HEADERS.has(name) || name.startsWith("access-control-") || name.startsWith("x-mimic-");
+const dropHeader = (name: string) => DROP_HEADERS.has(name) || name.startsWith("access-control-") || name.startsWith("x-mittens-");
 
 const TEXTUAL = /^(text\/|application\/([\w.+-]*\+)?(json|xml|javascript|x-www-form-urlencoded|graphql|yaml)|image\/svg\+xml)/i;
 

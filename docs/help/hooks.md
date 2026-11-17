@@ -4,7 +4,7 @@ When scenarios, match rules and templates aren't enough (a fake login, a list yo
 
 ```ts
 // services/users/hook.ts
-import type { RequestHook, ResponseHook } from "@clafonta/mimic"; // optional, for types
+import type { RequestHook, ResponseHook } from "@clafonta/mittens"; // optional, for types
 
 export const request: RequestHook = (req, ctx) => {
   if (!req.headers.authorization) return { status: 401, body: { error: "unauthorized" } };
@@ -43,10 +43,10 @@ Runs on every response the service sends, whether it came from a scenario, a hoo
 
 - `ctx.service`: the service, in its live state
 - `ctx.scenario(id)`: see above
-- `ctx.state`: an object for this service that keeps its contents between requests until Mimic restarts; clear it with **Clear hook state** on the service page
-- `ctx.shared`: one object for every hook in the project, for state that spans services (a cart that "add to cart", "view cart" and "checkout" all use); cleared with `DELETE /_mimic/api/hooks/state`
+- `ctx.state`: an object for this service that keeps its contents between requests until Mittens restarts; clear it with **Clear hook state** on the service page
+- `ctx.shared`: one object for every hook in the project, for state that spans services (a cart that "add to cart", "view cart" and "checkout" all use); cleared with `DELETE /_mittens/api/hooks/state`
 - `ctx.live`: the service's live `mode`, `defaultScenario` and `delayMs`, and `modified`, which is true when a profile or the dashboard chose a different mode or default scenario than the files
-- `ctx.log(...)`: print to Mimic's terminal, prefixed with the service id
+- `ctx.log(...)`: print to Mittens's terminal, prefixed with the service id
 
 ## Hooks and profiles
 
@@ -60,7 +60,7 @@ if (ctx.live.modified) return; // a profile or the dashboard picked something: l
 
 ## State across services
 
-Put state that several services need in `ctx.shared`, not in a module of your own: Mimic can't reload a module once hooks have imported it, so edits to a shared helper file need a restart (Mimic logs a reminder when such a file changes). Helpers without state, like a list of products, are fine in a shared file.
+Put state that several services need in `ctx.shared`, not in a module of your own: Mittens can't reload a module once hooks have imported it, so edits to a shared helper file need a restart (Mittens logs a reminder when such a file changes). Helpers without state, like a list of products, are fine in a shared file.
 
 ```ts
 // services/add-cart-item/hook.ts
@@ -78,13 +78,13 @@ export const request: RequestHook = (req, ctx) => ({ body: ctx.shared.cart ?? {}
 ## When something goes wrong
 
 - Hooks reload when you save them. If the new version doesn't load (a syntax error, say), the previous version keeps running and the service page shows the error.
-- If a hook throws, returns something unexpected, or takes longer than 10 seconds, that request gets a 500 explaining why, and Mimic carries on.
-- A hook stuck in an endless loop (without `await`) can't be interrupted and will freeze Mimic.
+- If a hook throws, returns something unexpected, or takes longer than 10 seconds, that request gets a 500 explaining why, and Mittens carries on.
+- A hook stuck in an endless loop (without `await`) can't be interrupted and will freeze Mittens.
 
 ## TypeScript
 
-`.ts` and `.mts` hooks run without a build step, using Node's built-in type stripping. Stick to syntax that can simply be erased: types and interfaces are fine; `enum` and `namespace` aren't. For editor support, `npm install -D @clafonta/mimic` and import the types as above.
+`.ts` and `.mts` hooks run without a build step, using Node's built-in type stripping. Stick to syntax that can simply be erased: types and interfaces are fine; `enum` and `namespace` aren't. For editor support, `npm install -D @clafonta/mittens` and import the types as above.
 
 ## Safety
 
-Hooks are code from your definitions folder and run with the same permissions as Mimic, like running a project's tests. Mimic lists every hook it loads at startup. Use `--no-hooks` to run definitions you don't trust without them.
+Hooks are code from your definitions folder and run with the same permissions as Mittens, like running a project's tests. Mittens lists every hook it loads at startup. Use `--no-hooks` to run definitions you don't trust without them.

@@ -1,19 +1,19 @@
 /**
  * "You're in control" diagram: what runs on your computer, what can reach
- * Mimic, and where data goes. Shown in the home page's assistant panel and on
+ * Mittens, and where data goes. Shown in the home page's assistant panel and on
  * the Assistants page. Static unless an assistant is connected, when the local
  * link animates (not with reduced motion).
  */
 export function ControlDiagram({ connected, client }: { connected: boolean; client?: string }) {
   const Y = 100; // row centre
   return (
-    <figure class="trust-diagram" aria-label="How AI assistants connect to Mimic">
+    <figure class="trust-diagram" aria-label="How AI assistants connect to Mittens">
       <svg viewBox="0 0 920 236" role="img" aria-labelledby="trust-title trust-desc">
         <title id="trust-title">Everything runs on your computer</title>
         <desc id="trust-desc">
-          Your app and your AI assistant talk to Mimic only on this computer, and you approve each tool your assistant uses. Mimic holds
+          Your app and your AI assistant talk to Mittens only on this computer, and you approve each tool your assistant uses. Mittens holds
           no API keys and doesn't contact an AI service. Your assistant has its own connection to its AI service. Other websites can't
-          reach Mimic's assistant endpoint.
+          reach Mittens's assistant endpoint.
         </desc>
 
         {/* the boundary */}
@@ -49,15 +49,15 @@ export function ControlDiagram({ connected, client }: { connected: boolean; clie
             Your app
           </text>
           <text class="t-sub" x="96" y={Y + 15} text-anchor="middle">
-            calls Mimic
+            calls Mittens
           </text>
         </g>
 
-        {/* Mimic */}
-        <g class="t-node mimic">
+        {/* Mittens */}
+        <g class="t-node mittens">
           <rect x="232" y={Y - 32} width="160" height="64" rx="12" />
           <text class="t-title big" x="312" y={Y - 4} text-anchor="middle">
-            Mimic
+            Mittens
           </text>
           <text class="t-sub" x="312" y={Y + 16} text-anchor="middle">
             no API keys
@@ -115,7 +115,7 @@ export function ControlDiagram({ connected, client }: { connected: boolean; clie
           <i class="sw local"></i> on your computer only
         </span>
         <span>
-          <i class="sw outbound"></i> your assistant's own connection: what it reads from Mimic goes to its AI service
+          <i class="sw outbound"></i> your assistant's own connection: what it reads from Mittens goes to its AI service
         </span>
         <span>
           <i class="sw blocked"></i> refused

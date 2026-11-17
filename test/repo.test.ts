@@ -13,7 +13,7 @@ afterEach(async () => {
 
 describe("FileRepo", () => {
   it("round-trips the example definitions", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-"));
     expect((await init(dir)).created).toBe(true);
     expect((await init(dir)).created).toBe(false);
 
@@ -25,7 +25,7 @@ describe("FileRepo", () => {
   });
 
   it("writes bodies as readable YAML block scalars", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-"));
     await init(dir);
     const text = await readFile(path.join(dir, "services/users/scenarios/found.yaml"), "utf8");
     expect(text).toContain("body: |");
@@ -33,7 +33,7 @@ describe("FileRepo", () => {
   });
 
   it("persists definition changes and honours read-only", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-"));
     await init(dir);
     const store = new Store(new FileRepo(dir));
     await store.load();
@@ -54,7 +54,7 @@ describe("FileRepo", () => {
   });
 
   it("never writes live state, profiles applied, or scenario edits' live view to disk", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-"));
     await init(dir);
     const file = path.join(dir, "services/users/service.yaml");
     const original = await readFile(file, "utf8");
@@ -79,7 +79,7 @@ describe("FileRepo", () => {
   });
 
   it("reports the offending file for invalid definitions", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "mimic-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mittens-"));
     await init(dir);
     await writeFile(path.join(dir, "services/users/service.yaml"), "name: Users\npath: no-slash\n");
     const err = await new FileRepo(dir).loadAll().catch((e) => e);

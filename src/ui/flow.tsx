@@ -42,7 +42,7 @@ const midY = (b: Box) => b.y + b.h / 2;
 const W = 1120;
 const PAD = 28;
 const APP: Omit<Box, "y"> = { x: 16, w: 150, h: 60 };
-const MIMIC: Omit<Box, "y"> = { x: 268, w: 180, h: 84 };
+const MITTENS: Omit<Box, "y"> = { x: 268, w: 180, h: 84 };
 const SVC = { x: 560, w: 270, h: 54, gap: 12 };
 const UP = { x: 940, w: 164, h: 44 };
 const NOMATCH = { w: 150, h: 38, below: 54 };
@@ -70,7 +70,7 @@ const hostOf = (url: string) => {
 export interface DiagramLayout {
   height: number;
   app: Box;
-  mimic: Box;
+  mittens: Box;
   nomatch: Box;
   services: { service: Service; box: Box; path: string; upstream?: { key: string; path: string; live: boolean; drawn: boolean } }[];
   more?: { count: number; box: Box; path: string };
@@ -85,11 +85,11 @@ export function layoutDiagram(all: Service[]): DiagramLayout {
   const overflow = all.length - shown.length;
   const rows = shown.length + (overflow > 0 ? 1 : 0);
   const block = rows * SVC.h + Math.max(rows - 1, 0) * SVC.gap;
-  const cy = PAD + Math.max(block, MIMIC.h) / 2;
+  const cy = PAD + Math.max(block, MITTENS.h) / 2;
 
-  const mimic: Box = { ...MIMIC, y: cy - MIMIC.h / 2 };
+  const mittens: Box = { ...MITTENS, y: cy - MITTENS.h / 2 };
   const app: Box = { ...APP, y: cy - APP.h / 2 };
-  const nomatch: Box = { x: mimic.x + (mimic.w - NOMATCH.w) / 2, y: mimic.y + mimic.h + NOMATCH.below, w: NOMATCH.w, h: NOMATCH.h };
+  const nomatch: Box = { x: mittens.x + (mittens.w - NOMATCH.w) / 2, y: mittens.y + mittens.h + NOMATCH.below, w: NOMATCH.w, h: NOMATCH.h };
   const top = cy - (rows * SVC.h + Math.max(rows - 1, 0) * SVC.gap) / 2;
   const rowBox = (i: number): Box => ({ x: SVC.x, y: top + i * (SVC.h + SVC.gap), w: SVC.w, h: SVC.h });
 
@@ -97,7 +97,7 @@ export function layoutDiagram(all: Service[]): DiagramLayout {
   const upstreams: DiagramLayout["upstreams"] = [];
   const services = shown.map((service, i) => {
     const box = rowBox(i);
-    const path = curve(right(mimic), cy, box.x, midY(box));
+    const path = curve(right(mittens), cy, box.x, midY(box));
     if (!service.upstream) return { service, box, path };
     const key = hostOf(service.upstream);
     let up = upstreams.find((u) => u.key === key);
@@ -122,13 +122,13 @@ export function layoutDiagram(all: Service[]): DiagramLayout {
   return {
     height: Math.ceil(lowest + PAD),
     app,
-    mimic,
+    mittens,
     nomatch,
     services,
-    ...(moreBox && { more: { count: overflow, box: moreBox, path: curve(right(mimic), cy, moreBox.x, midY(moreBox)) } }),
+    ...(moreBox && { more: { count: overflow, box: moreBox, path: curve(right(mittens), cy, moreBox.x, midY(moreBox)) } }),
     upstreams,
-    appPath: `M${right(app)},${cy} L${mimic.x},${cy}`,
-    nomatchPath: `M${mimic.x + mimic.w / 2},${mimic.y + mimic.h} L${mimic.x + mimic.w / 2},${nomatch.y}`,
+    appPath: `M${right(app)},${cy} L${mittens.x},${cy}`,
+    nomatchPath: `M${mittens.x + mittens.w / 2},${mittens.y + mittens.h} L${mittens.x + mittens.w / 2},${nomatch.y}`,
   };
 }
 
@@ -145,7 +145,7 @@ function subtitle(s: Service, hooked = false): string {
 }
 
 /**
- * Your app → Mimic → services (→ real APIs). Each service node shows its live
+ * Your app → Mittens → services (→ real APIs). Each service node shows its live
  * mode and how many requests it has in history. home.js moves a dot along
  * these paths for every request that arrives.
  */
@@ -161,7 +161,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
   const moreCount = data.history.filter((e) => e.serviceId && !shownIds.has(e.serviceId)).length;
 
   return (
-    <figure class="flow" aria-label="How requests flow through Mimic">
+    <figure class="flow" aria-label="How requests flow through Mittens">
       <svg
         id="flow"
         viewBox={`0 0 ${W} ${l.height}`}
@@ -169,7 +169,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
         aria-labelledby="flow-title"
         data-shown={[...shownIds].join(" ")}
       >
-        <title id="flow-title">Requests from your app go to Mimic, which answers from each service's scenarios or proxies to the real API.</title>
+        <title id="flow-title">Requests from your app go to Mittens, which answers from each service's scenarios or proxies to the real API.</title>
         {/* lines first, so nodes sit on top */}
         <path id="p-app" class="link" d={l.appPath} />
         <path id="p-nomatch" class="link faint" d={l.nomatchPath} />
@@ -191,12 +191,12 @@ export function FlowDiagram({ data }: { data: HomeData }) {
           </text>
         </g>
 
-        <g class="node mimic" id="n-mimic">
-          <rect x={l.mimic.x} y={l.mimic.y} width={l.mimic.w} height={l.mimic.h} rx="12" />
-          <text x={l.mimic.x + l.mimic.w / 2} y={midY(l.mimic) - 6} class="title big" text-anchor="middle">
-            Mimic
+        <g class="node mittens" id="n-mittens">
+          <rect x={l.mittens.x} y={l.mittens.y} width={l.mittens.w} height={l.mittens.h} rx="12" />
+          <text x={l.mittens.x + l.mittens.w / 2} y={midY(l.mittens) - 6} class="title big" text-anchor="middle">
+            Mittens
           </text>
-          <text x={l.mimic.x + l.mimic.w / 2} y={midY(l.mimic) + 16} class="sub" text-anchor="middle">
+          <text x={l.mittens.x + l.mittens.w / 2} y={midY(l.mittens) + 16} class="sub" text-anchor="middle">
             <tspan data-count="total">{data.history.length}</tspan> requests
           </text>
         </g>
@@ -290,7 +290,7 @@ export function FlowDiagram({ data }: { data: HomeData }) {
 export const MAX_DIAGRAM_SCENARIOS = 8;
 
 const S_APP: Omit<Box, "y"> = { x: 16, w: 140, h: 56 };
-const S_MIMIC: Omit<Box, "y"> = { x: 214, w: 140, h: 64 };
+const S_MITTENS: Omit<Box, "y"> = { x: 214, w: 140, h: 64 };
 const S_SVC: Omit<Box, "y"> = { x: 420, w: 230, h: 64 };
 const S_T = { x: 760, w: 330, h: 44, gap: 10 };
 
@@ -312,7 +312,7 @@ export interface ServiceTarget {
 
 /**
  * What a request to this service can end at, in the current mode: each
- * scenario, the real API, the hook, or Mimic's own error.
+ * scenario, the real API, the hook, or Mittens's own error.
  */
 export function serviceTargets(service: Service, opts: { requestHook: boolean }) {
   const t: Omit<ServiceTarget, "box" | "path">[] = [];
@@ -340,7 +340,7 @@ export function serviceTargets(service: Service, opts: { requestHook: boolean })
   }
   const hidden = service.scenarios.length - shown.length;
   if (hidden > 0) t.push({ key: "more", kind: "more", title: `+ ${hidden} more scenario${hidden === 1 ? "" : "s"}`, sub: "", reachable: true });
-  t.push({ key: "error", kind: "error", title: "Mimic error", sub: "no scenario could answer", reachable: true });
+  t.push({ key: "error", kind: "error", title: "Mittens error", sub: "no scenario could answer", reachable: true });
   return t;
 }
 
@@ -349,7 +349,7 @@ export function layoutServiceDiagram(service: Service, opts: { requestHook: bool
   const block = raw.length * S_T.h + (raw.length - 1) * S_T.gap;
   const cy = PAD + Math.max(block, S_SVC.h) / 2;
   const app: Box = { ...S_APP, y: cy - S_APP.h / 2 };
-  const mimic: Box = { ...S_MIMIC, y: cy - S_MIMIC.h / 2 };
+  const mittens: Box = { ...S_MITTENS, y: cy - S_MITTENS.h / 2 };
   const svc: Box = { ...S_SVC, y: cy - S_SVC.h / 2 };
   const top = cy - block / 2;
   const targets: ServiceTarget[] = raw.map((t, i) => {
@@ -359,18 +359,18 @@ export function layoutServiceDiagram(service: Service, opts: { requestHook: bool
   return {
     height: Math.ceil(Math.max(top + block, svc.y + svc.h) + PAD),
     app,
-    mimic,
+    mittens,
     svc,
     targets,
-    appPath: `M${right(app)},${cy} L${mimic.x},${cy}`,
-    svcPath: `M${right(mimic)},${cy} L${svc.x},${cy}`,
+    appPath: `M${right(app)},${cy} L${mittens.x},${cy}`,
+    svcPath: `M${right(mittens)},${cy} L${svc.x},${cy}`,
   };
 }
 
 const statusTone = (s: number) => (s >= 500 ? "s5" : s >= 400 ? "s4" : s >= 300 ? "s3" : "s2");
 
 /**
- * One service: app → Mimic → service → what can answer. Faint lines and
+ * One service: app → Mittens → service → what can answer. Faint lines and
  * nodes can't answer in the current mode (e.g. non-default scenarios in
  * static mode). Requests to other services are ignored by the script.
  */
@@ -412,10 +412,10 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
             Your app
           </text>
         </g>
-        <g class="node mimic" id="n-mimic">
-          <rect x={l.mimic.x} y={l.mimic.y} width={l.mimic.w} height={l.mimic.h} rx="12" />
-          <text x={l.mimic.x + l.mimic.w / 2} y={midY(l.mimic) + 6} class="title big" text-anchor="middle">
-            Mimic
+        <g class="node mittens" id="n-mittens">
+          <rect x={l.mittens.x} y={l.mittens.y} width={l.mittens.w} height={l.mittens.h} rx="12" />
+          <text x={l.mittens.x + l.mittens.w / 2} y={midY(l.mittens) + 6} class="title big" text-anchor="middle">
+            Mittens
           </text>
         </g>
         <g class={`node service mode-${service.mode}${props.inactive ? " inactive" : ""}`} id="n-svc">
@@ -486,7 +486,7 @@ export function ServiceFlow(props: { service: Service; history: HistoryEntry[]; 
 
 /**
  * Animates requests along the diagram as they arrive (server-sent events).
- * A dot travels app → Mimic → service (→ real API), then returns coloured by
+ * A dot travels app → Mittens → service (→ real API), then returns coloured by
  * status. With "reduce motion" on, the nodes just flash. Kept small and
  * dependency-free; without it the page still shows the diagram and counts.
  */
@@ -538,7 +538,7 @@ export const FLOW_SCRIPT = `
   }
 
 
-  // Service view: app → Mimic → this service → whatever answered (scenario, real API, hook, or Mimic's own error).
+  // Service view: app → Mittens → this service → whatever answered (scenario, real API, hook, or Mittens's own error).
   function serviceRoute(r, out, back) {
     var key;
     if (r.source === 'proxy' && el('p-t-upstream')) key = 'upstream';
@@ -549,7 +549,7 @@ export const FLOW_SCRIPT = `
     out.push([el('p-svc'), false, 'n-svc']);
     out.push([el('p-t-' + key), false, 'n-t-' + key]);
     back.push([el('p-t-' + key), true, 'n-svc']);
-    back.push([el('p-svc'), true, 'n-mimic']);
+    back.push([el('p-svc'), true, 'n-mittens']);
     bump(key); bump('service');
     return 'n-t-' + key;
   }
@@ -558,7 +558,7 @@ export const FLOW_SCRIPT = `
     var only = attr('data-service');
     if (only && r.serviceId !== only) return;
     var app = el('p-app'), out = [], back = [], target;
-    if (app) out.push([app, false, 'n-mimic']);
+    if (app) out.push([app, false, 'n-mittens']);
     if (only) {
       target = serviceRoute(r, out, back);
     } else if (r.serviceId && attr('data-shown').split(' ').indexOf(r.serviceId) >= 0 && el('p-svc-' + r.serviceId)) {
@@ -566,23 +566,23 @@ export const FLOW_SCRIPT = `
       out.push([el('p-svc-' + r.serviceId), false, target]);
       var up = el('p-up-' + r.serviceId);
       if (r.source === 'proxy' && up) { out.push([up, false, null]); back.push([up, true, target]); }
-      back.push([el('p-svc-' + r.serviceId), true, 'n-mimic']);
+      back.push([el('p-svc-' + r.serviceId), true, 'n-mittens']);
       bump(r.serviceId);
     } else if (r.serviceId && el('p-more')) {
       target = 'n-more';
-      out.push([el('p-more'), false, target]); back.push([el('p-more'), true, 'n-mimic']); bump('more');
+      out.push([el('p-more'), false, target]); back.push([el('p-more'), true, 'n-mittens']); bump('more');
     } else {
       target = 'n-nomatch';
-      out.push([el('p-nomatch'), false, target]); back.push([el('p-nomatch'), true, 'n-mimic']); bump('nomatch');
+      out.push([el('p-nomatch'), false, target]); back.push([el('p-nomatch'), true, 'n-mittens']); bump('nomatch');
     }
     if (app) back.push([app, true, null]);
     bump('total');
     if (r.status >= 400) bump('errors');
-    if (reduce) { flash('n-mimic'); flash(target); return; }
+    if (reduce) { flash('n-mittens'); flash(target); return; }
     travel(out, 'req', function () { travel(back, tone(r.status), function () {}); });
   }
 
   // Requests arrive as DOM events from the page's live connection (see live.tsx).
-  document.addEventListener('mimic:request', function (ev) { try { onRequest(ev.detail); } catch (e) {} });
+  document.addEventListener('mittens:request', function (ev) { try { onRequest(ev.detail); } catch (e) {} });
 })();
 `;

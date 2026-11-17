@@ -1,5 +1,5 @@
 {
-  "name": "@clafonta/mimic",
+  "name": "@clafonta/mittens",
   "version": "0.1.0",
   "description": "Local-first HTTP mock server and recording proxy for developers.",
   "keywords": [
@@ -18,7 +18,7 @@
   "author": "Laborious Labs (https://laboriouslabs.com)",
   "type": "module",
   "bin": {
-    "mimic": "dist/cli.js"
+    "mittens": "dist/cli.js"
   },
   "types": "./dist/index.d.ts",
   "exports": {
@@ -41,7 +41,7 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "tsx watch src/cli.ts --dir examples/mimic",
+    "dev": "tsx watch src/cli.ts --dir examples/mittens",
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').chmodSync('dist/cli.js',0o755)\"",
     "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit",

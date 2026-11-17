@@ -62,17 +62,17 @@ describe("response validation", () => {
   it("checks every mocked response and reports via header and history", async () => {
     const { request, history } = await setup([service()]);
     const good = await request("/users/1");
-    expect(good.headers.get("x-mimic-validation")).toBe("pass");
+    expect(good.headers.get("x-mittens-validation")).toBe("pass");
     const bad = await request("/users/2");
     expect(bad.status).toBe(200); // validation reports; it doesn't change the response
-    expect(bad.headers.get("x-mimic-validation")).toBe("fail");
-    expect((await request("/users/404")).headers.get("x-mimic-validation")).toBe("pass");
-    expect((await request("/users/500")).headers.has("x-mimic-validation")).toBe(false); // no schema for 5xx
+    expect(bad.headers.get("x-mittens-validation")).toBe("fail");
+    expect((await request("/users/404")).headers.get("x-mittens-validation")).toBe("pass");
+    expect((await request("/users/500")).headers.has("x-mittens-validation")).toBe(false); // no schema for 5xx
 
     const entries = history.list();
     expect(entries[2]!.validation).toMatchObject({ schema: "2xx", ok: false });
     expect(history.list({ validation: "fail" })).toHaveLength(1);
-    const failed = (await (await request("/_mimic/api/history?validation=fail")).json()) as unknown[];
+    const failed = (await (await request("/_mittens/api/history?validation=fail")).json()) as unknown[];
     expect(failed).toHaveLength(1);
   });
 
@@ -80,20 +80,20 @@ describe("response validation", () => {
     const fetchImpl = (async () => new Response('{"id":"9"}', { headers: { "content-type": "application/json" } })) as typeof fetch;
     const { request, history } = await setup([service({ mode: "proxy", upstream: "https://real.test" })], fetchImpl);
     const res = await request("/users/9");
-    expect(res.headers.get("x-mimic-validation")).toBe("fail");
+    expect(res.headers.get("x-mittens-validation")).toBe("fail");
     expect(history.list()[0]!.validation!.errors).toEqual(["(root): must have required property 'email'"]);
   });
 
-  it("doesn't validate Mimic's own errors", async () => {
+  it("doesn't validate Mittens's own errors", async () => {
     const { request } = await setup([service({ defaultScenario: undefined, mode: "static" })]);
     const res = await request("/users/1");
-    expect(res.headers.get("x-mimic-source")).toBe("error");
-    expect(res.headers.has("x-mimic-validation")).toBe(false);
+    expect(res.headers.get("x-mittens-source")).toBe("error");
+    expect(res.headers.has("x-mittens-validation")).toBe(false);
   });
 
   it("rejects invalid schemas and keys", async () => {
     const { request } = await setup([service()]);
-    const patch = (body: unknown) => request("/_mimic/api/services/users", { method: "PATCH", headers: json, body: JSON.stringify(body) });
+    const patch = (body: unknown) => request("/_mittens/api/services/users", { method: "PATCH", headers: json, body: JSON.stringify(body) });
     const badSchema = await patch({ responseSchema: { "2xx": { type: "nonsense" } } });
     expect(badSchema.status).toBe(400);
     expect(await badSchema.text()).toContain("Invalid JSON Schema");
@@ -103,37 +103,37 @@ describe("response validation", () => {
 
   it("dashboard: scenarios show whether they match; history shows the result", async () => {
     const { request, history } = await setup([service()]);
-    const page = await (await request("/_mimic/services/users")).text();
+    const page = await (await request("/_mittens/services/users")).text();
     expect(page.match(/schema ✓/g)).toHaveLength(2); // good, missing
     expect(page.match(/schema ✗/g)).toHaveLength(1); // drifted
     expect(page).toContain("<h2>Response schema");
 
     await request("/users/2");
     const id = history.list()[0]!.id;
-    const detail = await (await request(`/_mimic/history/${id}`)).text();
+    const detail = await (await request(`/_mittens/history/${id}`)).text();
     expect(detail).toContain("doesn&#39;t match the service&#39;s <code>2xx</code> schema");
     expect(detail).toContain("/id: must be string");
-    expect(await (await request("/_mimic/ui/history?validation=fail")).text()).toContain("schema ✗");
-    expect(await (await request("/_mimic/ui/history?validation=pass")).text()).toContain("No requests yet");
+    expect(await (await request("/_mittens/ui/history?validation=fail")).text()).toContain("schema ✗");
+    expect(await (await request("/_mittens/ui/history?validation=pass")).text()).toContain("No requests yet");
   });
 
   it("form accepts JSON, reports bad JSON or schemas, and clears", async () => {
     const { request, store } = await setup([service()]);
     const base = { name: "Users", path: "/users/{id}", method: "ANY", mode: "dynamic", delayMs: "0", defaultScenario: "good" };
-    const edit = await (await request("/_mimic/services/users/edit")).text();
+    const edit = await (await request("/_mittens/services/users/edit")).text();
     expect(edit).toContain("&quot;2xx&quot;: {");
 
-    let res = await request("/_mimic/services/users", form({ ...base, responseSchema: "{ nope" }));
+    let res = await request("/_mittens/services/users", form({ ...base, responseSchema: "{ nope" }));
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("Not valid JSON");
-    res = await request("/_mimic/services/users", form({ ...base, responseSchema: '{"2xx": {"type": 5}}' }));
+    res = await request("/_mittens/services/users", form({ ...base, responseSchema: '{"2xx": {"type": 5}}' }));
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("Invalid JSON Schema");
 
-    res = await request("/_mimic/services/users", form({ ...base, responseSchema: '{"default": {"type": "object"}}' }));
+    res = await request("/_mittens/services/users", form({ ...base, responseSchema: '{"default": {"type": "object"}}' }));
     expect(res.status).toBe(303);
     expect(store.getDefinition("users").responseSchema).toEqual({ default: { type: "object" } });
-    await request("/_mimic/services/users", form(base));
+    await request("/_mittens/services/users", form(base));
     expect(store.getDefinition("users").responseSchema).toBeUndefined();
   });
 });

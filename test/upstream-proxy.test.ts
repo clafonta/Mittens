@@ -97,7 +97,7 @@ describe("upstream calls through a corporate proxy", () => {
     expect(ok.status).toBe(200);
     expect(proxy.seen.at(-1)!.auth).toBe(`Basic ${Buffer.from("me:s3cret").toString("base64")}`);
 
-    // Without credentials the proxy refuses; Mimic reports the failure (or falls back to an error scenario).
+    // Without credentials the proxy refuses; Mittens reports the failure (or falls back to an error scenario).
     const { request, history } = await setup([{ id: "api", path: "/api/*", mode: "proxy", upstream: api }], proxiedFetch({ httpProxy: proxy.url }));
     const res = await request("/api/x");
     expect(res.status).toBe(502);

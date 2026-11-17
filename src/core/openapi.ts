@@ -4,7 +4,7 @@ import { HttpMethod, type Scenario, type Service, type ServiceMode } from "./sch
 import { matchesSchema } from "./validate.js";
 
 /**
- * Turns an OpenAPI 3.0 / 3.1 document into Mimic services:
+ * Turns an OpenAPI 3.0 / 3.1 document into Mittens services:
  *
  * - one service per operation (path + method), id from operationId
  * - one scenario per response, or per named example; bodies come from the
@@ -420,9 +420,9 @@ function scenariosFor(
 
 // --------------------------------------------------------------------- plan
 
-const toMimicPath = (prefix: string, path: string) =>
+const toMittensPath = (prefix: string, path: string) =>
   `${prefix}${path}`
-    // Only letters, digits, _ and - are allowed in Mimic param names.
+    // Only letters, digits, _ and - are allowed in Mittens param names.
     .replace(/\{([^}]+)\}/g, (_, name: string) => `{${name.replace(/[^A-Za-z0-9_-]/g, "_").replace(/^[^A-Za-z_]/, "_$&")}}`)
     .replace(/\/{2,}/g, "/") || "/";
 
@@ -463,14 +463,14 @@ export function planImport(input: unknown, opts: ImportOptions = {}): ImportPlan
   for (const [rawPath, rawItem] of Object.entries(input.paths)) {
     const item = r.deref(rawItem);
     if (!isObj(item)) continue;
-    const path = toMimicPath(prefix, rawPath);
+    const path = toMittensPath(prefix, rawPath);
     for (const method of METHODS) {
       const op = item[method];
       if (!isObj(op)) continue;
       const upper = method.toUpperCase();
       const route = `${upper} ${path}`;
       if (!HttpMethod.safeParse(upper).success) {
-        skipped.push({ id: "", route, reason: `${upper} isn't supported by Mimic` });
+        skipped.push({ id: "", route, reason: `${upper} isn't supported by Mittens` });
         continue;
       }
       // listPets → list-pets

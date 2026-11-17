@@ -81,7 +81,7 @@ function LiveSwitcher({ service, modified, view }: { service: Service; modified:
           hx-post={`${BASE}/ui/services/${service.id}/reset`}
           hx-target={target}
           hx-swap="outerHTML"
-          title="Differs from the YAML definition (it also resets when Mimic restarts). Click to go back to the definition."
+          title="Differs from the YAML definition (it also resets when Mittens restarts). Click to go back to the definition."
         >
           <span class="changed-label">changed</span>
           <span>Reset</span>
@@ -247,7 +247,7 @@ export function LiveStateBanner({ modified, returnTo }: { modified: string[]; re
     <div id="live-banner" class="banner live" role="status" {...refresh}>
       <span>
         {n} service{n === 1 ? "" : "s"} differ{n === 1 ? "s" : ""} from {n === 1 ? "its" : "their"} starting state. <HelpLink to="live-state#what-changes-your-files-and-what-doesnt" label="Help: live state" /> Live changes
-        reset when Mimic restarts.
+        reset when Mittens restarts.
       </span>
       <form method="post" action={`${BASE}/state/save`} class="inline">
         <input type="hidden" name="return" value={returnTo} />
@@ -351,10 +351,10 @@ export function ServicesPage(props: {
         </div>
       ) : services.length === 0 ? (
         <div class="empty">
-          No services yet. <a href={`${BASE}/services/new`}>Create one</a>, run <code>npx @clafonta/mimic init</code> for
+          No services yet. <a href={`${BASE}/services/new`}>Create one</a>, run <code>npx @clafonta/mittens init</code> for
           an example, add YAML files under <code>services/</code>, or <a href={`${BASE}/import`}>import an OpenAPI spec</a>.
           <br />
-          New to Mimic? Start with <a href={`${BASE}/help/getting-started`}>Getting started</a>.
+          New to Mittens? Start with <a href={`${BASE}/help/getting-started`}>Getting started</a>.
         </div>
       ) : (
         <table class="services">
@@ -428,7 +428,7 @@ export function ServicePage(props: {
               {service.defaultScenario === sc.id && <span class="pill">default</span>}{" "}
               {service.errorScenario === sc.id && <span class="pill">error</span>}{" "}
               {globalError?.service === service.id && globalError.scenario === sc.id && (
-                <a class="pill s5" href={`${BASE}/settings`} title="Used whenever Mimic would answer with its own error">
+                <a class="pill s5" href={`${BASE}/settings`} title="Used whenever Mittens would answer with its own error">
                   global error
                 </a>
               )}
@@ -713,7 +713,7 @@ export function HistoryPage({ validation, persistedTo, limit }: { validation?: "
           </>
         ) : (
           <>
-            Keeps the latest {limit} requests in memory; they're gone when Mimic restarts (use <code>--persist-history</code> to keep
+            Keeps the latest {limit} requests in memory; they're gone when Mittens restarts (use <code>--persist-history</code> to keep
             them).
           </>
         )}
@@ -951,7 +951,7 @@ export function ImportPage(props: { values: Record<string, string>; error?: stri
       </h1>
       <p class="muted">
         Creates a service per operation, with a scenario per response (or per named example) and the response schemas for
-        validation. Existing services are never overwritten. Also available as <code>npx @clafonta/mimic import spec.yaml</code>.
+        validation. Existing services are never overwritten. Also available as <code>npx @clafonta/mittens import spec.yaml</code>.
       </p>
       {error && <div class="banner error-banner">{error}</div>}
       {summary && <ImportSummaryView summary={summary} imported={!!imported} />}
@@ -1067,7 +1067,7 @@ function ImportSummaryView({ summary, imported }: { summary: ImportSummary; impo
   );
 }
 
-/** Project-wide settings (mimic.yaml). */
+/** Project-wide settings (mittens.yaml). */
 export function SettingsPage({ problems, children }: { problems: string[]; children: unknown }) {
   return (
     <>
@@ -1075,7 +1075,7 @@ export function SettingsPage({ problems, children }: { problems: string[]; child
         Settings <HelpLink to="scenarios#the-global-error-scenario" label="Help: settings" />
       </h1>
       <p class="muted">
-        Stored in <code>mimic.yaml</code> next to <code>services/</code>.
+        Stored in <code>mittens.yaml</code> next to <code>services/</code>.
       </p>
       {problems.map((p) => (
         <div class="banner error-banner">{p} — it is ignored until fixed.</div>

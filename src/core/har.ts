@@ -1,7 +1,7 @@
 import { STATUS_CODES } from "node:http";
 import type { HistoryEntry } from "./history.js";
 
-/** HAR 1.2 (http://www.softwareishard.com/blog/har-12-spec/). Mimic-specific data goes in `_mimic`. */
+/** HAR 1.2 (http://www.softwareishard.com/blog/har-12-spec/). Mittens-specific data goes in `_mittens`. */
 export interface Har {
   log: {
     version: "1.2";
@@ -47,7 +47,7 @@ function harEntry(e: HistoryEntry) {
     cache: {},
     timings: { send: 0, wait: e.durationMs, receive: 0 },
     ...(e.note && { comment: e.note }),
-    _mimic: {
+    _mittens: {
       id: e.id,
       source: e.source,
       ...(e.serviceId && { service: e.serviceId }),
@@ -66,7 +66,7 @@ export function toHar(entries: HistoryEntry[], version: string): Har {
   return {
     log: {
       version: "1.2",
-      creator: { name: "Mimic", version },
+      creator: { name: "Mittens", version },
       entries: [...entries].reverse().map(harEntry),
     },
   };

@@ -7,7 +7,7 @@ import type { Profile, Service } from "./core/schema.js";
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
 const JSON_HEADERS = { "content-type": "application/json" };
 
-/** Example definitions written by `mimic init`. */
+/** Example definitions written by `mittens init`. */
 export const EXAMPLE_SERVICES: Service[] = [
   {
     id: "users",
@@ -71,7 +71,7 @@ export const EXAMPLE_SERVICES: Service[] = [
   },
 ];
 
-/** Example profiles written by `mimic init`. */
+/** Example profiles written by `mittens init`. */
 export const EXAMPLE_PROFILES: Profile[] = [
   {
     id: "happy-path",
@@ -97,7 +97,7 @@ export async function init(
 ): Promise<{ created: boolean; dir: string; agents: Written; claude: Written }> {
   const root = path.resolve(dir);
   const files = await writeAgentFiles(root);
-  // --no-examples: just the agent notes, e.g. before `mimic import` fills the folder.
+  // --no-examples: just the agent notes, e.g. before `mittens import` fills the folder.
   if (opts.examples === false || existsSync(path.join(root, "services"))) return { created: false, dir: root, ...files };
   const repo = new FileRepo(root);
   for (const service of EXAMPLE_SERVICES) {

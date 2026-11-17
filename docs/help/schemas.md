@@ -26,9 +26,9 @@ Schemas are standard JSON Schema: 2020-12, or draft-07 when the schema's `$schem
 
 - **History**: each request shows **schema ✓** or **schema ✗**. Use **schema failures** to list only the failures; open a request to see exactly what's wrong (e.g. `/email: must match format "email"`).
 - **Service page**: each scenario is checked too, so you can see at a glance which mocks have drifted.
-- **Response header**: `x-mimic-validation: pass` or `fail`, handy in automated tests.
+- **Response header**: `x-mittens-validation: pass` or `fail`, handy in automated tests.
 
-Validation only reports; it never changes the response. Mimic's own error responses aren't checked.
+Validation only reports; it never changes the response. Mittens's own error responses aren't checked.
 
 ## Checking the real API
 

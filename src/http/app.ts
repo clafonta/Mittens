@@ -27,7 +27,7 @@ export function createApp({ store, history, fetchImpl, hooks = new Hooks(undefin
   const app = new Hono();
   const engine = new Engine(store, history, fetchImpl, hooks);
   const activity = new McpActivity();
-  // Everything under /_mimic is for this computer only (see local.ts); the API also answers local dev tools on other ports.
+  // Everything under /_mittens is for this computer only (see local.ts); the API also answers local dev tools on other ports.
   app.use(BASE, localOnly);
   app.use(`${BASE}/*`, localOnly);
   app.use(`${BASE}/api/*`, localCors);

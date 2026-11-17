@@ -8,7 +8,7 @@ import { fixtures, json, setup } from "./helpers.js";
 async function connect(services = fixtures(), fetchImpl?: typeof fetch) {
   const ctx = await setup(services, fetchImpl);
   const client = new Client({ name: "test-assistant", version: "1.0.0" });
-  const transport = new StreamableHTTPClientTransport(new URL("http://localhost/_mimic/mcp"), {
+  const transport = new StreamableHTTPClientTransport(new URL("http://localhost/_mittens/mcp"), {
     fetch: ((url: string | URL, init?: RequestInit) => ctx.app.request(String(url), init)) as typeof fetch,
   });
   await client.connect(transport);
@@ -25,7 +25,7 @@ async function connect(services = fixtures(), fetchImpl?: typeof fetch) {
 describe("MCP endpoint", () => {
   it("introduces itself and lists its tools", async () => {
     const { client } = await connect();
-    expect(client.getServerVersion()?.name).toBe("mimic");
+    expect(client.getServerVersion()?.name).toBe("mittens");
     expect(client.getInstructions()).toContain("Start with get_overview");
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
@@ -107,7 +107,7 @@ describe("MCP endpoint", () => {
     const { call, request } = await connect();
     await call("get_overview");
     await call("set_live_state", { service: "users", mode: "static" }).catch(() => {});
-    const page = await (await request("/_mimic/assistants")).text();
+    const page = await (await request("/_mittens/assistants")).text();
     expect(page).toContain("test-assistant");
     expect(page).toContain("get_overview");
     expect(page).toContain("set_live_state");
@@ -115,7 +115,7 @@ describe("MCP endpoint", () => {
 });
 
 describe("MCP endpoint security", () => {
-  const req = (host: string, origin?: string) => new Request(`http://${host}/_mimic/mcp`, { method: "POST", headers: { host, ...(origin && { origin }) } });
+  const req = (host: string, origin?: string) => new Request(`http://${host}/_mittens/mcp`, { method: "POST", headers: { host, ...(origin && { origin }) } });
   it("accepts local hosts and same-origin requests", () => {
     for (const host of ["localhost:4000", "127.0.0.1:4000", "[::1]:4000", "192.168.1.20:4000", "app.localhost:4000"]) expect(refuse(req(host)), host).toBeUndefined();
     expect(refuse(req("localhost:4000", "http://localhost:4000"))).toBeUndefined();
@@ -127,7 +127,7 @@ describe("MCP endpoint security", () => {
   });
   it("answers refused requests with 403", async () => {
     const { request } = await setup(fixtures());
-    const res = await request("/_mimic/mcp", { method: "POST", headers: { ...json, origin: "https://evil.example" }, body: "{}" });
+    const res = await request("/_mittens/mcp", { method: "POST", headers: { ...json, origin: "https://evil.example" }, body: "{}" });
     expect(res.status).toBe(403);
   });
 });

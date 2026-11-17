@@ -80,7 +80,7 @@ const ago = (iso: string) => {
  * or which one is connected, and whether AGENTS.md is there for coding agents.
  */
 /** localStorage key for the panel's collapsed/expanded choice. */
-export const PANEL_STORAGE_KEY = "mimic.assistantPanel";
+export const PANEL_STORAGE_KEY = "mittens.assistantPanel";
 
 /**
  * Tells people they can let an AI assistant do the setup, shows (with a
@@ -116,12 +116,12 @@ function AssistantPanel({ data }: { data: HomeData }) {
               </p>
             ) : (
               <p>
-                Claude Code, Codex, GitHub Copilot, Cursor and other assistants can connect to Mimic and create mocks, switch services
+                Claude Code, Codex, GitHub Copilot, Cursor and other assistants can connect to Mittens and create mocks, switch services
                 into failure modes and explain responses for you.
               </p>
             )}
             <p class="muted small">
-              Optional, and you stay in control: everything here still works by hand. Mimic only accepts connections from this
+              Optional, and you stay in control: everything here still works by hand. Mittens only accepts connections from this
               computer, holds no API keys and never contacts an AI service itself.
             </p>
             {agents && (
@@ -132,7 +132,7 @@ function AssistantPanel({ data }: { data: HomeData }) {
                   </>
                 ) : (
                   <>
-                    Run <code>npx @clafonta/mimic init</code> to add an <code>AGENTS.md</code> that tells coding agents how to edit
+                    Run <code>npx @clafonta/mittens init</code> to add an <code>AGENTS.md</code> that tells coding agents how to edit
                     your definitions.
                   </>
                 )}
@@ -167,10 +167,10 @@ export function HomePage({ data }: { data: HomeData }) {
   if (data.services.length === 0) {
     return (
       <>
-        <h1>Welcome to Mimic</h1>
+        <h1>Welcome to Mittens</h1>
         <div class="empty start">
           <p>
-            <strong>No services yet.</strong> Mimic answers your app's API calls with responses you define, or passes them through
+            <strong>No services yet.</strong> Mittens answers your app's API calls with responses you define, or passes them through
             to the real API and records them.
           </p>
           <p class="toolbar">
@@ -185,7 +185,7 @@ export function HomePage({ data }: { data: HomeData }) {
             </a>
           </p>
           <p class="muted small">
-            Or run <code>npx @clafonta/mimic init</code> for an example.
+            Or run <code>npx @clafonta/mittens init</code> for an example.
           </p>
         </div>
         <AssistantPanel data={data} />
@@ -196,7 +196,7 @@ export function HomePage({ data }: { data: HomeData }) {
     <>
       <div class="title-row">
         <h1>
-          Overview <HelpLink to="" label="Help: how Mimic works" />
+          Overview <HelpLink to="" label="Help: how Mittens works" />
         </h1>
         <span class="muted small">
           Point your app at <code>{data.origin}</code>

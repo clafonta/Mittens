@@ -83,7 +83,7 @@ function problem(status: number, message: string, source: Source, service?: Serv
     note: message,
     status,
     headers: { "content-type": "application/json" },
-    body: enc.encode(JSON.stringify({ mimic: { error: message } }, null, 2)),
+    body: enc.encode(JSON.stringify({ mittens: { error: message } }, null, 2)),
     delayMs: service?.delayMs ?? 0,
   };
 }
@@ -103,7 +103,7 @@ export class Engine {
   async handle(req: MockRequest, opts: { replayOf?: string } = {}): Promise<Resolution & { entry: HistoryEntry; validation?: ValidationResult }> {
     const started = performance.now();
     const res = await this.resolve(req);
-    // Mimic's own error responses aren't the service's, so they aren't validated. The full body is checked, even if history truncates it.
+    // Mittens's own error responses aren't the service's, so they aren't validated. The full body is checked, even if history truncates it.
     const validation =
       res.service && res.source !== "error" ? validateResponse(res.service.responseSchema, res.status, dec.decode(res.body)) : undefined;
     if (res.delayMs > 0) await new Promise((r) => setTimeout(r, res.delayMs));
@@ -131,7 +131,7 @@ export class Engine {
   }
 
   /**
-   * Picks the response; when Mimic would answer with its own error, the
+   * Picks the response; when Mittens would answer with its own error, the
    * global error scenario (if set) is used instead. Template scenarios are
    * rendered from the request, whichever way they were chosen, and the
    * service's response hook (if any) runs last.
@@ -208,7 +208,7 @@ export class Engine {
     return { ...fromHookResponse(result as HookResponse, { status: 200, headers: {}, delayMs: service.delayMs }), service, source: "hook", note: "Answered by hook" };
   }
 
-  /** The service's response hook, on everything it answered (not on Mimic's own errors). */
+  /** The service's response hook, on everything it answered (not on Mittens's own errors). */
   private async applyResponseHook(res: Resolution, input: MatchInput): Promise<Resolution> {
     const service = res.service;
     const hook = service && res.source !== "error" ? this.hooks?.get(service.id)?.module.response : undefined;
@@ -341,7 +341,7 @@ export function renderScenario(
   scenario: Scenario,
   sample: { method?: string; path?: string; headers?: Record<string, string>; body?: string },
 ): { status: number; headers: Record<string, string>; body: string; params: Record<string, string> } {
-  const url = new URL(sample.path?.trim() || service.path, "http://mimic.local");
+  const url = new URL(sample.path?.trim() || service.path, "http://mittens.local");
   const params = matchPath(compilePath(service.path), url.pathname) ?? {};
   if (!scenario.template) return { status: scenario.status, headers: scenario.headers, body: scenario.body, params };
   const input = new MatchInput((sample.method || "GET").toUpperCase(), url, new Headers(sample.headers ?? {}), params, sample.body ?? "");

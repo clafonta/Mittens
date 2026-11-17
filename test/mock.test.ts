@@ -27,8 +27,8 @@ describe("mock traffic", () => {
     const { request, history } = await setup([]);
     const res = await request("/nope");
     expect(res.status).toBe(404);
-    expect(res.headers.get("x-mimic-source")).toBe("unmatched");
-    expect(await res.json()).toEqual({ mimic: { error: "No service matches GET /nope" } });
+    expect(res.headers.get("x-mittens-source")).toBe("unmatched");
+    expect(await res.json()).toEqual({ mittens: { error: "No service matches GET /nope" } });
     expect(history.list()[0]?.source).toBe("unmatched");
   });
 
@@ -36,7 +36,7 @@ describe("mock traffic", () => {
     const { request } = await setup([{ ...users, mode: "static" }]);
     const res = await request("/api/users/404");
     expect(res.status).toBe(200);
-    expect(res.headers.get("x-mimic-scenario")).toBe("found");
+    expect(res.headers.get("x-mittens-scenario")).toBe("found");
     expect(res.headers.get("content-type")).toBe("application/json");
   });
 
@@ -47,16 +47,16 @@ describe("mock traffic", () => {
 
   it("dynamic mode picks the most specific matching scenario", async () => {
     const { request } = await setup([users]);
-    expect((await request("/api/users/404")).headers.get("x-mimic-scenario")).toBe("missing");
+    expect((await request("/api/users/404")).headers.get("x-mittens-scenario")).toBe("missing");
     const admin = await request("/api/users/404", { headers: { "x-role": "admin" } });
-    expect(admin.headers.get("x-mimic-scenario")).toBe("admin");
+    expect(admin.headers.get("x-mittens-scenario")).toBe("admin");
   });
 
   it("dynamic mode falls back to the default scenario", async () => {
     const { request } = await setup([users]);
     const res = await request("/api/users/7");
-    expect(res.headers.get("x-mimic-scenario")).toBe("found");
-    expect(res.headers.get("x-mimic-source")).toBe("fallback");
+    expect(res.headers.get("x-mittens-scenario")).toBe("found");
+    expect(res.headers.get("x-mittens-source")).toBe("fallback");
   });
 
   it("matches on query and body", async () => {
@@ -121,7 +121,7 @@ describe("mock traffic", () => {
       expect(res.status).toBe(201);
       expect(await res.text()).toBe("upstream says hi");
       expect(res.headers.get("x-up")).toBe("1");
-      expect(res.headers.get("x-mimic-source")).toBe("proxy");
+      expect(res.headers.get("x-mittens-source")).toBe("proxy");
 
       const [url, init] = fetchImpl.mock.calls[0]!;
       expect(String(url)).toBe("https://real.test/base/v1/things?x=1");
@@ -137,7 +137,7 @@ describe("mock traffic", () => {
       });
       const res = await request("/v1/x");
       expect(res.status).toBe(502);
-      expect(((await res.json()) as { mimic: { error: string } }).mimic.error).toContain("ECONNREFUSED");
+      expect(((await res.json()) as { mittens: { error: string } }).mittens.error).toContain("ECONNREFUSED");
     });
 
     it("uses the error scenario when upstream fails", async () => {
@@ -149,7 +149,7 @@ describe("mock traffic", () => {
       );
       const res = await request("/v1/x");
       expect(res.status).toBe(503);
-      expect(res.headers.get("x-mimic-source")).toBe("fallback");
+      expect(res.headers.get("x-mittens-source")).toBe("fallback");
     });
   });
 });

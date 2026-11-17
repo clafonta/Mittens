@@ -10,7 +10,7 @@ describe("replay", () => {
     expect(original.response.body).toBe("ok");
 
     store.setLiveState("users", { mode: "static", defaultScenario: "boom" });
-    const res = await request(`/_mimic/api/history/${original.id}/replay`, { method: "POST" });
+    const res = await request(`/_mittens/api/history/${original.id}/replay`, { method: "POST" });
     expect(res.status).toBe(201);
     const replayed = (await res.json()) as { id: string; replayOf: string; request: { method: string; headers: Record<string, string>; body: string }; response: { status: number; body: string } };
     expect(replayed.replayOf).toBe(original.id);
@@ -30,7 +30,7 @@ describe("replay", () => {
     const { request, store, history } = await setup(fixtures(), fetchImpl);
     store.setLiveState("orders", { mode: "proxy" });
     await request("/orders?page=2", { method: "PUT", body: "payload" });
-    await request(`/_mimic/api/history/${history.list()[0]!.id}/replay`, { method: "POST" });
+    await request(`/_mittens/api/history/${history.list()[0]!.id}/replay`, { method: "POST" });
     expect(seen).toEqual([
       { url: "https://orders.test/orders?page=2", body: "payload" },
       { url: "https://orders.test/orders?page=2", body: "payload" },
@@ -42,20 +42,20 @@ describe("replay", () => {
     await request("/users/1", { method: "POST", body: "x".repeat(HISTORY_BODY_LIMIT + 10) });
     const entry = history.list()[0]!;
     expect(entry.request.truncated).toBe(true);
-    expect((await request(`/_mimic/api/history/${entry.id}/replay`, { method: "POST" })).status).toBe(409);
-    expect((await request(`/_mimic/api/history/nope/replay`, { method: "POST" })).status).toBe(404);
-    expect(await (await request(`/_mimic/history/${entry.id}`)).text()).toContain("can&#39;t replay");
+    expect((await request(`/_mittens/api/history/${entry.id}/replay`, { method: "POST" })).status).toBe(409);
+    expect((await request(`/_mittens/api/history/nope/replay`, { method: "POST" })).status).toBe(404);
+    expect(await (await request(`/_mittens/history/${entry.id}`)).text()).toContain("can&#39;t replay");
   });
 
   it("dashboard: Replay button redirects to the new entry and compares responses", async () => {
     const { request, store, history } = await setup(fixtures());
     await request("/users/7");
     const original = history.list()[0]!;
-    const detail = await (await request(`/_mimic/history/${original.id}`)).text();
-    expect(detail).toContain(`action="/_mimic/history/${original.id}/replay"`);
+    const detail = await (await request(`/_mittens/history/${original.id}`)).text();
+    expect(detail).toContain(`action="/_mittens/history/${original.id}/replay"`);
 
     // Same live state: same response.
-    let res = await request(`/_mimic/history/${original.id}/replay`, form({}));
+    let res = await request(`/_mittens/history/${original.id}/replay`, form({}));
     expect(res.status).toBe(303);
     let page = await (await request(res.headers.get("location")!.replace(/^http:\/\/localhost/, ""))).text();
     expect(page).toContain("Replay of <a");
@@ -63,13 +63,13 @@ describe("replay", () => {
 
     // Changed live state: differences are listed.
     store.setLiveState("users", { mode: "static", defaultScenario: "boom" });
-    res = await request(`/_mimic/history/${original.id}/replay`, form({}));
+    res = await request(`/_mittens/history/${original.id}/replay`, form({}));
     page = await (await request(res.headers.get("location")!)).text();
     expect(page).toContain("Differs from the original");
     expect(page).toContain("body");
     expect(page).toContain("answered by users / boom (was users / ok)");
 
-    const table = await (await request("/_mimic/ui/history")).text();
+    const table = await (await request("/_mittens/ui/history")).text();
     expect(table).toContain(">replay</span>");
   });
 });

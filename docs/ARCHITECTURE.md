@@ -2,7 +2,7 @@
 
 ## Goals
 
-- **Local-first.** `npx @clafonta/mimic` and go. No database server, no cloud, no build step for users.
+- **Local-first.** `npx @clafonta/mittens` and go. No database server, no cloud, no build step for users.
 - **Definitions are code.** Human-readable YAML in the repo, one file per service/scenario, clean diffs.
 - **One process, one port.** Mock traffic, dashboard and API are served together.
 - **Scriptable from tests.** Everything the UI does is available over a JSON API.
@@ -47,8 +47,8 @@ src/
     rates.ts        requests per service in 30 s buckets, for sparklines
   mcp/
     server.ts       MCP tools and server instructions for AI assistants
-    http.ts         /_mimic/mcp endpoint and its local-only guard
-    bridge.ts       `mimic mcp`: stdio ↔ HTTP relay for command-launching assistants
+    http.ts         /_mittens/mcp endpoint and its local-only guard
+    bridge.ts       `mittens mcp`: stdio ↔ HTTP relay for command-launching assistants
     activity.ts     which assistant connected, and its recent tool calls
     upstream.ts     HTTP(S)_PROXY support for proxy-mode calls (undici)
     openapi.ts      OpenAPI 3 → import plan → services
@@ -59,9 +59,9 @@ src/
     watch.ts        debounced fs.watch -> Store.reload() and hook reload
   http/
     app.ts          composes the three sub-apps below
-    api.ts          /_mimic/api — JSON management API
-    ui.tsx          /_mimic — dashboard pages and form handlers
-    mock.ts         * — mock traffic (CORS, x-mimic-* headers)
+    api.ts          /_mittens/api — JSON management API
+    ui.tsx          /_mittens — dashboard pages and form handlers
+    mock.ts         * — mock traffic (CORS, x-mittens-* headers)
   ui/
     layout.tsx      page shell and styles
     pages.tsx       list/detail pages
@@ -82,7 +82,7 @@ scripts/smoke.mjs   pack, install the tarball in a scratch project, run the inst
 Definitions (YAML) are what you commit: services, scenarios, profiles, and each service's *starting* mode and default scenario. Live state is what is selected right now and exists only in memory:
 
 - Changes **live state only**: the dashboard mode/default switcher, applying a profile (UI, API or `--profile`), `PATCH /api/state/...`, and the tag serving filter (`--tag`, "Only serve", `PUT /api/state/tags`). The tag filter is separate from per-service overrides: "Reset all" and "Save as starting state" don't touch it.
-- Changes **definitions**: create/edit/delete forms, `POST/PATCH/DELETE /api/services...`, scenario and profile endpoints, the Settings page (`mimic.yaml`), and the explicit "Save as starting state" (`POST /api/state/save`).
+- Changes **definitions**: create/edit/delete forms, `POST/PATCH/DELETE /api/services...`, scenario and profile endpoints, the Settings page (`mittens.yaml`), and the explicit "Save as starting state" (`POST /api/state/save`).
 
 The store keeps an override only for services whose live state differs from the definition, so "modified" is simply "has an override". Reads (`getService`, `listServices`, `resolve`) return the live view; `getDefinition` returns the file view. Editing a starting value in the service form also sets that field live, so the edit takes effect immediately; other live overrides are kept. If an edit makes an override impossible (e.g. removing the upstream of a service that is live in proxy mode) the override is dropped.
 
@@ -94,23 +94,23 @@ Live state is deliberately not persisted, so restarts are predictable and CI run
 
 `watch.ts` watches the definitions directory recursively and, after a short debounce, calls `Store.reload()`. Reloads never overlap; events during a reload queue one more. `reload()` loads everything first and swaps only if every file is valid, so a half-finished edit never takes down a running mock: the last good definitions keep serving and `store.reloadError` is shown in the dashboard. Live overrides survive a reload unless they no longer make sense (service or scenario gone, proxy without upstream).
 
-Mimic's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
+Mittens's own writes also trigger the watcher. They are harmless (the reload sees what is already in memory) and silent: the watcher only logs when the definitions' fingerprint actually changed. Writes go through a temp file + rename so a reload never reads a partial file; temp and dot-files are ignored. In `--read-only` mode, in-memory edits are replaced by whatever is on disk when a file changes.
 
 ### AI assistants (MCP)
 
-`/_mimic/mcp` is a Model Context Protocol endpoint (Streamable HTTP, via the official SDK's web-standard transport). It is stateless: each POST gets a fresh `McpServer` whose ~20 tools (`mcp/server.ts`) call the same Store, Engine and History the dashboard uses, so an assistant's changes apply to the running mocks and show up in the dashboard immediately. Tool results are JSON text; errors come back as tool errors with readable messages. Server instructions explain the model (definitions vs live state) and steer assistants to experiment with live state and verify with `send_request`. Tools carry MCP annotations (read-only, destructive) so clients can ask before deleting.
+`/_mittens/mcp` is a Model Context Protocol endpoint (Streamable HTTP, via the official SDK's web-standard transport). It is stateless: each POST gets a fresh `McpServer` whose ~20 tools (`mcp/server.ts`) call the same Store, Engine and History the dashboard uses, so an assistant's changes apply to the running mocks and show up in the dashboard immediately. Tool results are JSON text; errors come back as tool errors with readable messages. Server instructions explain the model (definitions vs live state) and steer assistants to experiment with live state and verify with `send_request`. Tools carry MCP annotations (read-only, destructive) so clients can ask before deleting.
 
-The endpoint only answers local clients (`mcp/http.ts`): requests from other origins are refused, and the Host must be `localhost` or an IP literal, which defeats DNS rebinding. `mimic init` also writes `AGENTS.md` (and a `CLAUDE.md` that imports it) into the definitions folder for agents that edit the YAML directly; `src/agents.ts` holds the text, and a test validates every YAML example in it against the schemas. `GET /_mimic/api/health` reports `reloadError`, so an agent can confirm an edit loaded. `mimic mcp` (`mcp/bridge.ts`) relays stdio to that endpoint for assistants that only launch commands. `McpActivity` records the connecting client (from `initialize`) and every tool call for the dashboard's Assistants page.
+The endpoint only answers local clients (`mcp/http.ts`): requests from other origins are refused, and the Host must be `localhost` or an IP literal, which defeats DNS rebinding. `mittens init` also writes `AGENTS.md` (and a `CLAUDE.md` that imports it) into the definitions folder for agents that edit the YAML directly; `src/agents.ts` holds the text, and a test validates every YAML example in it against the schemas. `GET /_mittens/api/health` reports `reloadError`, so an agent can confirm an edit loaded. `mittens mcp` (`mcp/bridge.ts`) relays stdio to that endpoint for assistants that only launch commands. `McpActivity` records the connecting client (from `initialize`) and every tool call for the dashboard's Assistants page.
 
 ### Home page and live events
 
-The dashboard root is an overview: cards (services by mode, requests and errors, schema failures, live state), a flow diagram, and recent activity. The diagram is server-rendered SVG with a deterministic layout (`layoutDiagram` in `ui/home.tsx`): your app → Mimic → up to ten services (the rest share a "+N more" node) → one node per upstream host, plus a "No match" node. Each link is a `<path>` with a known id, so the page's small script can animate along it with `getPointAtLength`.
+The dashboard root is an overview: cards (services by mode, requests and errors, schema failures, live state), a flow diagram, and recent activity. The diagram is server-rendered SVG with a deterministic layout (`layoutDiagram` in `ui/home.tsx`): your app → Mittens → up to ten services (the rest share a "+N more" node) → one node per upstream host, plus a "No match" node. Each link is a `<path>` with a known id, so the page's small script can animate along it with `getPointAtLength`.
 
-Motion is driven by real traffic only: `GET /_mimic/api/events` is a server-sent-events stream of request summaries (History emits `entry`; the handler subscribes and unsubscribes on disconnect, with a keep-alive comment every 15 s). A service's page has a focused version (`ServiceFlow`): app → Mimic → that service → each scenario, the real API, the hook and "Mimic error", with answers that can't be used in the current mode drawn faint; it ignores events for other services and is re-rendered (htmx, on `live-changed`) when the live mode changes. Both diagrams live in `ui/flow.tsx` and share one script. For each event a dot travels the request's actual route and returns coloured by status; with `prefers-reduced-motion` the nodes flash instead. Without JavaScript the diagram and counts still render; the recent-activity table polls as elsewhere.
+Motion is driven by real traffic only: `GET /_mittens/api/events` is a server-sent-events stream of request summaries (History emits `entry`; the handler subscribes and unsubscribes on disconnect, with a keep-alive comment every 15 s). A service's page has a focused version (`ServiceFlow`): app → Mittens → that service → each scenario, the real API, the hook and "Mittens error", with answers that can't be used in the current mode drawn faint; it ignores events for other services and is re-rendered (htmx, on `live-changed`) when the live mode changes. Both diagrams live in `ui/flow.tsx` and share one script. For each event a dot travels the request's actual route and returns coloured by status; with `prefers-reduced-motion` the nodes flash instead. Without JavaScript the diagram and counts still render; the recent-activity table polls as elsewhere.
 
 ### Request rates
 
-`core/rates.ts` counts requests per service (and unmatched) in 30-second buckets over the last 10 minutes, fed by History's `entry` event but independent of History's size limit and of it being cleared (it seeds from History at startup, so restored history shows up). Sparklines (`ui/spark.tsx`) are drawn on the server with the same geometry the script uses, carry their series in `data-*` attributes, and are updated in the browser: each `mimic:request` adds to the newest bar, and a 5-second timer slides the window as buckets pass. Pages open a single EventSource (`ui/live.tsx`), which re-dispatches each request as a `mimic:request` DOM event for the diagram and sparklines to share.
+`core/rates.ts` counts requests per service (and unmatched) in 30-second buckets over the last 10 minutes, fed by History's `entry` event but independent of History's size limit and of it being cleared (it seeds from History at startup, so restored history shows up). Sparklines (`ui/spark.tsx`) are drawn on the server with the same geometry the script uses, carry their series in `data-*` attributes, and are updated in the browser: each `mittens:request` adds to the newest bar, and a 5-second timer slides the window as buckets pass. Pages open a single EventSource (`ui/live.tsx`), which re-dispatches each request as a `mittens:request` DOM event for the diagram and sparklines to share.
 
 ### In-app help
 
@@ -118,7 +118,7 @@ User documentation is Markdown in `docs/help/`, shipped in the npm package and r
 
 ### Local-only dashboard and API
 
-`http/local.ts` guards everything under `/_mimic`: the Host must be localhost, an IP literal or the machine's own name (DNS-rebinding protection), and state-changing requests are refused when the browser says they come from another site (`Origin` that isn't same-origin or a loopback page, or `Sec-Fetch-Site: cross-site`). Without it, any web page could make the browser submit the dashboard's forms (e.g. delete a service) because they are "simple" cross-site requests. The management API also answers CORS for loopback origins, so dev tools inside an app under development can call it. Mock traffic is unaffected. The MCP endpoint applies a stricter rule (same-origin only).
+`http/local.ts` guards everything under `/_mittens`: the Host must be localhost, an IP literal or the machine's own name (DNS-rebinding protection), and state-changing requests are refused when the browser says they come from another site (`Origin` that isn't same-origin or a loopback page, or `Sec-Fetch-Site: cross-site`). Without it, any web page could make the browser submit the dashboard's forms (e.g. delete a service) because they are "simple" cross-site requests. The management API also answers CORS for loopback origins, so dev tools inside an app under development can call it. Mock traffic is unaffected. The MCP endpoint applies a stricter rule (same-origin only).
 
 ### Templates
 
@@ -126,7 +126,7 @@ User documentation is Markdown in `docs/help/`, shipped in the npm package and r
 
 ### Hooks
 
-`hooks.ts` loads `services/<id>/hook.*` with a dynamic `import()` whose URL carries the file's mtime, so an edited hook is a new module; the old one stays in memory (fine for a dev tool, and it means a hook that fails to load can keep the previous version running). The watcher reloads hooks alongside the YAML. In the engine, the `request` hook runs after the service is matched and before its mode is applied; the `response` hook runs last, after templates, on everything except Mimic's own error responses. Both run under a 10 s timeout and any failure becomes a 500 `error` response (so the global error scenario applies), never a crash. A synchronous infinite loop can't be interrupted in-process; worker-thread isolation would fix that at the cost of serialising every request.
+`hooks.ts` loads `services/<id>/hook.*` with a dynamic `import()` whose URL carries the file's mtime, so an edited hook is a new module; the old one stays in memory (fine for a dev tool, and it means a hook that fails to load can keep the previous version running). The watcher reloads hooks alongside the YAML. In the engine, the `request` hook runs after the service is matched and before its mode is applied; the `response` hook runs last, after templates, on everything except Mittens's own error responses. Both run under a 10 s timeout and any failure becomes a 500 `error` response (so the global error scenario applies), never a crash. A synchronous infinite loop can't be interrupted in-process; worker-thread isolation would fix that at the cost of serialising every request.
 
 Hooks are on by default: they're the user's own code, like a test suite, and the CLI lists every loaded hook at startup. `--no-hooks` disables them.
 
@@ -142,21 +142,21 @@ Hooks are on by default: they're the user's own code, like a test suite, and the
    - static → `defaultScenario`
    - dynamic → highest-scoring `match` (criteria count, then exact-over-regex); fallback `defaultScenario` → `errorScenario` → 404
    - proxy → `fetch(upstream + rewritten path + query)` (through the outbound proxy if configured); on error `errorScenario` → 502
-   - anything that would end in Mimic's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mimic.yaml` instead, if one is set
+   - anything that would end in Mittens's own error response (unmatched, no fallback, failed proxy, misconfigured service) uses the global error scenario from `mittens.yaml` instead, if one is set
 4. Render template scenarios from the request.
-5. Validate the full body against the service's `responseSchema` for that status (not for Mimic's own error responses).
+5. Validate the full body against the service's `responseSchema` for that status (not for Mittens's own error responses).
 6. Apply delay (scenario overrides service).
-7. Record to history; respond with `x-mimic-*` headers.
+7. Record to history; respond with `x-mittens-*` headers.
 
-## Mockey → Mimic feature map
+## Mockey → Mittens feature map
 
-| Mockey | Mimic | Phase |
+| Mockey | Mittens | Phase |
 |---|---|---|
 | Services, scenarios, static/dynamic/proxy modes | Same concepts, YAML on disk | **0 (done)** |
 | Hang time | `delayMs` on service/scenario | **0** |
 | Dynamic match (substring / JSON rules) | Structured `match` (method, params, query, headers, bodyContains); regex values, `bodyMatches`, JSONPath `json` conditions | **0** / **2 (done)** |
 | History + inspect | Live history page and API; opt-in JSONL persistence (`--persist-history`) | **0** / **2 (done)** |
-| Error scenario / universal error | Per-service `errorScenario`; global error scenario in `mimic.yaml` | **0** / **1 (done)** |
+| Error scenario / universal error | Per-service `errorScenario`; global error scenario in `mittens.yaml` | **0** / **1 (done)** |
 | REST API (partial) | Full JSON API | **0** |
 | `-p`, `-l`, `-t` (transient), `-H` | `--port`, `--dir`, `--read-only`, `--open` (opt-in) | **0** |
 | Service/scenario editing in UI | Create/edit/delete forms | **1 (done)** |
@@ -167,7 +167,7 @@ Hooks are on by default: they're the user's own code, like a test suite, and the
 | File watching (n/a) | Reload when YAML changes on disk; last good version kept on errors | **1 (done)** |
 | Corporate proxy settings | Honour `HTTP(S)_PROXY`/`NO_PROXY` for upstream calls; `--upstream-proxy` / `--no-upstream-proxy` | **2 (done)** |
 | URL twisting | `stripPrefix` + ordered regex `rewrite` rules on proxy; "Try a path" preview | **2 (done)** |
-| Response JSON schema validation | `responseSchema` per status (Ajv, 2020-12 / draft-07); results in history, `x-mimic-validation`, and per-scenario on the service page | **2 (done)** |
+| Response JSON schema validation | `responseSchema` per status (Ajv, 2020-12 / draft-07); results in history, `x-mittens-validation`, and per-scenario on the service page | **2 (done)** |
 | Stats / CSV export | History export as HAR 1.2 or JSON, filterable by service / validation | **2 (done)**; per-service counts later |
 | Java request-inspector plugins | Per-service `hook.{js,mjs,ts,mts}`: `request` (answer, pick a scenario, or pass) and `response` (change any response); `ctx.state` for stateful mocks | **3 (done)** |
 | Templated responses (n/a) | `template: true` scenarios: `{{params.id}}`, `{{body.x \| json}}`, helpers and filters; validated on save; preview | **3 (done)** |
@@ -180,7 +180,7 @@ Hooks are on by default: they're the user's own code, like a test suite, and the
 - **Phase 1 — daily-driver UI (done):** CRUD forms, profiles, live state, record-to-scenario, file-watch reload, tags, replay, global error scenario.
 - **Phase 2 — proxy fidelity & export (done):** corporate proxy, path rewrites, history export, schema validation, regex/JSONPath matching, history persistence.
   - Still open from this area: faithful header forwarding (`fetch` adds defaults such as `sec-fetch-mode`; `undici.request` would avoid them) and streaming large bodies instead of buffering.
-- **Phase 4 — AI assistants:** ~~MCP endpoint, stdio bridge, Assistants page, `AGENTS.md`/`CLAUDE.md` from `mimic init`, home-page prompt~~ (done); next: verifying the setup with each assistant, and refining tool descriptions from real use.
+- **Phase 4 — AI assistants:** ~~MCP endpoint, stdio bridge, Assistants page, `AGENTS.md`/`CLAUDE.md` from `mittens init`, home-page prompt~~ (done); next: verifying the setup with each assistant, and refining tool descriptions from real use.
 - **Phase 3 — extensibility (done):** response templating, OpenAPI import, user JS hooks, and a local release gate (`prepublishOnly` runs typecheck, tests, build and a packaged-install smoke test). First publish still to do (see RELEASING.md). Not done: CI, since there is no hosted repository (only macOS has been tested), and a linter (e.g. Biome) — today `tsc --strict` is the only static check.
   - Import follow-ups: filtering by OpenAPI tag or path at import time (a full GitHub API import is 1,259 services and ~40 MB of YAML, because shared schemas are inlined per service), and re-importing to update services that came from a spec.
 

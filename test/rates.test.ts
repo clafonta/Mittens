@@ -48,7 +48,7 @@ describe("Rates", () => {
     await request("/users/1");
     history.clear();
     await request("/users/2");
-    const html = await (await request("/_mimic/services")).text();
+    const html = await (await request("/_mittens/services")).text();
     expect(html).toMatch(/data-spark-total="users" title="2 requests in the last 10 minutes">2</);
   });
 });
@@ -58,24 +58,24 @@ describe("sparklines in the dashboard", () => {
     const { request } = await setup(fixtures());
     await request("/users/1");
     await request("/nowhere");
-    const services = await (await request("/_mimic/services")).text();
+    const services = await (await request("/_mittens/services")).text();
     expect(services).toContain("<th>Traffic, last 10 min</th>");
     expect(services).toMatch(/<svg class="spark" data-spark="users" data-end="\d+" data-counts="(0,){19}1" data-errors="(0,){19}0"/);
     expect(services).toContain("function slide(el)");
-    const page = await (await request("/_mimic/services/users")).text();
+    const page = await (await request("/_mittens/services/users")).text();
     expect(page).toContain('data-spark="users"');
     expect(page).toContain("Traffic, last 10 min");
-    const home = await (await request("/_mimic")).text();
+    const home = await (await request("/_mittens")).text();
     expect(home).toMatch(/<svg class="spark" data-spark="users"[^>]*x="\d+" y="\d+"/);
     // one live connection per page, shared by the diagram and sparklines
     expect(home.match(/new EventSource/g)).toHaveLength(1);
-    expect(home).toContain("mimic:request");
+    expect(home).toContain("mittens:request");
   });
 
   it("re-rendered rows keep their sparkline", async () => {
     const { request } = await setup(fixtures());
     await request("/users/1");
-    const row = await (await request("/_mimic/ui/services/users", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "mode=static&defaultScenario=ok" })).text();
+    const row = await (await request("/_mittens/ui/services/users", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "mode=static&defaultScenario=ok" })).text();
     expect(row).toContain('data-spark="users"');
   });
 });

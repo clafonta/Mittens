@@ -6,7 +6,7 @@ import { fixtures, setup, type ServiceInput } from "./helpers.js";
 const svc = (id: string, extra: Partial<ServiceInput> = {}) => Service.parse({ id, name: id, path: `/${id}`, ...extra });
 
 describe("diagram layout", () => {
-  it("places app, Mimic, services and one node per upstream host", () => {
+  it("places app, Mittens, services and one node per upstream host", () => {
     const l = layoutDiagram([
       svc("a", { upstream: "https://api.example.com", mode: "proxy" }),
       svc("b", { upstream: "https://api.example.com/v2" }),
@@ -21,7 +21,7 @@ describe("diagram layout", () => {
     // nodes don't overlap and everything fits
     const boxes = l.services.map((s) => s.box);
     for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.y).toBeGreaterThanOrEqual(boxes[i - 1]!.y + boxes[i - 1]!.h);
-    for (const b of [l.app, l.mimic, l.nomatch, ...boxes, ...l.upstreams.map((u) => u.box)]) {
+    for (const b of [l.app, l.mittens, l.nomatch, ...boxes, ...l.upstreams.map((u) => u.box)]) {
       expect(b.y).toBeGreaterThanOrEqual(0);
       expect(b.y + b.h).toBeLessThanOrEqual(l.height);
     }
@@ -46,7 +46,7 @@ describe("home page", () => {
     await request("/users/2");
     await request("/orders");
     await request("/nowhere");
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mittens")).text();
 
     // cards
     expect(html).toMatch(/Services<\/span><span class="card-value">2<\/span><span class="card-detail">0 static · 1 dynamic · 1 proxy/);
@@ -54,17 +54,17 @@ describe("home page", () => {
     expect(html).toContain('<span data-count="errors">1</span> with errors');
     expect(html).toContain("Profile: Calm");
     // diagram: paths and nodes the animation script uses
-    for (const id of ["p-app", "p-nomatch", "p-svc-users", "p-svc-orders", "p-up-orders", "n-mimic", "n-nomatch", "n-svc-users", "n-svc-orders"]) {
+    for (const id of ["p-app", "p-nomatch", "p-svc-users", "p-svc-orders", "p-up-orders", "n-mittens", "n-nomatch", "n-svc-users", "n-svc-orders"]) {
       expect(html, id).toContain(`id="${id}"`);
     }
-    expect(html).toContain("new EventSource('/_mimic/api/events')");
+    expect(html).toContain("new EventSource('/_mittens/api/events')");
     expect(html).toMatch(/data-count="users">2</);
     expect(html).toMatch(/data-count="orders">1</);
     expect(html).toMatch(/data-count="nomatch">1</);
     expect(html).toContain("proxy → orders.test");
-    expect(html).toContain('href="/_mimic/services/users"');
+    expect(html).toContain('href="/_mittens/services/users"');
     // recent activity and the script
-    expect(html).toContain('hx-get="/_mimic/ui/history?limit=8"');
+    expect(html).toContain('hx-get="/_mittens/ui/history?limit=8"');
     expect(html).toContain("new EventSource");
   });
 
@@ -72,7 +72,7 @@ describe("home page", () => {
     const { request, store } = await setup(fixtures().map((s, i) => ({ ...s, tags: i === 0 ? ["a"] : ["b"] })));
     store.setLiveState("users", { mode: "static" });
     store.setActiveTags(["b"]);
-    const html = await (await request("/_mimic")).text();
+    const html = await (await request("/_mittens")).text();
     expect(html).toMatch(/id="n-svc-users"[^>]*|class="node service mode-static inactive"/);
     expect(html).toContain('class="node service mode-static inactive" id="n-svc-users"');
     expect(html).toContain('<circle class="changed"');
@@ -82,10 +82,10 @@ describe("home page", () => {
 
   it("welcomes a new project with next steps", async () => {
     const { request } = await setup([]);
-    const html = await (await request("/_mimic")).text();
-    expect(html).toContain("Welcome to Mimic");
-    expect(html).toContain('href="/_mimic/services/new"');
-    expect(html).toContain('href="/_mimic/import"');
+    const html = await (await request("/_mittens")).text();
+    expect(html).toContain("Welcome to Mittens");
+    expect(html).toContain('href="/_mittens/services/new"');
+    expect(html).toContain('href="/_mittens/import"');
     expect(html).not.toContain('<svg id="flow"');
   });
 });
@@ -95,7 +95,7 @@ describe("events stream", () => {
     const { request, history } = await setup(fixtures());
     const before = history.listenerCount("entry"); // e.g. the rate counter
     const abort = new AbortController();
-    const res = await request("/_mimic/api/events", { signal: abort.signal });
+    const res = await request("/_mittens/api/events", { signal: abort.signal });
     expect(res.headers.get("content-type")).toContain("text/event-stream");
     const reader = res.body!.getReader();
     const dec = new TextDecoder();
@@ -105,7 +105,7 @@ describe("events stream", () => {
     };
     await until(": connected");
     await request("/users/9");
-    await request("/_mimic/api/history", { method: "DELETE" });
+    await request("/_mittens/api/history", { method: "DELETE" });
     await until("event: clear");
     expect(history.listenerCount("entry")).toBe(before + 1);
     abort.abort();
@@ -161,7 +161,7 @@ describe("service diagram", () => {
     await request("/users/1");
     await request("/users/1");
     await request("/orders");
-    const html = await (await request("/_mimic/services/users")).text();
+    const html = await (await request("/_mittens/services/users")).text();
     expect(html).toContain('data-service="users"');
     expect(html).toContain('data-scenarios="ok boom"');
     for (const id of ["p-app", "p-svc", "p-t-sc-ok", "p-t-sc-boom", "p-t-error", "n-svc", "n-t-sc-ok"]) expect(html, id).toContain(`id="${id}"`);
@@ -173,9 +173,9 @@ describe("service diagram", () => {
 
   it("redraws after a live change", async () => {
     const { request, store } = await setup(fixtures());
-    expect(await (await request("/_mimic/services/users")).text()).toContain('hx-trigger="live-changed from:body"');
+    expect(await (await request("/_mittens/services/users")).text()).toContain('hx-trigger="live-changed from:body"');
     store.setLiveState("users", { mode: "static" });
-    const fragment = await (await request("/_mimic/ui/services/users/flow")).text();
+    const fragment = await (await request("/_mittens/ui/services/users/flow")).text();
     expect(fragment).toMatch(/^<div id="service-flow"/);
     expect(fragment).toContain("static mode");
     expect(fragment).toMatch(/class="node target kind-scenario idle" id="n-t-sc-boom"/);

@@ -72,7 +72,7 @@ const withFlash = (path: string, flash: string) => `${path}${path.includes("?") 
 const safeReturn = (v: string | undefined, fallback: string) =>
   v && (v === BASE || v.startsWith(`${BASE}/`) || v.startsWith(`${BASE}?`)) && !v.startsWith("//") ? v : fallback;
 
-/** HTML dashboard, mounted at /_mimic. */
+/** HTML dashboard, mounted at /_mittens. */
 export function createUi(
   store: Store,
   history: History,
@@ -182,7 +182,7 @@ export function createUi(
   // ------------------------------------------------------------- services
 
   ui.get("/", (c) => {
-    // Links from before the services list moved (e.g. /_mimic?tag=x) still land on it.
+    // Links from before the services list moved (e.g. /_mittens?tag=x) still land on it.
     const tag = c.req.query("tag");
     if (tag !== undefined) return c.redirect(`${SERVICES}?tag=${encodeURIComponent(tag)}`, 302);
     const services = store.listServices();
@@ -581,7 +581,7 @@ export function createUi(
     const service = store.getService(c.req.param("id"));
     const raw = c.req.query("path")?.trim();
     if (!raw) return c.html("");
-    const url = new URL(raw.startsWith("/") ? raw : `/${raw}`, "http://mimic.local");
+    const url = new URL(raw.startsWith("/") ? raw : `/${raw}`, "http://mittens.local");
     const target = upstreamUrl(service, url);
     if (!target) return c.html("");
     const method = service.method === "ANY" ? "GET" : service.method;
@@ -605,7 +605,7 @@ export function createUi(
       />,
     );
   });
-  /** AGENTS.md in the definitions folder, shown relative to where Mimic was started when that's shorter (e.g. mimic/AGENTS.md). */
+  /** AGENTS.md in the definitions folder, shown relative to where Mittens was started when that's shorter (e.g. mittens/AGENTS.md). */
   const agentsFile = (dir: string) => {
     const file = path.join(dir, "AGENTS.md");
     const rel = path.relative(process.cwd(), file);
@@ -617,7 +617,7 @@ export function createUi(
   // Installed from npm, assistants can launch the bridge with npx; from a checkout, with this copy's dist/cli.js.
   const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
   const stdioCommand = packageRoot.includes(`${path.sep}node_modules${path.sep}`)
-    ? { command: "npx", args: ["-y", "@clafonta/mimic"] }
+    ? { command: "npx", args: ["-y", "@clafonta/mittens"] }
     : { command: "node", args: [path.join(packageRoot, "dist", "cli.js")] };
 
   ui.get("/assistants", (c) =>

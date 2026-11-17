@@ -2,7 +2,7 @@
 
 Instead of working through forms, you can ask the AI assistant you already use to set Mittens up: "make the users API fail with a 500", "mock POST /api/orders with a 422 when quantity is 0", "why did my app get a 404 on /api/users/7?". Mittens speaks the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), which Claude Code, Claude Desktop, Codex, GitHub Copilot in VS Code, Cursor and many other assistants support. Mittens doesn't need an API key: your assistant uses its own.
 
-This is optional: everything an assistant can do, you can also do in the dashboard by hand, and nothing changes unless you connect one. It's also local: Mittens only accepts assistant connections from your own computer, holds no API keys, and never contacts an AI service itself (see [Safety](#safety)).
+This is optional: everything an assistant can do, you can also do in the dashboard by hand, and nothing changes unless you connect one. Mittens holds no API keys and never contacts an AI service itself. By default it only listens on your own computer, so only assistants running there can connect (see [Safety](#safety) for sharing it with a team).
 
 The **Assistants** page in the dashboard has copy-paste setup for each assistant, shows which one is connected, and lists every tool call it makes.
 
@@ -58,4 +58,4 @@ You stay in control: assistants such as Claude Code ask before using each tool, 
 
 Keep in mind that what your assistant reads from Mittens (your definitions, and recorded requests including any headers or bodies from proxied traffic) is sent to the AI service the assistant uses, just as with any other tool it has. If History holds credentials or personal data, clear it before asking your assistant about it, or don't connect one.
 
-The MCP endpoint only answers local clients. Requests from web pages (another origin) are refused, and so are requests whose host name isn't `localhost` or an IP address, which stops a malicious site from reaching it through DNS tricks. In `--read-only` mode, your assistant's changes stay in memory like any other. As with any tool you give an assistant, review what it proposes before letting it delete things.
+By default Mittens listens only on `127.0.0.1`, so only assistants on your own computer can reach the MCP endpoint. If you start it with `--host 0.0.0.0` to share it, anyone who can reach that machine can connect an assistant too, using its IP address or its machine name (other host names are refused), and there's no login, so only do this on a network you trust. Requests from web pages (another origin) are always refused, as are requests addressed to any other host name, which stops a malicious site from reaching Mittens through DNS tricks. In `--read-only` mode, your assistant's changes stay in memory like any other. As with any tool you give an assistant, review what it proposes before letting it delete things.

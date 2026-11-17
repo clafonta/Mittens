@@ -5,9 +5,11 @@ Mittens is published to npm as `@clafonta/mittens`, from a local checkout. There
 ## One-time setup
 
 ```sh
-npm login        # as clafonta
+npm login        # as clafonta; opens npmjs.com in the browser
 npm whoami       # should print clafonta
 ```
+
+npm requires two-factor authentication to publish. Turn it on under Account → Two-Factor Authentication on npmjs.com. Being signed in on the website does not log in the CLI; `npm login` does.
 
 ## Each release
 
@@ -16,9 +18,10 @@ From a clean `main`:
 ```sh
 npm version patch          # or minor / major: bumps package.json, commits, and tags vX.Y.Z
 npm publish                # access is public via publishConfig; runs the checks above first
+git push origin main --follow-tags
 ```
 
-If your npm account uses two-factor authentication for publishing, npm asks for a one-time code.
+Run `npm publish` in your own terminal: after the checks pass it prints an npmjs.com link (or asks for a one-time code) to approve the upload with 2FA. A brand-new version can take a few minutes to appear on the registry.
 
 Then check it:
 
@@ -26,7 +29,7 @@ Then check it:
 npx @clafonta/mittens@latest --version
 ```
 
-`npm version` creates a local git tag; there's no remote to push it to, but it marks what was released.
+`npm version` creates the `vX.Y.Z` tag on the release commit; `--follow-tags` pushes it to GitHub (`origin`) along with `main`.
 
 ## Notes
 

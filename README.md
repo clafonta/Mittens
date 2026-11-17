@@ -6,6 +6,14 @@ A local-first HTTP mock server and recording proxy for developers. Point your ap
 
 Mittens is a ground-up successor to [Mockey](https://github.com/clafonta/Mockey).
 
+## Why Mittens
+
+AI help is quickly becoming part of every developer tool, and too often the tool picks the model for you, sends your traffic to its own service and puts it all behind an account. Mittens was built to show it can work the other way:
+
+- **Your LLM, not ours.** Mittens has no model built in and holds no API keys. It exposes its features over the [Model Context Protocol](https://modelcontextprotocol.io), so whichever assistant you already use (Claude Code, Codex, GitHub Copilot, Cursor or any other MCP client) can create mocks, switch services into failure modes and explain responses. Change assistants whenever you like; Mittens doesn't care.
+- **Local or shared, same tool.** Run it on your laptop with one `npx` command, or on a shared machine (`--host 0.0.0.0`) so a team or a test environment points at the same mocks. There's no database, no Docker and no cloud service involved.
+- **Plain files you own.** Mocks are YAML in your repo, reviewed and versioned like the rest of your code, and everything an assistant can do you can also do by hand in the dashboard.
+
 - **Mock, match or proxy, per endpoint**, switchable live from the dashboard or the API; profiles flip many at once ("happy path", "outage").
 - **Definitions are YAML files** you commit next to your code, reloaded as you edit them.
 - **Record real traffic** in proxy mode and save responses as scenarios; replay any request; export history as HAR.
